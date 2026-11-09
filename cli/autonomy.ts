@@ -6,13 +6,15 @@
 //   `manual`: no transcript and no commit co-authored by Claude;
 //   `assisted`: anything between.
 // A commit made in a Claude Code cloud session (`Claude-Session:` trailer)
-// counts as co-authored by Claude. Without a transcript the human messages are
-// unknown, so a ticket is never `full` on its commits alone.
+// counts as co-authored by Claude. A ticket delivered only through integration
+// PRs is judged on the commits of theirs credited to it (`ownCommits`).
+// Without a transcript the human messages are unknown, so a ticket is never
+// `full` on its commits alone.
 //
 // An `autonomy:full`, `autonomy:assisted` or `autonomy:manual` label on the
 // ticket's issue, else on one of its PRs, wins over the computed level.
 import type { AutonomyThresholds } from "./config.ts";
-import type { LinkedWork, Ticket } from "./linker.ts";
+import { ownCommits, type LinkedWork, type Ticket } from "./linker.ts";
 
 export const AUTONOMY_LEVELS = ["full", "assisted", "manual"] as const;
 export type AutonomyLevel = (typeof AUTONOMY_LEVELS)[number];
@@ -38,7 +40,7 @@ export function classifyAutonomy(work: LinkedWork, thresholds: AutonomyThreshold
 }
 
 function computedLevel(ticket: Ticket, thresholds: AutonomyThresholds): AutonomyLevel {
-  const commits = ticket.pullRequests.flatMap((pr) => pr.commits);
+  const commits = ownCommits(ticket);
   const claude = commits.filter((commit) => commit.claudeCoAuthor || commit.cloudSession).length;
   const transcript = ticket.sessions.length > 0;
   if (!transcript && claude === 0) return "manual";

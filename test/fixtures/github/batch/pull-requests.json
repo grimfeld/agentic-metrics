@@ -1,0 +1,443 @@
+[
+ {
+  "data": {
+   "repository": {
+    "pullRequests": {
+     "pageInfo": {
+      "hasNextPage": false,
+      "endCursor": null
+     },
+     "nodes": [
+      {
+       "number": 22,
+       "title": "Spec #1",
+       "url": "https://github.com/grimfeld/agentic-metrics/pull/22",
+       "body": "",
+       "createdAt": "2026-11-02T08:00:00Z",
+       "updatedAt": "2026-11-06T09:00:00Z",
+       "mergedAt": "2026-11-06T09:00:00Z",
+       "baseRefName": "main",
+       "headRefName": "integration/spec-1",
+       "author": {
+        "login": "grimfeld",
+        "__typename": "User"
+       },
+       "closingIssuesReferences": {
+        "nodes": [
+         {
+          "number": 2,
+          "repository": {
+           "nameWithOwner": "grimfeld/agentic-metrics"
+          }
+         },
+         {
+          "number": 16,
+          "repository": {
+           "nameWithOwner": "grimfeld/agentic-metrics"
+          }
+         },
+         {
+          "number": 17,
+          "repository": {
+           "nameWithOwner": "grimfeld/agentic-metrics"
+          }
+         },
+         {
+          "number": 18,
+          "repository": {
+           "nameWithOwner": "grimfeld/agentic-metrics"
+          }
+         },
+         {
+          "number": 19,
+          "repository": {
+           "nameWithOwner": "grimfeld/agentic-metrics"
+          }
+         }
+        ]
+       },
+       "additions": 280,
+       "deletions": 25,
+       "changedFiles": 20,
+       "commits": {
+        "totalCount": 15,
+        "nodes": [
+         {
+          "commit": {
+           "oid": "c01",
+           "authoredDate": "2026-11-02T09:00:00Z",
+           "messageHeadline": "Set up TypeScript-on-Node 24 toolchain and CI",
+           "messageBody": "",
+           "additions": 100,
+           "deletions": 0,
+           "changedFilesIfAvailable": 7,
+           "parents": {
+            "nodes": [
+             {
+              "oid": "base"
+             }
+            ]
+           }
+          }
+         },
+         {
+          "commit": {
+           "oid": "c02",
+           "authoredDate": "2026-11-02T10:00:00Z",
+           "messageHeadline": "Add Claude Code plugin skeleton",
+           "messageBody": "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+           "additions": 50,
+           "deletions": 5,
+           "changedFilesIfAvailable": 4,
+           "parents": {
+            "nodes": [
+             {
+              "oid": "c01"
+             }
+            ]
+           }
+          }
+         },
+         {
+          "commit": {
+           "oid": "c03",
+           "authoredDate": "2026-11-02T11:00:00Z",
+           "messageHeadline": "Fix the SessionEnd hook path",
+           "messageBody": "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+           "additions": 10,
+           "deletions": 2,
+           "changedFilesIfAvailable": 1,
+           "parents": {
+            "nodes": [
+             {
+              "oid": "c02"
+             }
+            ]
+           }
+          }
+         },
+         {
+          "commit": {
+           "oid": "c04",
+           "authoredDate": "2026-11-02T12:00:00Z",
+           "messageHeadline": "Merge ticket-2: Plugin skeleton and SessionEnd transcript cache hook (#2)",
+           "messageBody": "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+           "additions": 60,
+           "deletions": 7,
+           "changedFilesIfAvailable": 5,
+           "parents": {
+            "nodes": [
+             {
+              "oid": "c01"
+             },
+             {
+              "oid": "c03"
+             }
+            ]
+           }
+          }
+         },
+         {
+          "commit": {
+           "oid": "c05",
+           "authoredDate": "2026-11-03T09:00:00Z",
+           "messageHeadline": "Add skill addenda hook, default addenda and conventions skill (#18)",
+           "messageBody": "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+           "additions": 30,
+           "deletions": 3,
+           "changedFilesIfAvailable": 3,
+           "parents": {
+            "nodes": [
+             {
+              "oid": "c04"
+             }
+            ]
+           }
+          }
+         },
+         {
+          "commit": {
+           "oid": "c06",
+           "authoredDate": "2026-11-03T10:00:00Z",
+           "messageHeadline": "Add GitHub Action that adds Closes from the branch name",
+           "messageBody": "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+           "additions": 40,
+           "deletions": 4,
+           "changedFilesIfAvailable": 2,
+           "parents": {
+            "nodes": [
+             {
+              "oid": "c04"
+             }
+            ]
+           }
+          }
+         },
+         {
+          "commit": {
+           "oid": "c07",
+           "authoredDate": "2026-11-03T11:00:00Z",
+           "messageHeadline": "Merge branch 'integration/spec-1' into feat/16-action",
+           "messageBody": "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+           "additions": 30,
+           "deletions": 3,
+           "changedFilesIfAvailable": 3,
+           "parents": {
+            "nodes": [
+             {
+              "oid": "c06"
+             },
+             {
+              "oid": "c05"
+             }
+            ]
+           }
+          }
+         },
+         {
+          "commit": {
+           "oid": "c08",
+           "authoredDate": "2026-11-03T12:00:00Z",
+           "messageHeadline": "Merge branch 'feat/16-action' into integration/spec-1",
+           "messageBody": "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+           "additions": 40,
+           "deletions": 4,
+           "changedFilesIfAvailable": 2,
+           "parents": {
+            "nodes": [
+             {
+              "oid": "c05"
+             },
+             {
+              "oid": "c07"
+             }
+            ]
+           }
+          }
+         },
+         {
+          "commit": {
+           "oid": "c09",
+           "authoredDate": "2026-11-04T09:00:00Z",
+           "messageHeadline": "Warn on gh pr create without a ticket reference (#19)",
+           "messageBody": "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+           "additions": 20,
+           "deletions": 0,
+           "changedFilesIfAvailable": 2,
+           "parents": {
+            "nodes": [
+             {
+              "oid": "c08"
+             }
+            ]
+           }
+          }
+         },
+         {
+          "commit": {
+           "oid": "c10",
+           "authoredDate": "2026-11-04T10:00:00Z",
+           "messageHeadline": "Merge pull request #30 from grimfeld/ticket-19",
+           "messageBody": "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+           "additions": 20,
+           "deletions": 0,
+           "changedFilesIfAvailable": 2,
+           "parents": {
+            "nodes": [
+             {
+              "oid": "c08"
+             },
+             {
+              "oid": "c09"
+             }
+            ]
+           }
+          }
+         },
+         {
+          "commit": {
+           "oid": "c11",
+           "authoredDate": "2026-11-04T11:00:00Z",
+           "messageHeadline": "Ask the regression question once",
+           "messageBody": "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+           "additions": 25,
+           "deletions": 1,
+           "changedFilesIfAvailable": 2,
+           "parents": {
+            "nodes": [
+             {
+              "oid": "c10"
+             }
+            ]
+           }
+          }
+         },
+         {
+          "commit": {
+           "oid": "c12",
+           "authoredDate": "2026-11-04T12:00:00Z",
+           "messageHeadline": "Tweak the reminder wording",
+           "messageBody": "",
+           "additions": 5,
+           "deletions": 1,
+           "changedFilesIfAvailable": 1,
+           "parents": {
+            "nodes": [
+             {
+              "oid": "c11"
+             }
+            ]
+           }
+          }
+         },
+         {
+          "commit": {
+           "oid": "c13",
+           "authoredDate": "2026-11-04T13:00:00Z",
+           "messageHeadline": "Merge ticket-17: Action reminders (#17)",
+           "messageBody": "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+           "additions": 30,
+           "deletions": 2,
+           "changedFilesIfAvailable": 3,
+           "parents": {
+            "nodes": [
+             {
+              "oid": "c10"
+             },
+             {
+              "oid": "c12"
+             }
+            ]
+           }
+          }
+         },
+         {
+          "commit": {
+           "oid": "c14",
+           "authoredDate": "2026-11-05T09:00:00Z",
+           "messageHeadline": "Use one HTML escaper for the report and every metric",
+           "messageBody": "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+           "additions": 7,
+           "deletions": 7,
+           "changedFilesIfAvailable": 2,
+           "parents": {
+            "nodes": [
+             {
+              "oid": "c13"
+             }
+            ]
+           }
+          }
+         },
+         {
+          "commit": {
+           "oid": "c15",
+           "authoredDate": "2026-11-05T10:00:00Z",
+           "messageHeadline": "Merge review-fixes: address code review of spec #1",
+           "messageBody": "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+           "additions": 7,
+           "deletions": 7,
+           "changedFilesIfAvailable": 2,
+           "parents": {
+            "nodes": [
+             {
+              "oid": "c13"
+             },
+             {
+              "oid": "c14"
+             }
+            ]
+           }
+          }
+         }
+        ]
+       },
+       "labels": {
+        "nodes": []
+       },
+       "files": {
+        "totalCount": 0,
+        "nodes": []
+       },
+       "reviews": {
+        "nodes": []
+       }
+      },
+      {
+       "number": 30,
+       "title": "Warn on gh pr create without a ticket reference",
+       "url": "https://github.com/grimfeld/agentic-metrics/pull/30",
+       "body": "",
+       "createdAt": "2026-11-04T08:00:00Z",
+       "updatedAt": "2026-11-04T10:00:00Z",
+       "mergedAt": "2026-11-04T10:00:00Z",
+       "baseRefName": "integration/spec-1",
+       "headRefName": "ticket-19",
+       "author": {
+        "login": "grimfeld",
+        "__typename": "User"
+       },
+       "closingIssuesReferences": {
+        "nodes": [
+         {
+          "number": 19,
+          "repository": {
+           "nameWithOwner": "grimfeld/agentic-metrics"
+          }
+         }
+        ]
+       },
+       "additions": 20,
+       "deletions": 0,
+       "changedFiles": 2,
+       "commits": {
+        "totalCount": 1,
+        "nodes": [
+         {
+          "commit": {
+           "oid": "c09",
+           "authoredDate": "2026-11-04T09:00:00Z",
+           "messageHeadline": "Warn on gh pr create without a ticket reference (#19)",
+           "messageBody": "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+           "additions": 20,
+           "deletions": 0,
+           "changedFilesIfAvailable": 2,
+           "parents": {
+            "nodes": [
+             {
+              "oid": "c08"
+             }
+            ]
+           }
+          }
+         }
+        ]
+       },
+       "labels": {
+        "nodes": []
+       },
+       "files": {
+        "totalCount": 2,
+        "nodes": [
+         {
+          "path": "plugin/hooks/pr-link.ts",
+          "additions": 15,
+          "deletions": 0
+         },
+         {
+          "path": "test/plugin/pr-link.test.ts",
+          "additions": 5,
+          "deletions": 0
+         }
+        ]
+       },
+       "reviews": {
+        "nodes": []
+       }
+      }
+     ]
+    }
+   }
+  }
+ }
+]

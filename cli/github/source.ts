@@ -65,7 +65,7 @@ query($owner: String!, $name: String!, $endCursor: String) {
         author { login __typename }
         closingIssuesReferences(first: 50) { nodes { number repository { nameWithOwner } } }
         additions deletions changedFiles
-        commits(first: 100) { nodes { commit { authoredDate messageHeadline messageBody } } }
+        commits(first: 100) { nodes { commit { oid authoredDate messageHeadline messageBody additions deletions changedFilesIfAvailable parents(first: 10) { nodes { oid } } } } }
         labels(first: 20) { nodes { name } }
         files(first: 100) { totalCount nodes { path additions deletions } }
         reviews(first: 100, states: [CHANGES_REQUESTED]) { nodes { submittedAt } }

@@ -1,3 +1,4 @@
+import { batchDiffCommits, hasOwnDiff, type Ticket } from "../linker.ts";
 import { escapeHtml } from "./html.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
@@ -19,18 +20,14 @@ export const netLinesRemoved: Metric<NetLinesRemoved> = {
   name: "Net lines removed",
 
   compute({ tickets, pullRequests }) {
-    // A ticket an integration PR alone delivered has no diff of its own.
-    const coverage = { tickets: tickets.filter((ticket) => ticket.pullRequests.length > 0).length, of: tickets.length };
+    // A ticket an integration PR alone delivered, with no commit of it credited, has no diff of its own.
+    const coverage = { tickets: tickets.filter(hasOwnDiff).length, of: tickets.length };
     if (tickets.length === 0) return { value: UNKNOWN, coverage };
-    const linesAdded = sum(pullRequests.map((pr) => pr.additions));
-    const linesDeleted = sum(pullRequests.map((pr) => pr.deletions));
-    const rows = tickets
-      .filter((ticket) => ticket.pullRequests.length > 0)
-      .map((ticket) => ({
-        ticket: ticket.id,
-        linesAdded: sum(ticket.pullRequests.map((pr) => pr.additions)),
-        linesDeleted: sum(ticket.pullRequests.map((pr) => pr.deletions)),
-      }));
+    // Commits credited from a batch belong to one ticket only, which has no PR: none is counted twice.
+    const credited = tickets.flatMap(batchDiffCommits);
+    const linesAdded = sum(pullRequests.map((pr) => pr.additions)) + sum(credited.map((commit) => commit.additions));
+    const linesDeleted = sum(pullRequests.map((pr) => pr.deletions)) + sum(credited.map((commit) => commit.deletions));
+    const rows = tickets.filter(hasOwnDiff).map((ticket) => ({ ticket: ticket.id, ...linesOf(ticket) }));
     const ticketsNetRemoving = rows.filter((row) => row.linesDeleted > row.linesAdded).length;
     return { value: { linesAdded, linesDeleted, netLinesRemoved: linesDeleted - linesAdded, ticketsNetRemoving, tickets: rows }, coverage };
   },
@@ -54,11 +51,17 @@ export const netLinesRemoved: Metric<NetLinesRemoved> = {
 
   methodology: {
     definition:
-      "Lines deleted minus lines added over every PR merged into the default branch, each PR counted once; negative when the code grew. Also counts the tickets whose PRs together deleted more lines than they added. A full dataset lists each ticket's lines over its own PRs; a PR delivering two tickets counts in both rows, but once in the totals.",
+      "Lines deleted minus lines added over every PR merged into the default branch, each PR counted once, and over the integration PR commits credited to tickets with no PR of their own (see Autonomy level), merges left out; negative when the code grew. Also counts the tickets whose PRs together deleted more lines than they added. A full dataset lists each ticket's lines over its own PRs; a PR delivering two tickets counts in both rows, but once in the totals.",
     limits:
-      "Counts every changed line as GitHub's diff stats report it, generated files and lockfiles included. PRs merged into other branches count only through the PR that lands them on the default branch.",
+      "Counts every changed line as GitHub's diff stats report it, generated files and lockfiles included. PRs merged into other branches count only through the PR that lands them on the default branch. Integration PR commits credited to no ticket, and conflict resolutions in merges, are not counted.",
   },
 };
+
+/** A ticket's lines over its own PRs, else over the batch commits credited to it. */
+function linesOf(ticket: Ticket): { linesAdded: number; linesDeleted: number } {
+  const changes = ticket.pullRequests.length > 0 ? ticket.pullRequests : batchDiffCommits(ticket);
+  return { linesAdded: sum(changes.map((change) => change.additions)), linesDeleted: sum(changes.map((change) => change.deletions)) };
+}
 
 function sum(values: readonly number[]): number {
   return values.reduce((total, value) => total + value, 0);

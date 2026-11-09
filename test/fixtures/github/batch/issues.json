@@ -1,0 +1,129 @@
+[
+ {
+  "data": {
+   "repository": {
+    "issues": {
+     "pageInfo": {
+      "hasNextPage": false,
+      "endCursor": null
+     },
+     "nodes": [
+      {
+       "number": 2,
+       "title": "Plugin skeleton and SessionEnd transcript cache hook",
+       "url": "https://github.com/grimfeld/agentic-metrics/issues/2",
+       "body": "",
+       "createdAt": "2026-11-01T09:00:00Z",
+       "updatedAt": "2026-11-06T09:00:00Z",
+       "closedAt": "2026-11-06T09:00:01Z",
+       "subIssues": {
+        "totalCount": 0
+       },
+       "labels": {
+        "nodes": []
+       },
+       "comments": {
+        "nodes": []
+       },
+       "timelineItems": {
+        "nodes": []
+       }
+      },
+      {
+       "number": 16,
+       "title": "GitHub Action skeleton and Closes #N from branch name",
+       "url": "https://github.com/grimfeld/agentic-metrics/issues/16",
+       "body": "",
+       "createdAt": "2026-11-01T09:00:00Z",
+       "updatedAt": "2026-11-06T09:00:00Z",
+       "closedAt": "2026-11-06T09:00:01Z",
+       "subIssues": {
+        "totalCount": 0
+       },
+       "labels": {
+        "nodes": []
+       },
+       "comments": {
+        "nodes": []
+       },
+       "timelineItems": {
+        "nodes": []
+       }
+      },
+      {
+       "number": 17,
+       "title": "Action reminders: regression question and estimate reminder",
+       "url": "https://github.com/grimfeld/agentic-metrics/issues/17",
+       "body": "",
+       "createdAt": "2026-11-01T09:00:00Z",
+       "updatedAt": "2026-11-06T09:00:00Z",
+       "closedAt": "2026-11-06T09:00:01Z",
+       "subIssues": {
+        "totalCount": 0
+       },
+       "labels": {
+        "nodes": []
+       },
+       "comments": {
+        "nodes": []
+       },
+       "timelineItems": {
+        "nodes": []
+       }
+      },
+      {
+       "number": 18,
+       "title": "Skill addenda hook, default addenda and conventions skill",
+       "url": "https://github.com/grimfeld/agentic-metrics/issues/18",
+       "body": "",
+       "createdAt": "2026-11-01T09:00:00Z",
+       "updatedAt": "2026-11-06T09:00:00Z",
+       "closedAt": "2026-11-06T09:00:01Z",
+       "subIssues": {
+        "totalCount": 0
+       },
+       "labels": {
+        "nodes": []
+       },
+       "comments": {
+        "nodes": [
+         {
+          "createdAt": "2026-11-01T10:00:00Z",
+          "author": {
+           "__typename": "User"
+          },
+          "body": "estimate: 1d"
+         }
+        ]
+       },
+       "timelineItems": {
+        "nodes": []
+       }
+      },
+      {
+       "number": 19,
+       "title": "Warning hook on gh pr create without a ticket reference",
+       "url": "https://github.com/grimfeld/agentic-metrics/issues/19",
+       "body": "",
+       "createdAt": "2026-11-01T09:00:00Z",
+       "updatedAt": "2026-11-06T09:00:00Z",
+       "closedAt": "2026-11-06T09:00:01Z",
+       "subIssues": {
+        "totalCount": 0
+       },
+       "labels": {
+        "nodes": []
+       },
+       "comments": {
+        "nodes": []
+       },
+       "timelineItems": {
+        "nodes": []
+       }
+      }
+     ]
+    }
+   }
+  }
+ }
+]
