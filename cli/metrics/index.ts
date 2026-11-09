@@ -12,6 +12,8 @@ import { netLinesRemoved } from "./net-lines-removed.ts";
 import { regressionRate } from "./regression-rate.ts";
 import { scheduledFailures } from "./scheduled-failures.ts";
 import { size } from "./size.ts";
+import { subAgents } from "./sub-agents.ts";
+import { apiEquivalentCost } from "./api-equivalent-cost.ts";
 import { testRatio } from "./test-ratio.ts";
 import { throughput } from "./throughput.ts";
 
@@ -25,6 +27,8 @@ export const METRICS: readonly Metric<unknown>[] = [
   regressionRate,
   humanMessagesPerTicket,
   orchestrationTime,
+  subAgents,
+  apiEquivalentCost,
   autonomy,
   testRatio,
   netLinesRemoved,
