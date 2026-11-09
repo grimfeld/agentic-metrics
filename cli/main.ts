@@ -5,6 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { readConfig } from "./config.ts";
 import { buildDataset, datasetPath, SCHEMA_VERSION, type Dataset } from "./dataset.ts";
+import { cachedSource, defaultCacheDir } from "./github/cache.ts";
 import { loadGitHub } from "./github/load.ts";
 import { ghSource, type GitHubSource } from "./github/source.ts";
 import { link } from "./linker.ts";
@@ -14,15 +15,24 @@ export interface Dependencies {
   cwd: string;
   /** Defaults to the `gh` CLI. */
   github?: GitHubSource;
+  /**
+   * The local cache of raw GitHub items that makes collection incremental.
+   * Defaults to ~/.cache/agentic-metrics with the `gh` source; with an
+   * injected source, nothing is cached unless this is set.
+   */
+  cacheDir?: string;
   now?: () => Date;
   stdout?: (text: string) => void;
   stderr?: (text: string) => void;
 }
 
 const USAGE = `Usage:
-  agentic-metrics collect [--repo owner/name] [--datasets dir]
+  agentic-metrics collect [--repo owner/name] [--datasets dir] [--full]
       Read the repo (default: the current one) through \`gh\` and write
       <dir>/<owner>/<name>.json (default dir: datasets).
+      The first run reads the whole history; later runs read only what
+      changed since, from a cache in ~/.cache/agentic-metrics. --full
+      reads everything again (e.g. after a metric definition changes).
   agentic-metrics report [--datasets dir] [--out dir]
       Render every dataset in <dir> (default: datasets) as <out>/index.html
       (default out: report), with the datasets copied alongside.
@@ -53,12 +63,19 @@ export async function main(argv: string[], deps: Dependencies): Promise<number> 
 async function collect(args: string[], deps: Dependencies, stdout: (text: string) => void): Promise<void> {
   const { values } = parseArgs({
     args,
-    options: { repo: { type: "string" }, datasets: { type: "string", default: "datasets" } },
+    options: {
+      repo: { type: "string" },
+      datasets: { type: "string", default: "datasets" },
+      full: { type: "boolean", default: false },
+    },
   });
   const config = readConfig(deps.cwd);
-  const github = deps.github ?? ghSource({ cwd: deps.cwd, repo: values.repo });
+  const now = deps.now ?? (() => new Date());
+  const source = deps.github ?? ghSource({ cwd: deps.cwd, repo: values.repo });
+  const cacheDir = deps.cacheDir ?? (deps.github ? undefined : defaultCacheDir());
+  const github = cacheDir ? cachedSource(source, { dir: cacheDir, now, full: values.full }) : source;
   const data = await loadGitHub(github);
-  const dataset = buildDataset(data.repo.fullName, link(data, config), (deps.now ?? (() => new Date()))());
+  const dataset = buildDataset(data.repo.fullName, link(data, config), now());
 
   const out = resolve(deps.cwd, values.datasets, datasetPath(dataset.repo));
   await mkdir(dirname(out), { recursive: true });
