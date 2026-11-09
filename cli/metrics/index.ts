@@ -1,5 +1,6 @@
 // Every metric the CLI computes, in report order.
 import type { Metric } from "./metric.ts";
+import { autonomy } from "./autonomy.ts";
 import { estimateVsActual } from "./estimate-vs-actual.ts";
 import { humanMessagesPerTicket } from "./human-messages.ts";
 import { leadTime } from "./lead-time.ts";
@@ -20,6 +21,7 @@ export const METRICS: readonly Metric<unknown>[] = [
   orchestrationTime,
   subAgents,
   apiEquivalentCost,
+  autonomy,
   testRatio,
   netLinesRemoved,
   size,

@@ -51,8 +51,8 @@
        "changedFiles": 3,
        "commits": {
         "nodes": [
-         { "commit": { "authoredDate": "2026-10-19T09:30:00Z", "messageHeadline": "Implement the change" } },
-         { "commit": { "authoredDate": "2026-10-19T09:00:00Z", "messageHeadline": "Implement the change" } }
+         { "commit": { "authoredDate": "2026-10-19T09:30:00Z", "messageHeadline": "Implement the change", "messageBody": "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" } },
+         { "commit": { "authoredDate": "2026-10-19T09:00:00Z", "messageHeadline": "Implement the change", "messageBody": "Written by hand." } }
         ]
        },
        "files": {
@@ -84,7 +84,7 @@
        "changedFiles": 2,
        "commits": {
         "nodes": [
-         { "commit": { "authoredDate": "2026-10-21T09:00:00Z", "messageHeadline": "Implement the change" } }
+         { "commit": { "authoredDate": "2026-10-21T09:00:00Z", "messageHeadline": "Implement the change", "messageBody": "co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>" } }
         ]
        },
        "files": {
@@ -128,7 +128,7 @@
        "changedFiles": 101,
        "commits": {
         "nodes": [
-         { "commit": { "authoredDate": "2026-10-27T01:00:00Z", "messageHeadline": "Implement the change" } }
+         { "commit": { "authoredDate": "2026-10-27T01:00:00Z", "messageHeadline": "Implement the change", "messageBody": "Co-Authored-By: Alex Doe <alex@example.com>" } }
         ]
        },
        "files": {
@@ -154,7 +154,7 @@
        "changedFiles": 2,
        "commits": {
         "nodes": [
-         { "commit": { "authoredDate": "2026-10-28T09:00:00Z", "messageHeadline": "Implement the change" } }
+         { "commit": { "authoredDate": "2026-10-28T09:00:00Z", "messageHeadline": "Implement the change", "messageBody": "Follow the review.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" } }
         ]
        },
        "files": {
@@ -184,7 +184,7 @@
        "changedFiles": 1,
        "commits": {
         "nodes": [
-         { "commit": { "authoredDate": "2026-11-09T01:00:00Z", "messageHeadline": "Implement the change" } }
+         { "commit": { "authoredDate": "2026-11-09T01:00:00Z", "messageHeadline": "Implement the change", "messageBody": "Claude-Session: https://claude.ai/code/session_01ABCDEF" } }
         ]
        },
        "files": {

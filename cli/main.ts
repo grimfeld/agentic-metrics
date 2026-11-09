@@ -3,6 +3,7 @@
 import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { classifyAutonomy } from "./autonomy.ts";
 import { CONFIG_FILE, readConfig } from "./config.ts";
 import { buildDataset, datasetPath, SCHEMA_VERSION, type Dataset } from "./dataset.ts";
 import { cachedSource, defaultCacheDir } from "./github/cache.ts";
@@ -105,7 +106,7 @@ async function collect(args: string[], deps: Dependencies, stdout: (text: string
     deps.transcripts ??
     (deps.github || checkout === undefined ? noTranscripts : transcriptCache({ dir: cacheDir ?? defaultCacheDir(), repoDir: resolve(deps.cwd, checkout) }));
   const sessions = loadSessions(await transcripts.read());
-  const work = linkSessions(link(data, config), sessions, config, data.repo.fullName);
+  const work = classifyAutonomy(linkSessions(link(data, config), sessions, config, data.repo.fullName), config.autonomy);
   const dataset = buildDataset(data.repo, work, now(), publish, config.alias);
 
   // Only this collect's dataset may stay in the datasets folder: a dataset left
