@@ -1,5 +1,6 @@
 // The overview: `index.html`. Four headline tiles pooled across the repos
-// published `full`, each naming the repos it covers; then a table comparing
+// published `full`, each naming the repos it covers and those it is unknown
+// for; then a table comparing
 // every repo, the CV-ready sentences, and a card per repo linking to its page.
 // Anonymized repos are in the table, the sentences and the cards, never in
 // the tiles.
@@ -32,14 +33,20 @@ function tiles(ctx: PageContext): string {
   const datasets = ctx.site.repos.map((repo) => repo.dataset);
   const byRepo = new Map(ctx.site.repos.map((repo) => [repo.dataset.repo, repo]));
   return HEADLINES.map((metric) => {
-    const { result, covers } = pooled(metric, datasets);
+    const { result, covers, unknownFor } = pooled(metric, datasets);
     const unknown = result.value === UNKNOWN ? " unknown" : "";
-    const names = covers.flatMap((dataset) => {
-      const repo = byRepo.get(dataset.repo);
-      return repo ? [`<a href="${escapeHtml(ctx.link(PATHS.metric(repo, metric)))}">${escapeHtml(dataset.repo)}</a>`] : [];
-    });
-    const coversText = names.length ? `Covers ${names.join(", ")}` : "No full repo has data";
-    return `<article class="tile" data-headline="${metric.id}"><h2>${escapeHtml(metric.name)}</h2><p class="value${unknown}">${headlineValue(metric, result)}</p><p class="coverage">${coverageText(result.coverage)}</p><p class="covers">${coversText}</p></article>`;
+    const names = (list: typeof covers) =>
+      list.flatMap((dataset) => {
+        const repo = byRepo.get(dataset.repo);
+        if (!repo) return [];
+        // A repo whose dataset predates the metric has no page for it.
+        const name = escapeHtml(dataset.repo);
+        return [repo.metrics.includes(metric) ? `<a href="${escapeHtml(ctx.link(PATHS.metric(repo, metric)))}">${name}</a>` : name];
+      });
+    const missing = names(unknownFor);
+    const coversText = covers.length ? `Covers ${names(covers).join(", ")}` : "No full repo has data";
+    const unknownText = covers.length && missing.length ? `<p class="covers">Unknown for ${missing.join(", ")}</p>` : "";
+    return `<article class="tile" data-headline="${metric.id}"><h2>${escapeHtml(metric.name)}</h2><p class="value${unknown}">${headlineValue(metric, result)}</p><p class="coverage">${coverageText(result.coverage)}</p><p class="covers">${coversText}</p>${unknownText}</article>`;
   }).join("\n");
 }
 

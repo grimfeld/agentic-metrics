@@ -61,6 +61,8 @@ export interface Pooled {
   result: MetricResult<unknown>;
   /** The `full` datasets whose data the value covers. */
   covers: Dataset[];
+  /** The other `full` datasets: their value is unknown, or they predate the metric. */
+  unknownFor: Dataset[];
 }
 
 /** `metric` pooled over the `full` datasets among `datasets`. */
@@ -76,6 +78,8 @@ export function pooled(metric: Metric<unknown>, datasets: readonly Dataset[]): P
   const known = results.filter(({ result }) => result.value !== UNKNOWN);
   const pool = POOLS[metric.id];
   const value = pool?.(known.map(({ result }) => ({ value: result.value, coverage: result.coverage })));
-  if (value === undefined) return { result: { value: UNKNOWN, coverage }, covers: [] };
-  return { result: { value, coverage }, covers: known.map(({ dataset }) => dataset) };
+  const full = datasets.filter((dataset) => dataset.publish === "full");
+  if (value === undefined) return { result: { value: UNKNOWN, coverage }, covers: [], unknownFor: full };
+  const covers = known.map(({ dataset }) => dataset);
+  return { result: { value, coverage }, covers, unknownFor: full.filter((dataset) => !covers.includes(dataset)) };
 }
