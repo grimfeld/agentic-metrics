@@ -32,7 +32,8 @@ A repo overrides one by name: `.agentic-metrics/addenda/<skill>.md` at its root 
 
 - writes `.agentic-metrics.json` with every field set: ready label `ready-for-agent`, the built-in branch pattern, `integration/` batches, Dependabot excluded, the default autonomy thresholds, and `publish` (`anonymized` for a private repo, else `full`; `--publish` overrides). An anonymized repo gets `--alias name`, or a random alias (`repo-` and 8 hex digits, not derived from the repo's name), which `init` reports so you can change it. `ciWorkflow` is set when exactly one existing workflow runs on pull requests; otherwise `init` says so, and you should set it, since the installed workflow runs on every PR too;
 - creates the `regression`, `autonomy:full`, `autonomy:assisted` and `autonomy:manual` labels that are missing;
-- installs `.github/workflows/agentic-metrics.yml` (see [GitHub Action](#github-action)), passing the config's ready label and branch pattern.
+- installs `.github/workflows/agentic-metrics.yml` (see [GitHub Action](#github-action)), passing the config's ready label and branch pattern, with the Action pinned to a commit SHA;
+- reads the repo's Actions permissions and, when only selected actions are allowed and no pattern covers the Action, prints the pattern to add. It never changes those settings.
 
 Re-running is safe: an existing config or workflow is kept as it is, and only missing labels are created. Addenda overrides go in `.agentic-metrics/addenda/` (see above). Review and commit the two files.
 
@@ -70,7 +71,7 @@ Linking PRs to tickets. A merged PR is linked to an issue by the first of: its c
 ```
 
 - `branchRegex`: a case-insensitive JavaScript pattern; the issue number is its first capture group that matched. The default is the GitHub Action's built-in pattern (`16-title`, `spec-376-…`, `spec/363-…`, `ticket-16`, `fix/issue-12`), defined once in `cli/branch.ts`.
-- `integrationBranchPrefix` (one string or a list; default `integration/`): PRs from these branches are batches. They count as no ticket and no PR, and are counted apart (`integrationPullRequests` in the dataset). A batch delivers the PRs merged into its branch, and the issues it closes that no PR of their own delivered.
+- `integrationBranchPrefix` (one string or a list; default `integration/`): PRs from these branches are batches. They count as no ticket and no PR, and are counted apart (`integrationPullRequests` in the dataset). A batch delivers the PRs merged into its branch, and the issues it closes that no PR of their own delivered. Such an issue is credited the batch's commits that name it (`Merge ticket-N: …`, a merged branch `branchRegex` resolves, or `(#N)`) and the commits those merges brought in; autonomy and the diff metrics read them. Commits naming no ticket count for none.
 - `exclude`: PRs by these authors (logins; `dependabot` and `dependabot[bot]` both match) or from branches starting with these prefixes count in no metric. Nothing is excluded by default.
 
 Transcript metrics (human messages per ticket, orchestration time) come from the transcripts the plugin caches, for the clone `collect` runs in (with `--repo`, pass that repo's clone as `--checkout dir`, else they are unknown). A session belongs to a ticket through its branch (a ticket PR's head, or the issue number `branchRegex` finds), else its worktree's name, else the PRs it opened; a sub-agent with none of these inherits its parent's ticket. Sessions naming no work are orchestration time. Only counts reach the dataset: no transcript text, account or organisation identifier, session id or path.
@@ -137,12 +138,22 @@ jobs:
   conventions:
     runs-on: ubuntu-latest
     steps:
-      - uses: grimfeld/agentic-metrics/action@main
+      - uses: grimfeld/agentic-metrics/action@<full commit SHA> # <ref>
         # with:
         #   branch-regex: '^spec[-/](\d+)'
         #   bug-label: bug
         #   ready-label: ready-for-agent
 ```
+
+**SHA pinning.** `init` pins the Action to a full commit SHA, with the ref it resolved in a trailing comment: the release tag of the CLI's version (`v0.2.0`) when `grimfeld/agentic-metrics` has that tag, else `main`. A repo whose Actions settings require SHA pinning (`sha_pinning_required`) rejects `@main` or `@v0.2.0` with a `startup_failure`, and a pinned SHA can't move under you anyway. By hand, look the commit up with `gh api repos/grimfeld/agentic-metrics/commits/main --jq .sha`. To upgrade, replace the SHA and the comment (or delete the workflow and run `init` again). When the repo requires pinning and an existing workflow isn't pinned, `init` says so.
+
+**Allow-listing.** A repo (or its organisation) that allows only selected actions must allow this one too, else its runs end in `startup_failure`. `init` reads the repo's settings (`gh api repos/<owner>/<repo>/actions/permissions` and `…/selected-actions`) and, when no allowed pattern covers the Action, prints the pattern to add:
+
+```
+grimfeld/agentic-metrics/action@*
+```
+
+Add it under Settings > Actions > General > Actions permissions > Allow specified actions and reusable workflows (for an organisation's repo, possibly in the organisation's settings). `init` never edits these settings; reading them needs admin rights on the repo, and without them `init` names the pattern to check and goes on.
 
 When a PR's description references no issue and its branch name carries one (`spec-376-…`, `spec/363-…`, `ticket-16`, `16-title`), the Action appends `Closes #N`. A description that already mentions an issue (`#12`, `owner/repo#12`, an issue link) is left alone, and so are PRs from forks. It needs only the default workflow token. `branch-regex` overrides the built-in pattern; the number is its first capture group that matched.
 

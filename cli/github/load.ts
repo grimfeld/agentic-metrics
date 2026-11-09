@@ -37,8 +37,8 @@ export interface PullRequest {
   filesComplete: boolean;
   /** The earliest authored date among its commits; undefined when GitHub returned none. */
   firstCommitAt: Date | undefined;
-  /** What the trailers of its commits (first 100) say. Commit messages never reach the dataset. */
-  commits: CommitTrailers[];
+  /** Its commits (first 100), oldest first as GitHub lists them. Commit messages never reach the dataset. */
+  commits: Commit[];
   /** Its current labels (first 20). */
   labels: string[];
   /** Numbers written `#N` in its title or body, in order, without repeats. */
@@ -53,6 +53,21 @@ export interface CommitTrailers {
   claudeCoAuthor: boolean;
   /** A `Claude-Session:` trailer: made in a Claude Code cloud session, which leaves no local transcript. */
   cloudSession: boolean;
+}
+
+/** One commit of a PR, as its commit listing shows it. */
+export interface Commit extends CommitTrailers {
+  oid: string;
+  /** Its parents' oids: two or more for a merge. */
+  parents: string[];
+  /** The first line of its message. */
+  subject: string;
+  authoredAt: Date | undefined;
+  /** Its own diff against its first parent. */
+  additions: number;
+  deletions: number;
+  /** Undefined when GitHub could not say. */
+  changedFiles: number | undefined;
 }
 
 /** One GitHub Actions workflow run, as the runs listing shows it. */
@@ -148,10 +163,21 @@ interface RawPullRequest {
   additions?: number;
   deletions?: number;
   changedFiles?: number;
-  commits?: { nodes: { commit: { authoredDate?: string; messageHeadline?: string; messageBody?: string } }[] };
+  commits?: { nodes: { commit: RawCommit }[] };
   labels?: RawLabels;
   files?: { totalCount: number; nodes: ChangedFile[] } | null;
   reviews?: { nodes: { submittedAt: string | null }[] };
+}
+
+interface RawCommit {
+  oid?: string;
+  authoredDate?: string;
+  messageHeadline?: string;
+  messageBody?: string;
+  additions?: number;
+  deletions?: number;
+  changedFilesIfAvailable?: number | null;
+  parents?: { nodes: { oid: string }[] };
 }
 
 interface RawRun {
@@ -223,7 +249,7 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
                 node.commit.messageHeadline === undefined ? [] : [node.commit.messageHeadline],
               ),
               ...diffOf(pr),
-              commits: (pr.commits?.nodes ?? []).map((node) => trailersOf(node.commit.messageBody ?? "")),
+              commits: (pr.commits?.nodes ?? []).map((node) => commitOf(node.commit)),
               labels: labelNames(pr.labels),
               references: references(`${pr.title}\n${pr.body ?? ""}`),
               changesRequestedAt: (pr.reviews?.nodes ?? []).flatMap((review) =>
@@ -310,6 +336,19 @@ function labelNames(labels: RawLabels | undefined): string[] {
 /** `Co-Authored-By: Name <email>` at the start of a line, any case. */
 const CO_AUTHOR = /^[ \t]*co-authored-by:[ \t]*(.*?)[ \t]*<([^>]*)>/gim;
 const CLOUD_SESSION = /^[ \t]*claude-session:/im;
+
+function commitOf(raw: RawCommit): Commit {
+  return {
+    oid: raw.oid ?? "",
+    parents: (raw.parents?.nodes ?? []).map((parent) => parent.oid),
+    subject: raw.messageHeadline ?? "",
+    authoredAt: raw.authoredDate === undefined ? undefined : new Date(raw.authoredDate),
+    additions: raw.additions ?? 0,
+    deletions: raw.deletions ?? 0,
+    changedFiles: raw.changedFilesIfAvailable ?? undefined,
+    ...trailersOf(raw.messageBody ?? ""),
+  };
+}
 
 function trailersOf(body: string): CommitTrailers {
   const claudeCoAuthor = [...body.matchAll(CO_AUTHOR)].some(

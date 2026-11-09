@@ -1,5 +1,6 @@
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
+import { plural } from "./stats.ts";
 
 export interface Throughput {
   /** Every week from the first delivery to the last, empty weeks included. */
@@ -53,7 +54,9 @@ export const throughput: Metric<Throughput> = {
   sentence({ weeks }) {
     const tickets = weeks.reduce((sum, week) => sum + week.tickets, 0);
     const pullRequests = weeks.reduce((sum, week) => sum + week.pullRequests, 0);
-    return `Delivered ${String(tickets)} tickets in ${String(pullRequests)} pull requests over ${String(weeks.length)} weeks`;
+    // A ticket with no PR of its own came through an integration PR: with no PR at all, every one did.
+    const how = pullRequests === 0 ? ", all through integration pull requests," : ` in ${plural(pullRequests, "pull request")}`;
+    return `Delivered ${plural(tickets, "ticket")}${how} over ${plural(weeks.length, "week")}`;
   },
 
   section({ weeks }) {

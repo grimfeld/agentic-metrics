@@ -13,13 +13,18 @@
 // merged into their branch, and the issues they close that no ticket PR
 // delivered (work merged into the batch without a PR of its own).
 //
+// A ticket delivered only by integration PRs takes the commits of theirs that
+// name it (`batch.ts`) as its own; a ticket with a PR of its own keeps that
+// PR's commits only, so no commit counts twice.
+//
 // Work counts once it reaches the default branch: a ticket PR when it merges
 // into it, or when the integration PR of the branch it merged into does.
 import type { Autonomy } from "./autonomy.ts";
+import { attributeBatch } from "./batch.ts";
 import type { Config } from "./config.ts";
 import { mainWorkflow, type Ci } from "./ci.ts";
 import { issueNumberFromBranch } from "./branch.ts";
-import type { GitHubData, Issue, PullRequest, RegressionIssue } from "./github/load.ts";
+import type { Commit, GitHubData, Issue, PullRequest, RegressionIssue } from "./github/load.ts";
 import type { Session } from "./transcripts/load.ts";
 
 export interface Ticket {
@@ -31,6 +36,8 @@ export interface Ticket {
   pullRequests: PullRequest[];
   /** Integration PRs that close its issue. */
   integrationPullRequests: PullRequest[];
+  /** Commits of those integration PRs credited to it (`batch.ts`). Read through `ownCommits`. */
+  batchCommits: Commit[];
   /** When it became ready: the ready label, else creation. Undefined when unknown. */
   readyAt: Date | undefined;
   /** When its last PR reached the default branch. */
@@ -88,14 +95,18 @@ export function link(data: GitHubData, config: Config): LinkedWork {
     const linked = linkedIssues(pr, issues, config);
     if (linked.length === 0) {
       const doneAt = deliveredAt.get(pr) ?? pr.mergedAt;
-      tickets.push({ id: `PR #${String(pr.number)}`, issue: undefined, pullRequests: [pr], integrationPullRequests: [], readyAt: pr.createdAt, doneAt, sessions: [] });
+      tickets.push({ id: `PR #${String(pr.number)}`, issue: undefined, pullRequests: [pr], integrationPullRequests: [], batchCommits: [], readyAt: pr.createdAt, doneAt, sessions: [] });
     }
     for (const number of linked) issuePrs.set(number, [...(issuePrs.get(number) ?? []), pr]);
   }
 
   const issueBatches = new Map<number, PullRequest[]>();
+  const issueBatchCommits = new Map<number, Commit[]>();
   for (const batch of integrationPullRequests) {
     for (const number of batch.closes) issueBatches.set(number, [...(issueBatches.get(number) ?? []), batch]);
+    for (const [number, commits] of attributeBatch(batch, config)) {
+      issueBatchCommits.set(number, [...(issueBatchCommits.get(number) ?? []), ...commits]);
+    }
   }
 
   for (const number of new Set([...issuePrs.keys(), ...issueBatches.keys()])) {
@@ -109,6 +120,7 @@ export function link(data: GitHubData, config: Config): LinkedWork {
       issue,
       pullRequests: prs,
       integrationPullRequests: batches,
+      batchCommits: issueBatchCommits.get(number) ?? [],
       readyAt: issue && readyAt(issue, doneAt, config),
       doneAt,
       sessions: [],
@@ -129,6 +141,28 @@ export function link(data: GitHubData, config: Config): LinkedWork {
     ci,
     transcripts: { sessions: 0, orchestration: [] },
   };
+}
+
+/**
+ * The commits that are a ticket's own work: those of its PRs, else, for a
+ * ticket only integration PRs delivered, the commits of theirs credited to it.
+ */
+export function ownCommits(ticket: Ticket): Commit[] {
+  return ticket.pullRequests.length > 0 ? ticket.pullRequests.flatMap((pr) => pr.commits) : ticket.batchCommits;
+}
+
+/**
+ * The non-merge commits credited to a ticket only integration PRs delivered:
+ * its diff, since a merge's own diff repeats what it merged. Empty for a
+ * ticket with a PR of its own, whose diff is its PRs'.
+ */
+export function batchDiffCommits(ticket: Ticket): Commit[] {
+  return ticket.pullRequests.length > 0 ? [] : ticket.batchCommits.filter((commit) => commit.parents.length <= 1);
+}
+
+/** Whether a ticket has a diff of its own: a PR, or commits credited from a batch. */
+export function hasOwnDiff(ticket: Ticket): boolean {
+  return ticket.pullRequests.length > 0 || batchDiffCommits(ticket).length > 0;
 }
 
 /** By author login (case-insensitive, with or without a bot's `[bot]` suffix) or by branch prefix. */

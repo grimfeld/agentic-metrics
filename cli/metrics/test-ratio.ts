@@ -89,6 +89,6 @@ export const testRatio: Metric<TestRatio> = {
     definition:
       "Lines added to test files divided by lines added to production files, over the PRs merged into the default branch, each PR counted once. A test file sits under a <code>test</code>, <code>tests</code>, <code>__tests__</code>, <code>spec</code>, <code>specs</code>, <code>e2e</code>, <code>__mocks__</code> or <code>testdata</code> folder, or is named <code>*.test.*</code>, <code>*.spec.*</code>, <code>*_test.*</code> or <code>test_*.py</code>. Documentation (<code>.md</code>, <code>.txt</code> and the like) and lockfiles count as neither; every other file is production.",
     limits:
-      "Classified by path only, so test fixtures count as test lines and generated files as production. GitHub lists at most 100 files per PR: a ticket with a PR changing more is left out. Unknown when no production line was added.",
+      "Classified by path only, so test fixtures count as test lines and generated files as production. GitHub lists at most 100 files per PR: a ticket with a PR changing more is left out. A ticket delivered only through an integration PR is left out too: the commits credited to it (see Autonomy level) carry no per-file lines. Unknown when no production line was added.",
   },
 };

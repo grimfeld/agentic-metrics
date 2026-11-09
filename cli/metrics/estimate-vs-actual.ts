@@ -1,6 +1,6 @@
 import { estimateHours } from "../conventions.ts";
 import type { Comment } from "../github/load.ts";
-import type { Ticket } from "../linker.ts";
+import { ownCommits, type Ticket } from "../linker.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
 import { SIZE_HEADERS, sizeCells, sizeOf, type TicketSize } from "./size.ts";
@@ -32,8 +32,12 @@ function estimateOf(comments: readonly Comment[]): { at: Date; hours: number } |
   return undefined;
 }
 
+/** The first commit of its PRs, else of the batch commits credited to it. */
 function firstCommitAt(ticket: Ticket): Date | undefined {
-  const times = ticket.pullRequests.flatMap((pr) => (pr.firstCommitAt ? [pr.firstCommitAt.getTime()] : []));
+  const times =
+    ticket.pullRequests.length > 0
+      ? ticket.pullRequests.flatMap((pr) => (pr.firstCommitAt ? [pr.firstCommitAt.getTime()] : []))
+      : ownCommits(ticket).flatMap((commit) => (commit.authoredAt ? [commit.authoredAt.getTime()] : []));
   return times.length > 0 ? new Date(Math.min(...times)) : undefined;
 }
 
@@ -89,7 +93,7 @@ export const estimateVsActual: Metric<EstimateVsActual> = {
 
   methodology: {
     definition:
-      "A ticket's estimate is the earliest comment on its issue with a line starting <code>estimate: &lt;n&gt;&lt;h|d|w&gt;</code> (for example <code>estimate: 2d</code>); later revisions never replace it, and comments by bots are ignored. Days and weeks are calendar time (24 h, 168 h). Actual time runs from the first commit on any of the ticket's PRs to its last PR merging into the default branch. The figure is the median of actual divided by estimate, shown beside each ticket's size proxies.",
+      "A ticket's estimate is the earliest comment on its issue with a line starting <code>estimate: &lt;n&gt;&lt;h|d|w&gt;</code> (for example <code>estimate: 2d</code>); later revisions never replace it, and comments by bots are ignored. Days and weeks are calendar time (24 h, 168 h). Actual time runs from the first commit on any of the ticket's PRs (for a ticket with no PR of its own, the first integration PR commit credited to it; see Autonomy level) to its last PR merging into the default branch. The figure is the median of actual divided by estimate, shown beside each ticket's size proxies.",
     limits:
       "Estimates are self-reported and optional. An estimate counts only when posted before the ticket's first commit; later ones are left out of coverage. Commit dates come from git and can be set by their author. Actual time is elapsed time, not hours worked.",
   },
