@@ -41,6 +41,18 @@ npx agentic-metrics report    # renders datasets/ as report/index.html
 { "readyLabel": "ready-for-agent" }
 ```
 
+A regression is an issue labelled `regression` with a line starting `caused-by: #N` in its body or a comment; `#N` is the ticket or PR that caused it.
+
+### Published report
+
+This repo publishes the report for every tracked repo on its GitHub Pages. Datasets are committed under `datasets/<owner>/<repo>.json`, so every published number can be checked against its raw data, which each repo's section links. To track a repo, run `collect` from this repo and commit the dataset:
+
+```
+npx agentic-metrics collect --repo owner/name   # writes datasets/owner/name.json
+```
+
+`.github/workflows/pages.yml` renders `datasets/` and deploys it on every push to `main` that touches `datasets/` or `cli/`, or by hand from the Actions tab. One-time setting: Settings > Pages > Build and deployment > Source: **GitHub Actions**.
+
 Adding a metric: write one file in `cli/metrics/` holding its computation (its dataset field), how the report shows it, and its Methodology entry. Then list it in `cli/metrics/index.ts`. Its tests go in `test/cli/`, fixtures in, dataset and HTML out. To read something new from GitHub, add a request to `cli/github/source.ts` and a recorded `gh api` answer to each folder in `test/fixtures/github/`.
 
 ## GitHub Action
@@ -52,9 +64,12 @@ name: agentic-metrics
 on:
   pull_request:
     types: [opened, edited, reopened]
+  issues:
+    types: [labeled]
 permissions:
   contents: read
   pull-requests: write
+  issues: write
 jobs:
   conventions:
     runs-on: ubuntu-latest
@@ -62,9 +77,13 @@ jobs:
       - uses: grimfeld/agentic-metrics/action@main
         # with:
         #   branch-regex: '^spec[-/](\d+)'
+        #   bug-label: bug
+        #   ready-label: ready-for-agent
 ```
 
 When a PR's description references no issue and its branch name carries one (`spec-376-…`, `spec/363-…`, `ticket-16`, `16-title`), the Action appends `Closes #N`. A description that already mentions an issue (`#12`, `owner/repo#12`, an issue link) is left alone, and so are PRs from forks. It needs only the default workflow token. `branch-regex` overrides the built-in pattern; the number is its first capture group that matched.
+
+When an issue gets the bug label (`bug-label`, default `bug`), the Action asks "Regression? Reply `caused-by: #N`", unless the issue already carries a `caused-by: #N` line. When a ticket gets the ready label (`ready-label`, default `ready-for-agent`) and no comment starts with `estimate: <n><h|d|w>`, it posts a one-line estimate reminder. Each reminder carries a hidden marker and is posted at most once per issue, however often the label is removed and added again.
 
 ## Repository layout
 

@@ -44,9 +44,10 @@ function repoSection(dataset: Dataset): string {
     const body = result.value === UNKNOWN ? `<p class="unknown">unknown</p>` : metric.section(result.value);
     return [`<section class="metric" data-section="${metric.id}"><h3>${escapeHtml(metric.name)}</h3>${body}</section>`];
   }).join("\n");
-  return `<section class="repo" data-repo="${repo}">
+  const raw = `datasets/${escapeHtml(datasetPath(dataset.repo))}`;
+  return `<section class="repo" id="${repo}" data-repo="${repo}">
 <h2>${repo}</h2>
-<p class="meta">${String(dataset.tickets)} tickets, ${String(dataset.pullRequests)} PRs merged · collected ${escapeHtml(dataset.generatedAt.slice(0, 10))}</p>
+<p class="meta">${String(dataset.tickets)} tickets, ${String(dataset.pullRequests)} PRs merged · collected ${escapeHtml(dataset.generatedAt.slice(0, 10))} · <a href="${raw}">raw dataset</a></p>
 <div class="cards">
 ${cards}
 </div>
@@ -106,6 +107,7 @@ export function renderReport(datasets: Dataset[]): string {
 </head>
 <body>
 <h1>Agentic metrics</h1>
+<nav id="repos">${sorted.map((dataset) => `<a href="#${escapeHtml(dataset.repo)}">${escapeHtml(dataset.repo)}</a>`).join(" ")}</nav>
 ${sorted.map(repoSection).join("\n")}
 ${methodology(sorted)}
 </body>
