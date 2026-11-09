@@ -38,7 +38,7 @@ function textOf(attribute: string, value: string, repo?: string): string {
 }
 
 function section(repo: string): string {
-  const match = new RegExp(`<section class="repo" data-repo="${repo}">([\\s\\S]*?)</section><!-- /repo -->`).exec(html);
+  const match = new RegExp(`<section class="repo"[^>]* data-repo="${repo}">([\\s\\S]*?)</section><!-- /repo -->`).exec(html);
   assert.ok(match, `no section for ${repo}`);
   return match[1] ?? "";
 }
@@ -56,7 +56,24 @@ describe("report", () => {
   it("shows the metrics not computed yet as unknown", () => {
     assert.equal(textOf("data-metric", "firstRunCiRate", "grimfeld/lifeline"), "First-run CI rate unknown not measured yet");
     assert.equal(textOf("data-metric", "humanMessagesPerTicket", "grimfeld/lifeline"), "Human messages per ticket unknown not measured yet");
-    assert.equal(textOf("data-metric", "regressionRate", "grimfeld/lifeline"), "Regression rate unknown not measured yet");
+  });
+
+  it("shows the regression rate on its card, with its coverage", () => {
+    assert.equal(textOf("data-metric", "regressionRate", "grimfeld/lifeline"), "Regression rate 60% 4 regressions 5 of 5 tickets");
+    assert.equal(textOf("data-metric", "regressionRate", "grimfeld/agentic-metrics"), "Regression rate unknown 0 of 0 tickets");
+  });
+
+  it("lists regressions per ticket, and the untraced ones", () => {
+    assert.equal(
+      textOf("data-section", "regressionRate", "grimfeld/lifeline"),
+      "Regression rate Ticket Regressions #104 #141 PR #136 #142 #106 #140, #145 Untraced: #143, #144",
+    );
+  });
+
+  it("defines regression rate in Methodology, with its coverage per repo", () => {
+    const entry = textOf("data-methodology", "regressionRate");
+    assert.match(entry, /^Regression rate The share of delivered tickets that caused at least one regression/);
+    assert.match(entry, /Coverage: grimfeld\/agentic-metrics 0 of 0 tickets; grimfeld\/lifeline 5 of 5 tickets/);
   });
 
   it("shows a metric with no data as unknown, with its coverage", () => {
@@ -76,6 +93,18 @@ describe("report", () => {
     assert.match(leadTime, /Coverage: grimfeld\/agentic-metrics 0 of 0 tickets; grimfeld\/lifeline 5 of 5 tickets/);
     assert.match(textOf("data-methodology", "throughput"), /^Throughput Tickets and pull requests delivered per week/);
     assert.doesNotMatch(html, /data-methodology="firstRunCiRate"/);
+  });
+
+  it("links each repo's raw dataset from its own section", () => {
+    assert.match(section("grimfeld/lifeline"), /<a href="datasets\/grimfeld\/lifeline\.json">/);
+    assert.match(section("grimfeld/agentic-metrics"), /<a href="datasets\/grimfeld\/agentic-metrics\.json">/);
+  });
+
+  it("lists every tracked repo at the top, linking to its section", () => {
+    const nav = textOf("id", "repos");
+    assert.equal(nav, "grimfeld/agentic-metrics grimfeld/lifeline");
+    assert.match(html, /<a href="#grimfeld\/lifeline">/);
+    assert.match(html, /<section class="repo" id="grimfeld\/lifeline" data-repo="grimfeld\/lifeline">/);
   });
 
   it("links each raw dataset from Methodology, copied next to the report", () => {

@@ -17,7 +17,7 @@
 // into it, or when the integration PR of the branch it merged into does.
 import type { Config } from "./config.ts";
 import { issueNumberFromBranch } from "./branch.ts";
-import type { GitHubData, Issue, PullRequest } from "./github/load.ts";
+import type { GitHubData, Issue, PullRequest, RegressionIssue } from "./github/load.ts";
 
 export interface Ticket {
   /** `#104` for an issue, `PR #136` for a PR that is its own ticket. */
@@ -40,6 +40,8 @@ export interface LinkedWork {
   pullRequests: PullRequest[];
   /** Integration PRs merged into the default branch, nothing excluded. Kept for batch metrics. */
   integrationPullRequests: PullRequest[];
+  /** Issues labelled as regressions, whether or not their cause is delivered work. */
+  regressions: RegressionIssue[];
 }
 
 export function link(data: GitHubData, config: Config): LinkedWork {
@@ -97,7 +99,7 @@ export function link(data: GitHubData, config: Config): LinkedWork {
   }
 
   tickets.sort((a, b) => a.doneAt.getTime() - b.doneAt.getTime());
-  return { tickets, pullRequests, integrationPullRequests };
+  return { tickets, pullRequests, integrationPullRequests, regressions: data.regressions };
 }
 
 /** By author login (case-insensitive, with or without a bot's `[bot]` suffix) or by branch prefix. */

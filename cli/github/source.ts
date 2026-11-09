@@ -12,7 +12,10 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-export type GitHubRequest = "repo" | "pull-requests" | "issues";
+export type GitHubRequest = "repo" | "pull-requests" | "issues" | "regressions";
+
+/** The label that marks a bug as a regression; `init` creates it. */
+export const REGRESSION_LABEL = "regression";
 
 export interface GitHubSource {
   read(request: GitHubRequest): Promise<unknown>;
@@ -48,6 +51,21 @@ query($owner: String!, $name: String!, $endCursor: String) {
   }
 }`;
 
+// Issues labelled as regressions, with the text a `caused-by: #N` line may sit
+// in. Text is read here only to find that line; it never reaches the dataset.
+const REGRESSIONS_QUERY = `
+query($owner: String!, $name: String!, $label: String!, $endCursor: String) {
+  repository(owner: $owner, name: $name) {
+    issues(first: 50, after: $endCursor, labels: [$label], orderBy: {field: CREATED_AT, direction: ASC}) {
+      pageInfo { hasNextPage endCursor }
+      nodes {
+        number createdAt body
+        comments(first: 100) { nodes { createdAt body } }
+      }
+    }
+  }
+}`;
+
 const run = promisify(execFile);
 
 /**
@@ -60,8 +78,8 @@ export function ghSource(options: { cwd: string; repo?: string | undefined }): G
     const { stdout } = await run("gh", ["api", ...args], { cwd: options.cwd, env, maxBuffer: 512 * 1024 * 1024 });
     return JSON.parse(stdout) as unknown;
   };
-  const graphql = (query: string) =>
-    gh(["graphql", "--paginate", "--slurp", "-F", "owner={owner}", "-F", "name={repo}", "-f", `query=${query}`]);
+  const graphql = (query: string, variables: string[] = []) =>
+    gh(["graphql", "--paginate", "--slurp", "-F", "owner={owner}", "-F", "name={repo}", ...variables, "-f", `query=${query}`]);
 
   return {
     read(request) {
@@ -72,6 +90,8 @@ export function ghSource(options: { cwd: string; repo?: string | undefined }): G
           return graphql(PULL_REQUESTS_QUERY);
         case "issues":
           return graphql(ISSUES_QUERY);
+        case "regressions":
+          return graphql(REGRESSIONS_QUERY, ["-f", `label=${REGRESSION_LABEL}`]);
       }
     },
   };

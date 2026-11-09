@@ -33,11 +33,19 @@ export interface Issue {
   labelled: LabelEvent[];
 }
 
+/** An issue labelled as a regression. */
+export interface RegressionIssue {
+  number: number;
+  /** Issue numbers named by `caused-by: #N` lines in its body or comments, in order, without repeats. */
+  causedBy: number[];
+}
+
 export interface GitHubData {
   repo: Repo;
   /** Merged PRs, whatever their base branch. */
   pullRequests: PullRequest[];
   issues: Issue[];
+  regressions: RegressionIssue[];
 }
 
 interface RawRepo {
@@ -60,6 +68,12 @@ interface RawIssue {
   number: number;
   createdAt: string;
   timelineItems: { nodes: { __typename: string; createdAt?: string; label?: { name: string } }[] };
+}
+
+interface RawRegressionIssue {
+  number: number;
+  body: string;
+  comments: { nodes: { createdAt: string; body: string }[] };
 }
 
 type Pages<K extends string, N> = { data: { repository: Record<K, { nodes: N[] }> } }[];
@@ -105,5 +119,21 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
         .sort((a, b) => a.at.getTime() - b.at.getTime()),
     }));
 
-  return { repo, pullRequests, issues };
+  const regressionPages = (await source.read("regressions")) as Pages<"issues", RawRegressionIssue>;
+  const regressions = regressionPages
+    .flatMap((page) => page.data.repository.issues.nodes)
+    .map((issue): RegressionIssue => {
+      const comments = [...issue.comments.nodes].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+      return { number: issue.number, causedBy: causedBy([issue.body, ...comments.map((comment) => comment.body)]) };
+    });
+
+  return { repo, pullRequests, issues, regressions };
+}
+
+/** A line starting with `caused-by: #N`, any case. A mention mid-line (such as the Action's question) is not one. */
+const CAUSED_BY = /^[ \t]*caused-by:[ \t]*#(\d+)\b/gim;
+
+function causedBy(texts: string[]): number[] {
+  const numbers = texts.flatMap((text) => [...text.matchAll(CAUSED_BY)].map((match) => Number(match[1])));
+  return [...new Set(numbers)];
 }

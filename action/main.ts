@@ -1,9 +1,15 @@
-// Thin wrapper around `decide`: reads the event the runner wrote, refreshes the
-// PR body, and performs the operations with the workflow token. Not unit-tested
-// (spec, Testing Decisions #3); keep logic out of here.
+// Thin wrapper around `decide`: reads the event the runner wrote, fetches the
+// current PR body or issue comments, and performs the operations with the
+// workflow token. Not unit-tested (spec, Testing Decisions #3); keep logic out of here.
 import { readFileSync } from "node:fs";
 import { branchRegex as compileBranchRegex, DEFAULT_BRANCH_REGEX } from "../cli/branch.ts";
-import { decide, type Operation } from "./decide.ts";
+import {
+  decide,
+  DEFAULT_BUG_LABEL,
+  DEFAULT_READY_LABEL,
+  type IssueComment,
+  type Operation,
+} from "./decide.ts";
 
 const api = process.env["GITHUB_API_URL"] ?? "https://api.github.com";
 const token = input("github-token");
@@ -20,10 +26,13 @@ async function run(): Promise<void> {
   const payload = JSON.parse(readFileSync(requiredEnv("GITHUB_EVENT_PATH"), "utf8")) as Record<string, unknown>;
   const pattern = input("branch-regex");
   const branchRegex = pattern ? compileBranchRegex(pattern) : DEFAULT_BRANCH_REGEX;
+  const bugLabel = input("bug-label") || DEFAULT_BUG_LABEL;
+  const readyLabel = input("ready-label") || DEFAULT_READY_LABEL;
 
   if (name === "pull_request") await refreshBody(payload);
+  const comments = name === "issues" ? await issueComments(payload) : undefined;
 
-  const operations = decide({ name, payload }, { branchRegex });
+  const operations = decide({ name, payload, ...(comments ? { comments } : {}) }, { branchRegex, bugLabel, readyLabel });
   if (operations.length === 0) console.log("agentic-metrics: nothing to do.");
   for (const operation of operations) await perform(operation);
 }
@@ -37,12 +46,34 @@ async function refreshBody(payload: Record<string, unknown>): Promise<void> {
   pr.body = fresh.body;
 }
 
-// One operation kind so far; branch on `operation.kind` when a second arrives.
+// Every comment on the issue, so a reminder already posted is never posted again.
+async function issueComments(payload: Record<string, unknown>): Promise<IssueComment[]> {
+  const issue = payload["issue"] as { comments_url?: string } | undefined;
+  if (!issue?.comments_url) return [];
+  const comments: IssueComment[] = [];
+  for (let page = 1; ; page++) {
+    const batch = (await request("GET", `${issue.comments_url}?per_page=100&page=${String(page)}`)) as IssueComment[];
+    comments.push(...batch);
+    if (batch.length < 100) return comments;
+  }
+}
+
 async function perform(operation: Operation): Promise<void> {
   const { owner, repo, body } = operation;
-  const pullNumber = String(operation.pullNumber);
-  await request("PATCH", `${api}/repos/${owner}/${repo}/pulls/${pullNumber}`, { body });
-  console.log(`agentic-metrics: linked ${owner}/${repo}#${pullNumber} to its issue.`);
+  switch (operation.kind) {
+    case "update-pr-body": {
+      const pullNumber = String(operation.pullNumber);
+      await request("PATCH", `${api}/repos/${owner}/${repo}/pulls/${pullNumber}`, { body });
+      console.log(`agentic-metrics: linked ${owner}/${repo}#${pullNumber} to its issue.`);
+      return;
+    }
+    case "create-issue-comment": {
+      const issueNumber = String(operation.issueNumber);
+      await request("POST", `${api}/repos/${owner}/${repo}/issues/${issueNumber}/comments`, { body });
+      console.log(`agentic-metrics: commented on ${owner}/${repo}#${issueNumber}.`);
+      return;
+    }
+  }
 }
 
 async function request(method: string, url: string, body?: unknown): Promise<unknown> {
