@@ -15,6 +15,7 @@
 //
 // Work counts once it reaches the default branch: a ticket PR when it merges
 // into it, or when the integration PR of the branch it merged into does.
+import type { Autonomy } from "./autonomy.ts";
 import type { Config } from "./config.ts";
 import { issueNumberFromBranch } from "./branch.ts";
 import type { GitHubData, Issue, PullRequest, RegressionIssue } from "./github/load.ts";
@@ -35,6 +36,8 @@ export interface Ticket {
   doneAt: Date;
   /** Its Claude Code sessions, sub-agents included (`transcripts/link.ts`). None: its transcript metrics are unknown. */
   sessions: Session[];
+  /** Its autonomy level, set once sessions are linked (`autonomy.ts`); undefined before. */
+  autonomy?: Autonomy;
 }
 
 export interface LinkedWork {

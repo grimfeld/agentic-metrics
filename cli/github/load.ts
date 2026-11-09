@@ -34,6 +34,18 @@ export interface PullRequest {
   filesComplete: boolean;
   /** The earliest authored date among its commits; undefined when GitHub returned none. */
   firstCommitAt: Date | undefined;
+  /** What the trailers of its commits (first 100) say. Commit messages never reach the dataset. */
+  commits: CommitTrailers[];
+  /** Its current labels (first 20). */
+  labels: string[];
+}
+
+/** What a commit's trailers say about who wrote it. */
+export interface CommitTrailers {
+  /** A `Co-Authored-By:` trailer names Claude: a name starting with "Claude", or an anthropic.com address. */
+  claudeCoAuthor: boolean;
+  /** A `Claude-Session:` trailer: made in a Claude Code cloud session, which leaves no local transcript. */
+  cloudSession: boolean;
 }
 
 export interface ChangedFile {
@@ -56,6 +68,8 @@ export interface Issue {
   labelled: LabelEvent[];
   /** Number of sub-issues. */
   subIssues: number;
+  /** Its current labels (first 20). */
+  labels: string[];
   /** Its comments (the first 100), oldest first. Bodies never reach the dataset. */
   comments: Comment[];
 }
@@ -102,7 +116,8 @@ interface RawPullRequest {
   additions?: number;
   deletions?: number;
   changedFiles?: number;
-  commits?: { nodes: { commit: { authoredDate?: string; messageHeadline?: string } }[] };
+  commits?: { nodes: { commit: { authoredDate?: string; messageHeadline?: string; messageBody?: string } }[] };
+  labels?: RawLabels;
   files?: { totalCount: number; nodes: ChangedFile[] } | null;
 }
 
@@ -113,6 +128,7 @@ interface RawIssue {
   createdAt: string;
   timelineItems: { nodes: { __typename: string; createdAt?: string; label?: { name: string } }[] };
   subIssues?: { totalCount: number };
+  labels?: RawLabels;
   comments?: { nodes: { createdAt: string; body: string; author: { __typename: string } | null }[] };
 }
 
@@ -156,6 +172,8 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
                 node.commit.messageHeadline === undefined ? [] : [node.commit.messageHeadline],
               ),
               ...diffOf(pr),
+              commits: (pr.commits?.nodes ?? []).map((node) => trailersOf(node.commit.messageBody ?? "")),
+              labels: labelNames(pr.labels),
             },
           ],
     );
@@ -176,6 +194,7 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
         )
         .sort((a, b) => a.at.getTime() - b.at.getTime()),
       subIssues: issue.subIssues?.totalCount ?? 0,
+      labels: labelNames(issue.labels),
       comments: (issue.comments?.nodes ?? [])
         .map((comment) => ({ at: new Date(comment.createdAt), body: comment.body, byBot: comment.author?.__typename === "Bot" }))
         .sort((a, b) => a.at.getTime() - b.at.getTime()),
@@ -198,6 +217,23 @@ const CAUSED_BY = /^[ \t]*caused-by:[ \t]*#(\d+)\b/gim;
 function causedBy(texts: string[]): number[] {
   const numbers = texts.flatMap((text) => [...text.matchAll(CAUSED_BY)].map((match) => Number(match[1])));
   return [...new Set(numbers)];
+}
+
+type RawLabels = { nodes: { name: string }[] } | null;
+
+function labelNames(labels: RawLabels | undefined): string[] {
+  return (labels?.nodes ?? []).map((label) => label.name);
+}
+
+/** `Co-Authored-By: Name <email>` at the start of a line, any case. */
+const CO_AUTHOR = /^[ \t]*co-authored-by:[ \t]*(.*?)[ \t]*<([^>]*)>/gim;
+const CLOUD_SESSION = /^[ \t]*claude-session:/im;
+
+function trailersOf(body: string): CommitTrailers {
+  const claudeCoAuthor = [...body.matchAll(CO_AUTHOR)].some(
+    ([, name = "", email = ""]) => /^claude\b/i.test(name) || /@anthropic\.com$/i.test(email),
+  );
+  return { claudeCoAuthor, cloudSession: CLOUD_SESSION.test(body) };
 }
 
 /** A PR's diff stats and first commit. Missing fields read as an empty, incomplete diff. */

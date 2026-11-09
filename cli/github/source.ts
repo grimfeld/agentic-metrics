@@ -56,7 +56,8 @@ query($owner: String!, $name: String!, $endCursor: String) {
         author { login __typename }
         closingIssuesReferences(first: 50) { nodes { number repository { nameWithOwner } } }
         additions deletions changedFiles
-        commits(first: 100) { nodes { commit { authoredDate messageHeadline } } }
+        commits(first: 100) { nodes { commit { authoredDate messageHeadline messageBody } } }
+        labels(first: 20) { nodes { name } }
         files(first: 100) { totalCount nodes { path additions deletions } }
       }
     }
@@ -71,6 +72,7 @@ query($owner: String!, $name: String!, $endCursor: String) {
       nodes {
         number title url createdAt updatedAt closedAt
         subIssues { totalCount }
+        labels(first: 20) { nodes { name } }
         comments(first: 100) { nodes { createdAt body author { __typename } } }
         timelineItems(first: 100, itemTypes: [LABELED_EVENT]) {
           nodes { __typename ... on LabeledEvent { createdAt label { name } } }

@@ -24,6 +24,15 @@ export interface Config {
   integrationBranchPrefixes: string[];
   /** PRs by these authors (GitHub logins) or from branches starting with these prefixes count nowhere. */
   exclude: { authors: string[]; branches: string[] };
+  /** When a ticket counts as `full` autonomy (see `autonomy.ts`). The file may set either field. */
+  autonomy: AutonomyThresholds;
+}
+
+export interface AutonomyThresholds {
+  /** Human messages allowed beyond the opening request. */
+  fullMaxFollowUps: number;
+  /** The share of its commits Claude must have co-authored, from 0 to 1. */
+  fullMinClaudeCommitShare: number;
 }
 
 /**
@@ -42,6 +51,7 @@ const DEFAULTS: Config = {
   branchRegex: DEFAULT_BRANCH_REGEX,
   integrationBranchPrefixes: ["integration/"],
   exclude: { authors: [], branches: [] },
+  autonomy: { fullMaxFollowUps: 1, fullMinClaudeCommitShare: 1 },
 };
 
 export function readConfig(repoDir: string): Config {
@@ -98,7 +108,31 @@ export function readConfig(repoDir: string): Config {
       branches: "branches" in lists ? stringList(lists["branches"], "exclude.branches") : [],
     };
   }
+  if ("autonomy" in fields) config.autonomy = autonomyThresholds(fields["autonomy"]);
   return config;
+}
+
+function autonomyThresholds(value: unknown): AutonomyThresholds {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error(`${CONFIG_FILE}: autonomy must be an object with "fullMaxFollowUps" and/or "fullMinClaudeCommitShare"`);
+  }
+  const fields = value as Record<string, unknown>;
+  const thresholds = { ...DEFAULTS.autonomy };
+  if ("fullMaxFollowUps" in fields) {
+    const followUps = fields["fullMaxFollowUps"];
+    if (typeof followUps !== "number" || !Number.isInteger(followUps) || followUps < 0) {
+      throw new Error(`${CONFIG_FILE}: autonomy.fullMaxFollowUps must be a whole number, 0 or more`);
+    }
+    thresholds.fullMaxFollowUps = followUps;
+  }
+  if ("fullMinClaudeCommitShare" in fields) {
+    const share = fields["fullMinClaudeCommitShare"];
+    if (typeof share !== "number" || !(share >= 0 && share <= 1)) {
+      throw new Error(`${CONFIG_FILE}: autonomy.fullMinClaudeCommitShare must be a number from 0 to 1`);
+    }
+    thresholds.fullMinClaudeCommitShare = share;
+  }
+  return thresholds;
 }
 
 function stringList(value: unknown, field: string): string[] {
