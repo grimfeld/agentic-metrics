@@ -6,7 +6,7 @@
     {
       "name": "agentic-metrics",
       "source": "./plugin",
-      "description": "Caches Claude Code transcripts at the end of every session so metrics survive Claude Code's cleanup."
+      "description": "Caches Claude Code transcripts at the end of every session so metrics survive Claude Code's cleanup, and adds skill addenda for the metrics conventions."
     }
   ]
 }

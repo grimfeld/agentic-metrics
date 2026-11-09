@@ -12,5 +12,5 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true
   },
-  "include": ["cli/**/*.ts", "plugin/**/*.ts", "test/**/*.ts"]
+  "include": ["cli/**/*.ts", "plugin/**/*.ts", "action/**/*.ts", "test/**/*.ts"]
 }
