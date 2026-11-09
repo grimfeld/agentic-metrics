@@ -46,7 +46,7 @@ const USAGE = `Usage:
   agentic-metrics init [--alias name] [--publish full|anonymized|none]
       Onboard the current repo: write ${CONFIG_FILE} with every field set
       (Dependabot excluded; publish anonymized for a private repo, under
-      --alias or an alias derived from the repo), create the \`regression\`
+      --alias or a random alias), create the \`regression\`
       and \`autonomy:*\` labels, and install the GitHub Action workflow.
       Safe to run again: an existing config or workflow is kept.
   agentic-metrics collect [--repo owner/name [--checkout dir]] [--datasets dir] [--local dir] [--case-studies dir] [--full]

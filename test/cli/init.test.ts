@@ -109,7 +109,17 @@ describe("init", () => {
     assert.equal(typeof alias, "string");
     assert.doesNotMatch(String(alias), /acme|widgets/i);
     assert.equal(readConfig(cwd).alias, alias);
-    assert.match(stdout, new RegExp(`${String(alias)}.*derived`));
+    assert.match(stdout, new RegExp(`${String(alias)}.*random`));
+  });
+
+  it("picks a random alias, so the repo's name can't be recovered from it by hashing", async () => {
+    const { admin } = fakeGitHub({ private: true });
+    assert.equal(await init(admin), 0, stderr);
+    const first = configFile()["alias"];
+    rmSync(join(cwd, ".agentic-metrics.json"));
+    assert.equal(await init(admin), 0, stderr);
+
+    assert.notEqual(configFile()["alias"], first);
   });
 
   it("refuses an alias that isn't a plain name, writing nothing", async () => {

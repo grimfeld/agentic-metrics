@@ -2,7 +2,7 @@
 // every field set, creates the labels the metrics read, and installs the
 // GitHub Action workflow. Safe to run again: nothing that exists is replaced.
 import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -27,7 +27,7 @@ export interface Label {
 }
 
 export interface InitOptions {
-  /** The name an anonymized repo is published under; derived from the repo when unset. */
+  /** The name an anonymized repo is published under; a random one when unset. */
   alias?: string | undefined;
   /** Overrides the default publish mode (`anonymized` for a private repo, else `full`). */
   publish?: PublishMode | undefined;
@@ -68,8 +68,8 @@ export async function init(cwd: string, admin: RepoAdmin, options: InitOptions):
     };
     let note = `publish: ${publish}${options.publish || !repo.private ? "" : " (the repo is private)"}`;
     if (publish === "anonymized") {
-      file["alias"] = options.alias ?? derivedAlias(repo.fullName);
-      note += options.alias ? `, alias ${options.alias}` : `, alias ${String(file["alias"])} (derived; pass --alias or edit the file to choose one)`;
+      file["alias"] = options.alias ?? randomAlias();
+      note += options.alias ? `, alias ${options.alias}` : `, alias ${String(file["alias"])} (random; pass --alias or edit the file to choose one)`;
     } else if (options.alias) {
       file["alias"] = options.alias;
     }
@@ -116,11 +116,12 @@ function prCheckWorkflow(cwd: string): string | undefined {
 }
 
 /**
- * A stable alias that names nothing: the repo's name would defeat anonymizing,
- * so it is a short hash of it.
+ * An alias that names nothing. Random, not a hash of the repo's name: anyone
+ * who guesses the name could hash it and confirm the guess. It is written once
+ * to the config, so it stays stable.
  */
-function derivedAlias(fullName: string): string {
-  return `repo-${createHash("sha256").update(fullName.toLowerCase()).digest("hex").slice(0, 8)}`;
+function randomAlias(): string {
+  return `repo-${randomBytes(4).toString("hex")}`;
 }
 
 /** YAML single-quoted scalar. */
