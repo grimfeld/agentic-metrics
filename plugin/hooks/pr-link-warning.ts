@@ -23,7 +23,9 @@ const CLOSING_REFERENCE = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?\s+(?:[\
 
 // An issue number standing as its own segment of the branch name: `ticket-19`,
 // `spec/363-zoom`, `19-tidy`, but not the digits inside `agent-a97562946d8`.
-// Matches the per-repo branch regex's default; the hook doesn't read the config.
+// Deliberately looser than the shared default branch regex (cli/branch.ts),
+// which the plugin can't import: any number segment silences the warning. The
+// hook doesn't read the config.
 const BRANCH_ISSUE_NUMBER = /(?:^|[/_-])\d+(?=$|[/_-])/;
 
 // The value of an option given as `--long value`, `--long=value` or `-s value`,

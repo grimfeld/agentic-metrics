@@ -15,6 +15,10 @@ export interface PullRequest {
   headRefName: string;
   /** Issue numbers in this repo the PR closes (GitHub's closing references). */
   closes: number[];
+  /** The author's login, without a bot's `[bot]` suffix; undefined for a deleted account. */
+  author: string | undefined;
+  /** First line of each of its commits (first 100). */
+  commitSubjects: string[];
   /** Lines added and deleted, and files changed, over the whole diff. */
   additions: number;
   deletions: number;
@@ -83,10 +87,11 @@ interface RawPullRequest {
   baseRefName: string;
   headRefName: string;
   closingIssuesReferences: { nodes: { number: number; repository: { nameWithOwner: string } }[] };
+  author?: { login: string } | null;
   additions?: number;
   deletions?: number;
   changedFiles?: number;
-  commits?: { nodes: { commit: { authoredDate: string } }[] };
+  commits?: { nodes: { commit: { authoredDate?: string; messageHeadline?: string } }[] };
   files?: { totalCount: number; nodes: ChangedFile[] } | null;
 }
 
@@ -126,6 +131,10 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
               closes: pr.closingIssuesReferences.nodes
                 .filter((ref) => ref.repository.nameWithOwner.toLowerCase() === repo.fullName.toLowerCase())
                 .map((ref) => ref.number),
+              author: pr.author?.login.replace(/\[bot\]$/, ""),
+              commitSubjects: (pr.commits?.nodes ?? []).flatMap((node) =>
+                node.commit.messageHeadline === undefined ? [] : [node.commit.messageHeadline],
+              ),
               ...diffOf(pr),
             },
           ],
@@ -172,7 +181,9 @@ function causedBy(texts: string[]): number[] {
 /** A PR's diff stats and first commit. Missing fields read as an empty, incomplete diff. */
 function diffOf(pr: RawPullRequest) {
   const files = pr.files?.nodes ?? [];
-  const commitTimes = (pr.commits?.nodes ?? []).map((node) => Date.parse(node.commit.authoredDate));
+  const commitTimes = (pr.commits?.nodes ?? []).flatMap((node) =>
+    node.commit.authoredDate === undefined ? [] : [Date.parse(node.commit.authoredDate)],
+  );
   return {
     additions: pr.additions ?? 0,
     deletions: pr.deletions ?? 0,

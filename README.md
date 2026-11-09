@@ -43,6 +43,20 @@ The first `collect` on a repo reads its whole history. Later runs read only the 
 { "readyLabel": "ready-for-agent" }
 ```
 
+Linking PRs to tickets. A merged PR is linked to an issue by the first of: its closing references (`Closes #N`), the issue number in its branch name, `(#N)` in its commit subjects. A PR linked to no issue is a ticket of its own. These fields tune it:
+
+```json
+{
+  "branchRegex": "^spec[-/](\\d+)",
+  "integrationBranchPrefix": ["integration/", "batch/"],
+  "exclude": { "authors": ["dependabot"], "branches": ["dependabot/"] }
+}
+```
+
+- `branchRegex`: a case-insensitive JavaScript pattern; the issue number is its first capture group that matched. The default is the GitHub Action's built-in pattern (`16-title`, `spec-376-…`, `spec/363-…`, `ticket-16`, `fix/issue-12`), defined once in `cli/branch.ts`.
+- `integrationBranchPrefix` (one string or a list; default `integration/`): PRs from these branches are batches. They count as no ticket and no PR, and are counted apart (`integrationPullRequests` in the dataset). A batch delivers the PRs merged into its branch, and the issues it closes that no PR of their own delivered.
+- `exclude`: PRs by these authors (logins; `dependabot` and `dependabot[bot]` both match) or from branches starting with these prefixes count in no metric. Nothing is excluded by default.
+
 A regression is an issue labelled `regression` with a line starting `caused-by: #N` in its body or a comment; `#N` is the ticket or PR that caused it.
 
 ### Published report
