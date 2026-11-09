@@ -15,7 +15,10 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-export type GitHubRequest = "repo" | "pull-requests" | "issues";
+export type GitHubRequest = "repo" | "pull-requests" | "issues" | "regressions";
+
+/** The label that marks a bug as a regression; `init` creates it. */
+export const REGRESSION_LABEL = "regression";
 
 export interface ReadOptions {
   /**
@@ -117,6 +120,23 @@ const GRAPHQL_REQUESTS = {
 /** The requests collection reads incrementally. */
 export const INCREMENTAL: Partial<Record<GitHubRequest, IncrementalRequest>> = GRAPHQL_REQUESTS;
 
+// Issues labelled as regressions, with the text a `caused-by: #N` line may sit
+// in. Text is read here only to find that line; it never reaches the dataset.
+// Not incremental: an issue whose label is removed drops out of this filtered
+// list, which a merge of updated items could never notice. The list is short.
+const REGRESSIONS_QUERY = `
+query($owner: String!, $name: String!, $label: String!, $endCursor: String) {
+  repository(owner: $owner, name: $name) {
+    issues(first: 50, after: $endCursor, labels: [$label], orderBy: {field: CREATED_AT, direction: ASC}) {
+      pageInfo { hasNextPage endCursor }
+      nodes {
+        number createdAt body
+        comments(first: 100) { nodes { createdAt body } }
+      }
+    }
+  }
+}`;
+
 const run = promisify(execFile);
 
 /**
@@ -147,6 +167,10 @@ export function ghSource(options: { cwd: string; repo?: string | undefined }): G
     }
   };
 
+  /** Reads every page of a query at once. */
+  const graphqlAll = (query: string, variables: string[] = []) =>
+    gh(["graphql", "--paginate", "--slurp", "-F", "owner={owner}", "-F", "name={repo}", ...variables, "-f", `query=${query}`]);
+
   return {
     read(request, readOptions) {
       switch (request) {
@@ -155,6 +179,8 @@ export function ghSource(options: { cwd: string; repo?: string | undefined }): G
         case "pull-requests":
         case "issues":
           return graphql(GRAPHQL_REQUESTS[request], readOptions?.since);
+        case "regressions":
+          return graphqlAll(REGRESSIONS_QUERY, ["-f", `label=${REGRESSION_LABEL}`]);
       }
     },
   };

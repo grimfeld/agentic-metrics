@@ -31,7 +31,7 @@ function recording(fixture: string) {
   const source: GitHubSource = {
     async read(request, options) {
       const raw = await inner.read(request, options);
-      if (request !== "repo") {
+      if (request === "pull-requests" || request === "issues") {
         const connection = request === "issues" ? "issues" : "pullRequests";
         fetched[request] = (raw as { data: { repository: Record<string, { nodes: { number: number }[] }> } }[])
           .flatMap((page) => page.data.repository[connection]?.nodes ?? [])
