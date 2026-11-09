@@ -107,6 +107,10 @@ describe("report", () => {
     );
   });
 
+  it("says in Methodology that an issue closed with no PR is not a delivered ticket", () => {
+    for (const id of ["throughput", "leadTime"]) assert.match(textOf("data-methodology", id), /closed with no (merged )?PR/, id);
+  });
+
   it("shows each ticket's lead time", () => {
     assert.equal(
       textOf("data-section", "leadTime", "grimfeld/lifeline"),
