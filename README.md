@@ -43,7 +43,7 @@ Run it from a clone of the repo to measure. It reads GitHub through your `gh` lo
 
 ```
 npx agentic-metrics collect   # writes datasets/<owner>/<repo>.json
-npx agentic-metrics report    # renders datasets/ as report/index.html
+npx agentic-metrics report    # renders datasets/ as a site in report/ (open report/index.html)
 ```
 
 The first `collect` on a repo reads its whole history. Later runs read only the PRs and issues updated since the last run and merge them into a local cache of raw GitHub items, `~/.cache/agentic-metrics/github/<owner>/<repo>/` (or under `$AGENTIC_METRICS_CACHE_DIR`), so the dataset comes out the same as a full re-collection. `collect --full` reads everything again, for example after a metric definition changes. Editing a request's query also triggers a full read of that request on the next run.

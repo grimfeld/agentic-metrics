@@ -4,6 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../../cli/main.ts";
+import { readRepo } from "./report-pages.ts";
 import { fixtureSource } from "../../cli/github/source.ts";
 import { transcriptCache } from "../../cli/transcripts/source.ts";
 
@@ -159,7 +160,7 @@ describe("delegation and cost", () => {
   it("labels the dollars API equivalent in the report and Methodology, with the price table used", async () => {
     await run(["collect"]);
     await run(["report"]);
-    const html = readFileSync(join(cwd, "report/index.html"), "utf8");
+    const html = readRepo(join(cwd, "report"), "grimfeld/lifeline");
     const text = (pattern: RegExp) => (pattern.exec(html)?.[1] ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 
     const section = text(/data-section="apiEquivalentCost">([\s\S]*?)<\/section>/);

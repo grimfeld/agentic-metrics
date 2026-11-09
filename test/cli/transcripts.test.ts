@@ -4,6 +4,7 @@ import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../../cli/main.ts";
+import { readRepo } from "./report-pages.ts";
 import { fixtureSource } from "../../cli/github/source.ts";
 import { transcriptCache } from "../../cli/transcripts/source.ts";
 
@@ -133,7 +134,7 @@ describe("transcripts", () => {
   it("fills the human messages headline card, and defines both metrics in Methodology", async () => {
     await collect();
     await run(["report"]);
-    const html = readFileSync(join(cwd, "report/index.html"), "utf8");
+    const html = readRepo(join(cwd, "report"), "grimfeld/lifeline");
     const text = (pattern: RegExp) => (pattern.exec(html)?.[1] ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 
     assert.equal(text(/<article class="card" data-metric="humanMessagesPerTicket">([\s\S]*?)<\/article>/), "Human messages per ticket 2 p50 · 3 p90 4 of 5 tickets");

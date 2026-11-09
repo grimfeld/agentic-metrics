@@ -4,6 +4,7 @@ import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../../cli/main.ts";
+import { readRepo } from "./report-pages.ts";
 import { fixtureSource } from "../../cli/github/source.ts";
 import { transcriptCache } from "../../cli/transcripts/source.ts";
 
@@ -150,7 +151,7 @@ describe("autonomy", () => {
   it("shows the levels and the overridden count in the report, and defines the rule in Methodology", async () => {
     await run(["collect"]);
     await run(["report"]);
-    const html = readFileSync(join(cwd, "report/index.html"), "utf8");
+    const html = readRepo(join(cwd, "report"), "grimfeld/lifeline");
     const text = (pattern: RegExp) => (pattern.exec(html)?.[1] ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 
     assert.match(text(/data-section="autonomy">([\s\S]*?)<\/section>/), /^Autonomy level Full 3 Assisted 1 Manual 1 1 of 5 tickets overridden by an autonomy:\* label\./);

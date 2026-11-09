@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { main } from "../../cli/main.ts";
 import { fixtureSource } from "../../cli/github/source.ts";
 import { transcriptCache } from "../../cli/transcripts/source.ts";
+import { readRepo } from "./report-pages.ts";
 
 const GITHUB = join(import.meta.dirname, "../fixtures/github");
 const BATCH_CACHE = join(import.meta.dirname, "../fixtures/transcript-cache/batch");
@@ -49,8 +50,9 @@ function dataset(repo: string): Dataset {
   return JSON.parse(readFileSync(join(cwd, "datasets", `${repo}.json`), "utf8")) as Dataset;
 }
 
-function report(): string {
-  return readFileSync(join(cwd, "report/index.html"), "utf8");
+/** The repo's report page, then Methodology. */
+function report(repo = "grimfeld/agentic-metrics"): string {
+  return readRepo(join(cwd, "report"), repo);
 }
 
 /** The visible text of the first element carrying `attribute="value"`, or undefined. */
@@ -146,7 +148,7 @@ describe("net lines changed", () => {
   it("shows net lines as lines changed with a sign, in the section, the CV sentences, the trends and Methodology; the dataset keeps its id", async () => {
     await run(["collect"], join(GITHUB, "lifeline"));
     await run(["report"], join(GITHUB, "lifeline"));
-    const html = report();
+    const html = report("grimfeld/lifeline");
 
     // #115 +120/-30, #116 +50/-70, #117 +10/-40, #136 +200/-5, #137 +5/-0: 385 added, 145 deleted.
     assert.equal(dataset("grimfeld/lifeline").metrics["netLinesRemoved"]?.coverage.tickets, 5);
@@ -168,6 +170,6 @@ describe("net lines changed", () => {
     await run(["collect"], github);
     await run(["report"], github);
 
-    assert.match(textOf(report(), "data-section", "netLinesRemoved") ?? "", /^Net lines changed \+103,030 net lines changed: 103,175 added, 145 deleted\./);
+    assert.match(textOf(report("grimfeld/lifeline"), "data-section", "netLinesRemoved") ?? "", /^Net lines changed \+103,030 net lines changed: 103,175 added, 145 deleted\./);
   });
 });

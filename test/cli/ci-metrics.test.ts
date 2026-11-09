@@ -4,6 +4,7 @@ import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:f
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { main } from "../../cli/main.ts";
+import { readRepo } from "./report-pages.ts";
 import { fixtureSource } from "../../cli/github/source.ts";
 
 const FIXTURES = join(import.meta.dirname, "../fixtures/github");
@@ -199,7 +200,7 @@ describe("CI metrics in the report", () => {
     await collect();
     const status = await main(["report"], { cwd, stdout: () => undefined, stderr: () => undefined });
     assert.equal(status, 0);
-    return readFileSync(join(cwd, "report/index.html"), "utf8");
+    return readRepo(join(cwd, "report"), "grimfeld/ci");
   }
 
   it("fills the first-run CI rate headline card", async () => {
@@ -213,9 +214,9 @@ describe("CI metrics in the report", () => {
     const html = await report();
     for (const id of ["fixCycles", "scheduledFailures", "batchHealth"]) assert.match(html, new RegExp(`data-section="${id}"`));
     for (const id of CI_METRICS) {
-      const entry = new RegExp(`<article data-methodology="${id}">.*?</article>`, "s").exec(html)?.[0] ?? "";
+      const entry = new RegExp(`<article [^>]*data-methodology="${id}">.*?</article>`, "s").exec(html)?.[0] ?? "";
       assert.match(entry, /Coverage:<\/strong> grimfeld\/ci \d+ of 8 tickets/, id);
     }
-    assert.match(html, /<article data-methodology="firstRunCiRate">.*re-run.*<\/article>/s);
+    assert.match(html, /<article [^>]*data-methodology="firstRunCiRate">.*re-run.*<\/article>/s);
   });
 });
