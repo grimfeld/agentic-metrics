@@ -9,9 +9,10 @@ export interface RegressionRate {
   regressions: number;
   regressedTickets: number;
   /** Regression issues whose `caused-by:` is missing or names no delivered ticket or PR. */
-  untraced: number[];
-  /** The tickets with regressions, in delivery order, with the bug issues traced to each. */
-  perTicket: { ticket: string; bugs: number[] }[];
+  /** Absent once anonymized. */
+  untraced?: number[];
+  /** The tickets with regressions, in delivery order, with the bug issues traced to each. Absent once anonymized. */
+  perTicket?: { ticket: string; bugs: number[] }[];
 }
 
 export const regressionRate: Metric<RegressionRate> = {
@@ -56,11 +57,16 @@ export const regressionRate: Metric<RegressionRate> = {
     };
   },
 
+  anonymize: ({ rate, regressions, regressedTickets }) => ({ rate, regressions, regressedTickets }),
+
   headline({ rate, regressions }) {
     return `${String(Math.round(rate * 1000) / 10)}% <small>${String(regressions)} regression${regressions === 1 ? "" : "s"}</small>`;
   },
 
-  section({ perTicket, untraced }) {
+  section({ perTicket, untraced, regressions, regressedTickets }) {
+    if (!perTicket || !untraced) {
+      return `<p>${String(regressions)} regression${regressions === 1 ? "" : "s"} traced to ${String(regressedTickets)} ticket${regressedTickets === 1 ? "" : "s"}.</p>`;
+    }
     const rows = perTicket
       .map((row) => `<tr><td>${row.ticket}</td><td>${row.bugs.map((bug) => `#${String(bug)}`).join(", ")}</td></tr>`)
       .join("");

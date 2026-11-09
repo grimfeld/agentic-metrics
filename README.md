@@ -38,8 +38,14 @@ npx agentic-metrics report    # renders datasets/ as report/index.html
 `collect --repo owner/name` measures another repo. Per-repo settings live in `.agentic-metrics.json` at the repo root. All fields are optional:
 
 ```json
-{ "readyLabel": "ready-for-agent" }
+{ "readyLabel": "ready-for-agent", "publish": "anonymized", "alias": "client-a" }
 ```
+
+`publish` sets what a repo's dataset may show:
+
+- `full`: titles and links of every delivered ticket. The default for a public repo.
+- `anonymized`: aggregates only, written to `datasets/<alias>.json` under `alias`, with no names, titles, ticket numbers or links. The default for a private repo; `collect` refuses to run without an `alias`.
+- `none`: nothing in the datasets; a local report in `.agentic-metrics-local/index.html` (`--local dir` to change).
 
 A regression is an issue labelled `regression` with a line starting `caused-by: #N` in its body or a comment; `#N` is the ticket or PR that caused it.
 

@@ -45,14 +45,30 @@ function repoSection(dataset: Dataset): string {
     return [`<section class="metric" data-section="${metric.id}"><h3>${escapeHtml(metric.name)}</h3>${body}</section>`];
   }).join("\n");
   const raw = `datasets/${escapeHtml(datasetPath(dataset.repo))}`;
+  const heading = dataset.url ? `<a href="${escapeHtml(dataset.url)}">${repo}</a>` : repo;
   return `<section class="repo" id="${repo}" data-repo="${repo}">
-<h2>${repo}</h2>
+<h2>${heading}</h2>
 <p class="meta">${String(dataset.tickets)} tickets, ${String(dataset.pullRequests)} PRs merged · collected ${escapeHtml(dataset.generatedAt.slice(0, 10))} · <a href="${raw}">raw dataset</a></p>
 <div class="cards">
 ${cards}
 </div>
 ${sections}
+${ticketList(dataset)}
 </section><!-- /repo -->`;
+}
+
+/** The delivered tickets with their titles and links, latest first; only a `full` dataset has them. */
+function ticketList(dataset: Dataset): string {
+  if (!dataset.ticketList?.length) return "";
+  const items = [...dataset.ticketList]
+    .reverse()
+    .map((ticket) => {
+      const label = `${escapeHtml(ticket.id)} ${escapeHtml(ticket.title)}`;
+      const linked = ticket.url ? `<a href="${escapeHtml(ticket.url)}">${label}</a>` : label;
+      return `<li>${linked} <small>${escapeHtml(ticket.doneAt.slice(0, 10))}</small></li>`;
+    })
+    .join("");
+  return `<details class="tickets" data-section="tickets"><summary>Tickets delivered (${String(dataset.ticketList.length)})</summary><ul>${items}</ul></details>`;
 }
 
 function methodology(datasets: Dataset[]): string {

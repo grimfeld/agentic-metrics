@@ -10,6 +10,8 @@
      "nodes": [
       {
        "number": 104,
+       "title": "Lifeline issue title 104",
+       "url": "https://github.com/grimfeld/lifeline/issues/104",
        "createdAt": "2026-10-18T20:00:00Z",
        "closedAt": "2026-10-19T20:00:01Z",
        "timelineItems": {
@@ -20,6 +22,8 @@
       },
       {
        "number": 105,
+       "title": "Lifeline issue title 105",
+       "url": "https://github.com/grimfeld/lifeline/issues/105",
        "createdAt": "2026-10-19T00:00:00Z",
        "closedAt": "2026-10-19T20:00:01Z",
        "timelineItems": { "nodes": [] }
@@ -40,6 +44,8 @@
      "nodes": [
       {
        "number": 106,
+       "title": "Lifeline issue title 106",
+       "url": "https://github.com/grimfeld/lifeline/issues/106",
        "createdAt": "2026-10-20T12:00:00Z",
        "closedAt": "2026-10-28T12:00:01Z",
        "timelineItems": {
@@ -51,6 +57,8 @@
       },
       {
        "number": 107,
+       "title": "Lifeline issue title 107",
+       "url": "https://github.com/grimfeld/lifeline/issues/107",
        "createdAt": "2026-10-20T08:00:00Z",
        "closedAt": null,
        "timelineItems": {

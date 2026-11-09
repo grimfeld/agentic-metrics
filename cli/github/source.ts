@@ -27,7 +27,7 @@ query($owner: String!, $name: String!, $endCursor: String) {
     pullRequests(first: 50, after: $endCursor, states: [MERGED], orderBy: {field: CREATED_AT, direction: ASC}) {
       pageInfo { hasNextPage endCursor }
       nodes {
-        number createdAt mergedAt baseRefName headRefName
+        number title url createdAt mergedAt baseRefName headRefName
         author { login __typename }
         closingIssuesReferences(first: 50) { nodes { number repository { nameWithOwner } } }
       }
@@ -41,7 +41,7 @@ query($owner: String!, $name: String!, $endCursor: String) {
     issues(first: 50, after: $endCursor, orderBy: {field: CREATED_AT, direction: ASC}) {
       pageInfo { hasNextPage endCursor }
       nodes {
-        number createdAt closedAt
+        number title url createdAt closedAt
         timelineItems(first: 100, itemTypes: [LABELED_EVENT]) {
           nodes { __typename ... on LabeledEvent { createdAt label { name } } }
         }

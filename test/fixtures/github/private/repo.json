@@ -1,0 +1,13 @@
+{
+ "id": 1080000001,
+ "name": "payroll-engine",
+ "full_name": "acme-corp/payroll-engine",
+ "private": true,
+ "owner": {
+  "login": "acme-corp",
+  "type": "User"
+ },
+ "html_url": "https://github.com/acme-corp/payroll-engine",
+ "created_at": "2026-09-01T10:00:00Z",
+ "default_branch": "master"
+}

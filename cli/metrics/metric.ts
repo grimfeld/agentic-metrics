@@ -24,6 +24,12 @@ export interface Metric<V> {
   id: string;
   name: string;
   compute(work: LinkedWork): MetricResult<V>;
+  /**
+   * The value as an `anonymized` dataset publishes it: aggregates only, with
+   * no ticket or issue number, title or link. Required, so that no metric
+   * publishes per-ticket data by default. `section` must render its result.
+   */
+  anonymize(value: V): V;
   /** The figure on its headline card, for the metrics that have one. */
   headline?(value: V): string;
   /** A report section of its own (HTML), for metrics shown beyond a card. */
