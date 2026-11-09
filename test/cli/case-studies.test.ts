@@ -124,6 +124,20 @@ describe("case studies", () => {
     assert.equal(existsSync(join(cwd, "report/case-studies")), false);
   });
 
+  it("leaves an older draft's instruction line off its page", async () => {
+    await run(["collect"]);
+    // Drafts written before the instruction moved to the front matter carry it in their story.
+    write(
+      `${DRAFTS}/106.md`,
+      "---\napproved: true\n---\n\n# PR #88 Retire the Bible App\n\nDraft written by `agentic-metrics collect`. Edit it, then set `approved: true` above to publish it in the report.\n\nCandidate for: largest ticket.\n\nDraft written by hand is fine here.\n",
+    );
+    await run(["report"]);
+    const page = read("report/grimfeld--lifeline/case-studies/106.html");
+    assert.match(page, /<h4>PR #88 Retire the Bible App<\/h4>\n<p>Candidate for: largest ticket\.<\/p>/);
+    assert.doesNotMatch(page, /agentic-metrics collect|approved: true/);
+    assert.match(page, /<p>Draft written by hand is fine here\.<\/p>/);
+  });
+
   it("renders an approved case study's Markdown as text, never as raw HTML", async () => {
     await run(["collect"]);
     write(`${DRAFTS}/106.md`, "---\napproved: true\n---\n\n# Title\n\n<script>alert(1)</script> and [a link](https://example.com/x)\n\n- one\n- two\n");
