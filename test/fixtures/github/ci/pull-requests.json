@@ -1,0 +1,516 @@
+[
+ {
+  "data": {
+   "repository": {
+    "pullRequests": {
+     "pageInfo": {
+      "hasNextPage": false,
+      "endCursor": null
+     },
+     "nodes": [
+      {
+       "number": 201,
+       "title": "CI PR title 201",
+       "url": "https://github.com/grimfeld/ci/pull/201",
+       "body": "",
+       "createdAt": "2026-10-01T08:00:00Z",
+       "updatedAt": "2026-10-01T12:00:00Z",
+       "mergedAt": "2026-10-01T12:00:00Z",
+       "baseRefName": "master",
+       "headRefName": "spec-301-first-run-passes",
+       "author": {
+        "login": "grimfeld",
+        "__typename": "User"
+       },
+       "closingIssuesReferences": {
+        "nodes": [
+         {
+          "number": 301,
+          "repository": {
+           "nameWithOwner": "grimfeld/ci"
+          }
+         }
+        ]
+       },
+       "additions": 10,
+       "deletions": 2,
+       "changedFiles": 1,
+       "commits": {
+        "nodes": [
+         {
+          "commit": {
+           "authoredDate": "2026-10-01T08:00:00Z",
+           "messageHeadline": "Implement the change"
+          }
+         }
+        ]
+       },
+       "files": {
+        "totalCount": 1,
+        "nodes": [
+         {
+          "path": "src/a.ts",
+          "additions": 10,
+          "deletions": 2
+         }
+        ]
+       },
+       "reviews": {
+        "nodes": []
+       }
+      },
+      {
+       "number": 202,
+       "title": "CI PR title 202",
+       "url": "https://github.com/grimfeld/ci/pull/202",
+       "body": "",
+       "createdAt": "2026-10-02T08:00:00Z",
+       "updatedAt": "2026-10-02T14:00:00Z",
+       "mergedAt": "2026-10-02T14:00:00Z",
+       "baseRefName": "master",
+       "headRefName": "spec-302-fixed-after-failure",
+       "author": {
+        "login": "grimfeld",
+        "__typename": "User"
+       },
+       "closingIssuesReferences": {
+        "nodes": [
+         {
+          "number": 302,
+          "repository": {
+           "nameWithOwner": "grimfeld/ci"
+          }
+         }
+        ]
+       },
+       "additions": 10,
+       "deletions": 2,
+       "changedFiles": 1,
+       "commits": {
+        "nodes": [
+         {
+          "commit": {
+           "authoredDate": "2026-10-02T08:00:00Z",
+           "messageHeadline": "Implement the change"
+          }
+         }
+        ]
+       },
+       "files": {
+        "totalCount": 1,
+        "nodes": [
+         {
+          "path": "src/a.ts",
+          "additions": 10,
+          "deletions": 2
+         }
+        ]
+       },
+       "reviews": {
+        "nodes": []
+       }
+      },
+      {
+       "number": 203,
+       "title": "CI PR title 203",
+       "url": "https://github.com/grimfeld/ci/pull/203",
+       "body": "",
+       "createdAt": "2026-10-03T08:00:00Z",
+       "updatedAt": "2026-10-03T16:00:00Z",
+       "mergedAt": "2026-10-03T16:00:00Z",
+       "baseRefName": "master",
+       "headRefName": "spec-303-re-run",
+       "author": {
+        "login": "grimfeld",
+        "__typename": "User"
+       },
+       "closingIssuesReferences": {
+        "nodes": [
+         {
+          "number": 303,
+          "repository": {
+           "nameWithOwner": "grimfeld/ci"
+          }
+         }
+        ]
+       },
+       "additions": 10,
+       "deletions": 2,
+       "changedFiles": 1,
+       "commits": {
+        "nodes": [
+         {
+          "commit": {
+           "authoredDate": "2026-10-03T08:00:00Z",
+           "messageHeadline": "Implement the change"
+          }
+         }
+        ]
+       },
+       "files": {
+        "totalCount": 1,
+        "nodes": [
+         {
+          "path": "src/a.ts",
+          "additions": 10,
+          "deletions": 2
+         }
+        ]
+       },
+       "reviews": {
+        "nodes": []
+       }
+      },
+      {
+       "number": 204,
+       "title": "CI PR title 204",
+       "url": "https://github.com/grimfeld/ci/pull/204",
+       "body": "",
+       "createdAt": "2026-10-04T08:00:00Z",
+       "updatedAt": "2026-10-04T18:00:00Z",
+       "mergedAt": "2026-10-04T18:00:00Z",
+       "baseRefName": "master",
+       "headRefName": "spec-304-review",
+       "author": {
+        "login": "grimfeld",
+        "__typename": "User"
+       },
+       "closingIssuesReferences": {
+        "nodes": [
+         {
+          "number": 304,
+          "repository": {
+           "nameWithOwner": "grimfeld/ci"
+          }
+         }
+        ]
+       },
+       "additions": 10,
+       "deletions": 2,
+       "changedFiles": 1,
+       "commits": {
+        "nodes": [
+         {
+          "commit": {
+           "authoredDate": "2026-10-04T08:00:00Z",
+           "messageHeadline": "Implement the change"
+          }
+         }
+        ]
+       },
+       "files": {
+        "totalCount": 1,
+        "nodes": [
+         {
+          "path": "src/a.ts",
+          "additions": 10,
+          "deletions": 2
+         }
+        ]
+       },
+       "reviews": {
+        "nodes": [
+         {
+          "submittedAt": "2026-10-04T09:00:00Z"
+         }
+        ]
+       }
+      },
+      {
+       "number": 205,
+       "title": "CI PR title 205",
+       "url": "https://github.com/grimfeld/ci/pull/205",
+       "body": "",
+       "createdAt": "2026-10-05T08:00:00Z",
+       "updatedAt": "2026-10-05T10:00:00Z",
+       "mergedAt": "2026-10-05T10:00:00Z",
+       "baseRefName": "master",
+       "headRefName": "spec-305-no-ci",
+       "author": {
+        "login": "grimfeld",
+        "__typename": "User"
+       },
+       "closingIssuesReferences": {
+        "nodes": [
+         {
+          "number": 305,
+          "repository": {
+           "nameWithOwner": "grimfeld/ci"
+          }
+         }
+        ]
+       },
+       "additions": 10,
+       "deletions": 2,
+       "changedFiles": 1,
+       "commits": {
+        "nodes": [
+         {
+          "commit": {
+           "authoredDate": "2026-10-05T08:00:00Z",
+           "messageHeadline": "Implement the change"
+          }
+         }
+        ]
+       },
+       "files": {
+        "totalCount": 1,
+        "nodes": [
+         {
+          "path": "src/a.ts",
+          "additions": 10,
+          "deletions": 2
+         }
+        ]
+       },
+       "reviews": {
+        "nodes": []
+       }
+      },
+      {
+       "number": 206,
+       "title": "CI PR title 206",
+       "url": "https://github.com/grimfeld/ci/pull/206",
+       "body": "",
+       "createdAt": "2026-10-05T12:00:00Z",
+       "updatedAt": "2026-10-06T12:00:02Z",
+       "mergedAt": "2026-10-06T12:00:02Z",
+       "baseRefName": "master",
+       "headRefName": "spec-306-batched",
+       "author": {
+        "login": "grimfeld",
+        "__typename": "User"
+       },
+       "closingIssuesReferences": {
+        "nodes": [
+         {
+          "number": 306,
+          "repository": {
+           "nameWithOwner": "grimfeld/ci"
+          }
+         }
+        ]
+       },
+       "additions": 10,
+       "deletions": 2,
+       "changedFiles": 1,
+       "commits": {
+        "nodes": [
+         {
+          "commit": {
+           "authoredDate": "2026-10-05T12:00:00Z",
+           "messageHeadline": "Implement the change"
+          }
+         }
+        ]
+       },
+       "files": {
+        "totalCount": 1,
+        "nodes": [
+         {
+          "path": "src/a.ts",
+          "additions": 10,
+          "deletions": 2
+         }
+        ]
+       },
+       "reviews": {
+        "nodes": []
+       }
+      },
+      {
+       "number": 207,
+       "title": "CI PR title 207",
+       "url": "https://github.com/grimfeld/ci/pull/207",
+       "body": "",
+       "createdAt": "2026-10-05T12:00:00Z",
+       "updatedAt": "2026-10-06T12:00:03Z",
+       "mergedAt": "2026-10-06T12:00:03Z",
+       "baseRefName": "master",
+       "headRefName": "spec-307-batched",
+       "author": {
+        "login": "grimfeld",
+        "__typename": "User"
+       },
+       "closingIssuesReferences": {
+        "nodes": [
+         {
+          "number": 307,
+          "repository": {
+           "nameWithOwner": "grimfeld/ci"
+          }
+         }
+        ]
+       },
+       "additions": 10,
+       "deletions": 2,
+       "changedFiles": 1,
+       "commits": {
+        "nodes": [
+         {
+          "commit": {
+           "authoredDate": "2026-10-05T12:00:00Z",
+           "messageHeadline": "Implement the change"
+          }
+         }
+        ]
+       },
+       "files": {
+        "totalCount": 1,
+        "nodes": [
+         {
+          "path": "src/a.ts",
+          "additions": 10,
+          "deletions": 2
+         }
+        ]
+       },
+       "reviews": {
+        "nodes": []
+       }
+      },
+      {
+       "number": 208,
+       "title": "CI PR title 208",
+       "url": "https://github.com/grimfeld/ci/pull/208",
+       "body": "",
+       "createdAt": "2026-10-05T12:00:00Z",
+       "updatedAt": "2026-10-07T12:00:02Z",
+       "mergedAt": "2026-10-07T12:00:02Z",
+       "baseRefName": "master",
+       "headRefName": "spec-308-skipped",
+       "author": {
+        "login": "grimfeld",
+        "__typename": "User"
+       },
+       "closingIssuesReferences": {
+        "nodes": [
+         {
+          "number": 308,
+          "repository": {
+           "nameWithOwner": "grimfeld/ci"
+          }
+         }
+        ]
+       },
+       "additions": 10,
+       "deletions": 2,
+       "changedFiles": 1,
+       "commits": {
+        "nodes": [
+         {
+          "commit": {
+           "authoredDate": "2026-10-05T12:00:00Z",
+           "messageHeadline": "Implement the change"
+          }
+         }
+        ]
+       },
+       "files": {
+        "totalCount": 1,
+        "nodes": [
+         {
+          "path": "src/a.ts",
+          "additions": 10,
+          "deletions": 2
+         }
+        ]
+       },
+       "reviews": {
+        "nodes": []
+       }
+      },
+      {
+       "number": 210,
+       "title": "Integrate #206, #207",
+       "url": "https://github.com/grimfeld/ci/pull/210",
+       "body": "Lands these PRs on master together.\n\n- #206\n- #207\n\nSkipped (they conflict with the batch):\n\n- #208\n",
+       "createdAt": "2026-10-06T08:00:00Z",
+       "updatedAt": "2026-10-06T12:00:00Z",
+       "mergedAt": "2026-10-06T12:00:00Z",
+       "baseRefName": "master",
+       "headRefName": "integration/2026-10-06",
+       "author": {
+        "login": "grimfeld",
+        "__typename": "User"
+       },
+       "closingIssuesReferences": {
+        "nodes": []
+       },
+       "additions": 10,
+       "deletions": 2,
+       "changedFiles": 1,
+       "commits": {
+        "nodes": [
+         {
+          "commit": {
+           "authoredDate": "2026-10-06T08:00:00Z",
+           "messageHeadline": "Implement the change"
+          }
+         }
+        ]
+       },
+       "files": {
+        "totalCount": 1,
+        "nodes": [
+         {
+          "path": "src/a.ts",
+          "additions": 10,
+          "deletions": 2
+         }
+        ]
+       },
+       "reviews": {
+        "nodes": []
+       }
+      },
+      {
+       "number": 211,
+       "title": "Integrate #208",
+       "url": "https://github.com/grimfeld/ci/pull/211",
+       "body": "Lands these PRs on master together.\n\n- #208\n",
+       "createdAt": "2026-10-07T08:00:00Z",
+       "updatedAt": "2026-10-07T12:00:00Z",
+       "mergedAt": "2026-10-07T12:00:00Z",
+       "baseRefName": "master",
+       "headRefName": "integration/2026-10-07",
+       "author": {
+        "login": "grimfeld",
+        "__typename": "User"
+       },
+       "closingIssuesReferences": {
+        "nodes": []
+       },
+       "additions": 10,
+       "deletions": 2,
+       "changedFiles": 1,
+       "commits": {
+        "nodes": [
+         {
+          "commit": {
+           "authoredDate": "2026-10-07T08:00:00Z",
+           "messageHeadline": "Implement the change"
+          }
+         }
+        ]
+       },
+       "files": {
+        "totalCount": 1,
+        "nodes": [
+         {
+          "path": "src/a.ts",
+          "additions": 10,
+          "deletions": 2
+         }
+        ]
+       },
+       "reviews": {
+        "nodes": []
+       }
+      }
+     ]
+    }
+   }
+  }
+ }
+]

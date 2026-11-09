@@ -3,7 +3,7 @@
 // GitHub Action workflow. Safe to run again: nothing that exists is replaced.
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
@@ -73,6 +73,9 @@ export async function init(cwd: string, admin: RepoAdmin, options: InitOptions):
     } else if (options.alias) {
       file["alias"] = options.alias;
     }
+    const check = prCheckWorkflow(cwd);
+    if (check) file["ciWorkflow"] = check;
+    note += check ? `, ciWorkflow ${check}` : ", ciWorkflow unset (no single PR check workflow found; set it to the main check workflow)";
     await writeFile(configPath, `${JSON.stringify(file, null, 2)}\n`);
     lines.push(`${CONFIG_FILE}: written (${note})`);
   }
@@ -95,6 +98,21 @@ export async function init(cwd: string, admin: RepoAdmin, options: InitOptions):
     lines.push(`${WORKFLOW_FILE}: written`);
   }
   return lines;
+}
+
+/**
+ * The repo's main check workflow, when exactly one workflow besides ours runs
+ * on pull requests. Unset, `collect` takes the workflow that ran on the most
+ * PRs, which the installed workflow (it runs on every PR) could tie and win.
+ */
+function prCheckWorkflow(cwd: string): string | undefined {
+  const dir = join(cwd, ".github", "workflows");
+  if (!existsSync(dir)) return undefined;
+  const candidates = readdirSync(dir)
+    .filter((file) => /\.ya?ml$/.test(file))
+    .map((file) => `.github/workflows/${file}`)
+    .filter((path) => path !== WORKFLOW_FILE && /\bpull_request\b(?!_)/.test(readFileSync(join(cwd, path), "utf8")));
+  return candidates.length === 1 ? candidates[0] : undefined;
 }
 
 /**

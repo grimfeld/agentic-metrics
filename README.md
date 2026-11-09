@@ -30,7 +30,7 @@ A repo overrides one by name: `.agentic-metrics/addenda/<skill>.md` at its root 
 
 `/agentic-metrics:init` (or `npx agentic-metrics init` from the repo root) onboards a repo in one step:
 
-- writes `.agentic-metrics.json` with every field set: ready label `ready-for-agent`, the built-in branch pattern, `integration/` batches, Dependabot excluded, the default autonomy thresholds, and `publish` (`anonymized` for a private repo, else `full`; `--publish` overrides). An anonymized repo gets `--alias name`, or an alias derived from a hash of the repo's name, which `init` reports so you can change it;
+- writes `.agentic-metrics.json` with every field set: ready label `ready-for-agent`, the built-in branch pattern, `integration/` batches, Dependabot excluded, the default autonomy thresholds, and `publish` (`anonymized` for a private repo, else `full`; `--publish` overrides). An anonymized repo gets `--alias name`, or an alias derived from a hash of the repo's name, which `init` reports so you can change it. `ciWorkflow` is set when exactly one existing workflow runs on pull requests; otherwise `init` says so, and you should set it, since the installed workflow runs on every PR too;
 - creates the `regression`, `autonomy:full`, `autonomy:assisted` and `autonomy:manual` labels that are missing;
 - installs `.github/workflows/agentic-metrics.yml` (see [GitHub Action](#github-action)), passing the config's ready label and branch pattern.
 
@@ -82,6 +82,18 @@ Each ticket gets an autonomy level. `full`: a transcript with at most one human 
 ```
 
 A regression is an issue labelled `regression` with a line starting `caused-by: #N` in its body or a comment; `#N` is the ticket or PR that caused it.
+
+CI metrics (first-run CI rate, fix cycles, scheduled failures, batch health) read the repo's GitHub Actions runs. `ciWorkflow` names the main check workflow by path (`.github/workflows/check.yml`), file name or name; unset, it is the workflow that ran on the most PRs. A batch drops a PR it names (`#N` in its title or description) that merged only after it.
+
+```json
+{ "ciWorkflow": "check.yml" }
+```
+
+### Case studies
+
+For a repo published `full`, `collect` flags case-study candidates: the largest ticket (lines changed), the fewest human messages for its size (per line changed), the largest deletion (most lines removed net of lines added) and a regression caught and fixed (a traced regression whose issue was closed as completed). The dataset lists them under `caseStudyCandidates`, and `collect` writes a Markdown draft for each to `case-studies/<owner>/<repo>/<N>.md` (`pr-<N>.md` for a PR that is its own ticket; `--case-studies dir` to change the folder), from the ticket's numbers and its issue and PR descriptions, quoting any PR's "Notable intervention" line. A draft that exists is never overwritten.
+
+A draft starts with `approved: false` in its front matter. Edit it, set `approved: true` and commit it: `report` renders approved case studies only, and never for a repo published `anonymized` or `none` (those get no candidates or drafts either). Drafts themselves are not copied into the report.
 
 ### Published report
 

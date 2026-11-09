@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../../cli/main.ts";
@@ -70,6 +70,27 @@ describe("init", () => {
     // The file reads back as a valid config, and its branch pattern links the usual branch names.
     const config = readConfig(cwd);
     assert.equal(config.branchRegex.exec("spec-376-title")?.[2], "376");
+  });
+
+  it("names the repo's own PR check workflow as ciWorkflow, so the installed workflow can't be taken for it", async () => {
+    mkdirSync(join(cwd, ".github/workflows"), { recursive: true });
+    writeFileSync(join(cwd, ".github/workflows/pages.yml"), "on:\n  push:\n    branches: [main]\n");
+    writeFileSync(join(cwd, ".github/workflows/check.yml"), "on:\n  pull_request:\n  push:\n");
+    const { admin } = fakeGitHub();
+    assert.equal(await init(admin), 0, stderr);
+
+    assert.equal(configFile()["ciWorkflow"], ".github/workflows/check.yml");
+  });
+
+  it("leaves ciWorkflow unset when no single PR check workflow stands out", async () => {
+    mkdirSync(join(cwd, ".github/workflows"), { recursive: true });
+    writeFileSync(join(cwd, ".github/workflows/a.yml"), "on: [pull_request]\n");
+    writeFileSync(join(cwd, ".github/workflows/b.yaml"), "on: pull_request\n");
+    const { admin } = fakeGitHub();
+    assert.equal(await init(admin), 0, stderr);
+
+    assert.equal("ciWorkflow" in configFile(), false);
+    assert.match(stdout, /ciWorkflow/);
   });
 
   it("publishes a private repo anonymized, under the alias given", async () => {

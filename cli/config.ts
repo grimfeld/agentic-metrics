@@ -26,6 +26,12 @@ export interface Config {
   exclude: { authors: string[]; branches: string[] };
   /** When a ticket counts as `full` autonomy (see `autonomy.ts`). The file may set either field. */
   autonomy: AutonomyThresholds;
+  /**
+   * The repo's main check workflow, by file path (`.github/workflows/check.yml`),
+   * file name (`check.yml`) or name (`Check`). Unset: the workflow that ran on
+   * the most PRs.
+   */
+  ciWorkflow?: string | undefined;
 }
 
 export interface AutonomyThresholds {
@@ -71,6 +77,11 @@ export function readConfig(repoDir: string): Config {
   if ("readyLabel" in fields) {
     if (typeof fields["readyLabel"] !== "string") throw new Error(`${CONFIG_FILE}: readyLabel must be a string`);
     config.readyLabel = fields["readyLabel"];
+  }
+  if ("ciWorkflow" in fields) {
+    const workflow = fields["ciWorkflow"];
+    if (typeof workflow !== "string" || workflow === "") throw new Error(`${CONFIG_FILE}: ciWorkflow must be a non-empty string`);
+    config.ciWorkflow = workflow;
   }
   if ("publish" in fields) {
     const publish = fields["publish"];

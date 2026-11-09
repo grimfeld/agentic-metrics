@@ -45,7 +45,8 @@ export function cachedSource(inner: GitHubSource, options: { dir: string; now: (
       const cached = options.full ? undefined : await load(path, incremental.version);
 
       const readAt = options.now();
-      const since = cached && new Date(new Date(cached.readAt).getTime() - OVERLAP_MS);
+      const pending = (cached?.items ?? []).flatMap((item) => incremental.pendingSince?.(item) ?? []).map(Date.parse);
+      const since = cached && new Date(Math.min(new Date(cached.readAt).getTime() - OVERLAP_MS, ...pending));
       const fresh = incremental.items(await inner.read(request, { since }));
 
       const items = new Map((cached?.items ?? []).map((item) => [incremental.key(item), item]));
