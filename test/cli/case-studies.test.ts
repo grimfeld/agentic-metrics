@@ -131,6 +131,27 @@ describe("case studies", () => {
     assert.match(html, /<ul><li>one<\/li><li>two<\/li><\/ul>/);
   });
 
+  it("renders a fenced code block as code, keeping its language and its text", async () => {
+    await run(["collect"]);
+    write(
+      `${DRAFTS}/106.md`,
+      "---\napproved: true\n---\n\n## Summary\n\n```diff\n-apps/bible   (old <app>)\n+migration    body → Thought\n\n- not a list item\n# not a heading\n```\n\nAfter.\n\n```\nplain\n```\n",
+    );
+    await run(["report"]);
+    const page = read("report/grimfeld--lifeline/case-studies/106.html");
+    assert.match(
+      page,
+      /<pre><code class="language-diff">-apps\/bible   \(old &#60;app&#62;\)\n\+migration    body → Thought\n\n- not a list item\n# not a heading<\/code><\/pre>\n<p>After\.<\/p>\n<pre><code>plain<\/code><\/pre>/,
+    );
+  });
+
+  it("renders an unclosed fence as code to the end of the story", async () => {
+    await run(["collect"]);
+    write(`${DRAFTS}/106.md`, "---\napproved: true\n---\n\nBefore.\n\n```ts\nconst a = 1;\n");
+    await run(["report"]);
+    assert.match(read("report/grimfeld--lifeline/case-studies/106.html"), /<p>Before\.<\/p>\n<pre><code class="language-ts">const a = 1;\n?<\/code><\/pre>/);
+  });
+
   it("renders no case study while none is approved", async () => {
     await run(["collect"]);
     assert.doesNotMatch(await report(), /case-stud/);
