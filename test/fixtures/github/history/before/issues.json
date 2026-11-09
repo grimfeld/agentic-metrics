@@ -1,0 +1,42 @@
+[
+ {
+  "data": {
+   "repository": {
+    "issues": {
+     "pageInfo": {
+      "hasNextPage": false,
+      "endCursor": null
+     },
+     "nodes": [
+      {
+       "number": 2,
+       "createdAt": "2026-10-21T09:00:00Z",
+       "updatedAt": "2026-10-21T09:00:00Z",
+       "closedAt": null,
+       "timelineItems": {
+        "nodes": []
+       }
+      },
+      {
+       "number": 1,
+       "createdAt": "2026-10-18T09:00:00Z",
+       "updatedAt": "2026-10-20T09:00:01Z",
+       "closedAt": "2026-10-20T09:00:01Z",
+       "timelineItems": {
+        "nodes": [
+         {
+          "__typename": "LabeledEvent",
+          "createdAt": "2026-10-19T09:00:00Z",
+          "label": {
+           "name": "ready-for-agent"
+          }
+         }
+        ]
+       }
+      }
+     ]
+    }
+   }
+  }
+ }
+]
