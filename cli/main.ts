@@ -1,5 +1,5 @@
 // The `agentic-metrics` CLI: `collect` writes the current repo's dataset,
-// `report` renders the datasets as a static HTML report.
+// `report` renders the datasets as a static HTML report, `init` onboards a repo.
 import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
@@ -9,6 +9,7 @@ import { CONFIG_FILE, readConfig } from "./config.ts";
 import { buildDataset, datasetPath, SCHEMA_VERSION, type Dataset } from "./dataset.ts";
 import { cachedSource, defaultCacheDir } from "./github/cache.ts";
 import { loadGitHub } from "./github/load.ts";
+import { ghAdmin, init, type RepoAdmin } from "./init.ts";
 import { ghSource, type GitHubSource } from "./github/source.ts";
 import { link } from "./linker.ts";
 import { renderReport } from "./report.ts";
@@ -20,6 +21,8 @@ export interface Dependencies {
   cwd: string;
   /** Defaults to the `gh` CLI. */
   github?: GitHubSource;
+  /** The repo settings `init` reads and changes (visibility, labels). Defaults to the `gh` CLI. */
+  admin?: RepoAdmin;
   /**
    * The local cache of raw GitHub items that makes collection incremental.
    * Defaults to ~/.cache/agentic-metrics with the `gh` source; with an
@@ -40,6 +43,12 @@ export interface Dependencies {
 const LOCAL_DIR = ".agentic-metrics-local";
 
 const USAGE = `Usage:
+  agentic-metrics init [--alias name] [--publish full|anonymized|none]
+      Onboard the current repo: write ${CONFIG_FILE} with every field set
+      (Dependabot excluded; publish anonymized for a private repo, under
+      --alias or an alias derived from the repo), create the \`regression\`
+      and \`autonomy:*\` labels, and install the GitHub Action workflow.
+      Safe to run again: an existing config or workflow is kept.
   agentic-metrics collect [--repo owner/name [--checkout dir]] [--datasets dir] [--local dir] [--case-studies dir] [--full]
       Read the repo (default: the current one) through \`gh\` and write
       <dir>/<owner>/<name>.json (default dir: datasets), or <dir>/<alias>.json
@@ -72,6 +81,9 @@ export async function main(argv: string[], deps: Dependencies): Promise<number> 
         return 0;
       case "report":
         await report(rest, deps, stdout);
+        return 0;
+      case "init":
+        await initCommand(rest, deps, stdout);
         return 0;
       default:
         stderr(USAGE);
@@ -137,6 +149,16 @@ async function collect(args: string[], deps: Dependencies, stdout: (text: string
   await writeJson(join(local, "datasets", datasetPath(dataset.repo)), dataset);
   await writeFile(join(local, "index.html"), renderReport([dataset]));
   stdout(`${dataset.repo} (publish: none): ${String(dataset.tickets)} tickets, ${String(dataset.pullRequests)} PRs -> ${join(local, "index.html")}\n`);
+}
+
+async function initCommand(args: string[], deps: Dependencies, stdout: (text: string) => void): Promise<void> {
+  const { values } = parseArgs({ args, options: { alias: { type: "string" }, publish: { type: "string" } } });
+  const publish = values.publish;
+  if (publish !== undefined && publish !== "full" && publish !== "anonymized" && publish !== "none") {
+    throw new Error("--publish must be one of full, anonymized, none");
+  }
+  const lines = await init(deps.cwd, deps.admin ?? ghAdmin(deps.cwd), { alias: values.alias, publish });
+  stdout(lines.map((line) => `${line}\n`).join(""));
 }
 
 async function writeJson(path: string, value: unknown): Promise<void> {
