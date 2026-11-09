@@ -1,0 +1,9 @@
+{
+  "name": "agentic-metrics",
+  "description": "Keeps the data for agentic-metrics flowing: caches Claude Code transcripts at the end of every session and adds the metrics conventions to third-party skills through addenda.",
+  "author": { "name": "grimfeld" },
+  "homepage": "https://github.com/grimfeld/agentic-metrics",
+  "repository": "https://github.com/grimfeld/agentic-metrics",
+  "license": "MIT",
+  "keywords": ["metrics", "transcripts", "agentic-workflow"]
+}

@@ -1,0 +1,47 @@
+name: Pages
+
+# Renders the committed datasets (datasets/<owner>/<repo>.json) as the report
+# and publishes it on this repo's GitHub Pages. One-time setting:
+# Settings > Pages > Build and deployment > Source: GitHub Actions.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "datasets/**"
+      - "case-studies/**"
+      - "cli/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      # The CLI has no runtime dependencies and Node 24 runs its TypeScript directly.
+      - run: node cli/bin.ts report --datasets datasets --out _site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

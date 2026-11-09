@@ -1,0 +1,20 @@
+{
+  "action": "labeled",
+  "label": { "name": "ready-for-agent" },
+  "issue": {
+    "number": 376,
+    "title": "Library: shelf filters",
+    "body": "## What to build\n\nFilters for the library view, one per shelf.",
+    "state": "open",
+    "labels": [{ "name": "ready-for-agent" }],
+    "user": { "login": "grimfeld", "type": "User" },
+    "comments_url": "https://api.github.com/repos/grimfeld/lifeline/issues/376/comments"
+  },
+  "repository": {
+    "full_name": "grimfeld/lifeline",
+    "name": "lifeline",
+    "owner": { "login": "grimfeld" },
+    "default_branch": "main"
+  },
+  "sender": { "login": "grimfeld", "type": "User" }
+}
