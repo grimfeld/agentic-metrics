@@ -41,6 +41,16 @@ npx agentic-metrics report    # renders datasets/ as report/index.html
 { "readyLabel": "ready-for-agent" }
 ```
 
+### Published report
+
+This repo publishes the report for every tracked repo on its GitHub Pages. Datasets are committed under `datasets/<owner>/<repo>.json`, so every published number can be checked against its raw data, which each repo's section links. To track a repo, run `collect` from this repo and commit the dataset:
+
+```
+npx agentic-metrics collect --repo owner/name   # writes datasets/owner/name.json
+```
+
+`.github/workflows/pages.yml` renders `datasets/` and deploys it on every push to `main` that touches `datasets/` or `cli/`, or by hand from the Actions tab. One-time setting: Settings > Pages > Build and deployment > Source: **GitHub Actions**.
+
 Adding a metric: write one file in `cli/metrics/` holding its computation (its dataset field), how the report shows it, and its Methodology entry. Then list it in `cli/metrics/index.ts`. Its tests go in `test/cli/`, fixtures in, dataset and HTML out. To read something new from GitHub, add a request to `cli/github/source.ts` and a recorded `gh api` answer to each folder in `test/fixtures/github/`.
 
 ## GitHub Action
