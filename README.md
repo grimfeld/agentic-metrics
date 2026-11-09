@@ -26,6 +26,16 @@ Addenda add the metrics conventions to third-party skills without forking them. 
 
 A repo overrides one by name: `.agentic-metrics/addenda/<skill>.md` at its root replaces the shipped addendum, adds one for a skill that has none, or, left empty, switches it off. A namespaced skill (`plugin:name`) matches on its full name first, then on `name`.
 
+### Onboarding a repo
+
+`/agentic-metrics:init` (or `npx agentic-metrics init` from the repo root) onboards a repo in one step:
+
+- writes `.agentic-metrics.json` with every field set: ready label `ready-for-agent`, the built-in branch pattern, `integration/` batches, Dependabot excluded, the default autonomy thresholds, and `publish` (`anonymized` for a private repo, else `full`; `--publish` overrides). An anonymized repo gets `--alias name`, or an alias derived from a hash of the repo's name, which `init` reports so you can change it;
+- creates the `regression`, `autonomy:full`, `autonomy:assisted` and `autonomy:manual` labels that are missing;
+- installs `.github/workflows/agentic-metrics.yml` (see [GitHub Action](#github-action)), passing the config's ready label and branch pattern.
+
+Re-running is safe: an existing config or workflow is kept as it is, and only missing labels are created. Addenda overrides go in `.agentic-metrics/addenda/` (see above). Review and commit the two files.
+
 ## CLI
 
 Run it from a clone of the repo to measure. It reads GitHub through your `gh` login, so there's no token to set up:
@@ -87,7 +97,7 @@ Adding a metric: write one file in `cli/metrics/` holding its computation (its d
 
 ## GitHub Action
 
-Add `.github/workflows/agentic-metrics.yml` to a repo:
+`init` installs it. By hand, add `.github/workflows/agentic-metrics.yml` to a repo:
 
 ```yaml
 name: agentic-metrics
