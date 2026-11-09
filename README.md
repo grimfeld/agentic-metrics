@@ -97,13 +97,14 @@ A draft starts with `approved: false` in its front matter. Edit it, set `approve
 
 ### Published report
 
-This repo publishes the report for every tracked repo on its GitHub Pages. Datasets are committed under `datasets/<owner>/<repo>.json`, so every published number can be checked against its raw data, which each repo's section links. To track a repo, run `collect` from this repo and commit the dataset:
+The tool doesn't host anyone's report. Keep your datasets and case studies in a repo of their own (for example a private `you/agentic-metrics-report`) and render them there:
 
 ```
-npx agentic-metrics collect --repo owner/name   # writes datasets/owner/name.json
+npx agentic-metrics collect --repo owner/name --checkout ~/path/to/name   # writes datasets/owner/name.json
+npx agentic-metrics report --datasets datasets --case-studies case-studies --out _site
 ```
 
-`.github/workflows/pages.yml` renders `datasets/` (an empty-state page while there is none) and deploys it on every push to `main` that touches `datasets/` or `cli/`, or by hand from the Actions tab. One-time setting: Settings > Pages > Build and deployment > Source: **GitHub Actions**.
+`--checkout` points at the tracked repo's local clone, so its `.agentic-metrics.json` and its Claude Code transcripts are used. Commit `datasets/` (so every published number can be checked against its raw data, which each repo's section links) and the approved case studies, and publish `_site` with any static host. A GitHub Pages workflow for that repo only needs to run the `report` command above with `npx agentic-metrics@0` and deploy `_site`.
 
 Each repo's section shows trends (every metric per month of delivery), a comparison by autonomy level (`full`, `assisted`, `manual`), and CV-ready sentences with a Copy button. A sentence quotes only known values, each with its coverage. All three come from the dataset (`trends`, `byAutonomy`), so an anonymized repo gets them too, from aggregates only, with any figure covering fewer than 3 tickets withheld (shown as —; `"suppressed"` in the dataset).
 
