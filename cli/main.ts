@@ -25,6 +25,8 @@ export interface Dependencies {
   github?: GitHubSource;
   /** The repo settings `init` reads and changes (visibility, labels). Defaults to the `gh` CLI. */
   admin?: RepoAdmin;
+  /** The CLI's version, whose release `init` pins the Action to. Defaults to package.json's. */
+  version?: string;
   /**
    * The local cache of raw GitHub items that makes collection incremental.
    * Defaults to ~/.cache/agentic-metrics with the `gh` source; with an
@@ -51,7 +53,9 @@ const USAGE = `Usage:
       Onboard the current repo: write ${CONFIG_FILE} with every field set
       (Dependabot excluded; publish anonymized for a private repo, under
       --alias or a random alias), create the \`regression\`
-      and \`autonomy:*\` labels, and install the GitHub Action workflow.
+      and \`autonomy:*\` labels, and install the GitHub Action workflow,
+      pinned to the commit of this version's release tag (else of main).
+      Prints the pattern to allow when the repo allows only selected actions.
       Safe to run again: an existing config or workflow is kept.
   agentic-metrics collect [--repo owner/name [--checkout dir]] [--datasets dir] [--local dir] [--case-studies dir] [--full]
       Read the repo (default: the current one) through \`gh\` and write
@@ -172,7 +176,7 @@ async function initCommand(args: string[], deps: Dependencies, stdout: (text: st
   if (publish !== undefined && publish !== "full" && publish !== "anonymized" && publish !== "none") {
     throw new Error("--publish must be one of full, anonymized, none");
   }
-  const lines = await init(deps.cwd, deps.admin ?? ghAdmin(deps.cwd), { alias: values.alias, publish });
+  const lines = await init(deps.cwd, deps.admin ?? ghAdmin(deps.cwd), { alias: values.alias, publish, version: deps.version });
   stdout(lines.map((line) => `${line}\n`).join(""));
 }
 

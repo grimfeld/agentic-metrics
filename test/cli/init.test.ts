@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../../cli/main.ts";
 import { readConfig } from "../../cli/config.ts";
-import type { RepoAdmin } from "../../cli/init.ts";
+import type { ActionsPolicy, RepoAdmin } from "../../cli/init.ts";
 
 const WORKFLOW = ".github/workflows/agentic-metrics.yml";
 
@@ -23,12 +23,32 @@ afterEach(() => {
   rmSync(cwd, { recursive: true, force: true });
 });
 
-/** A fake of the repo's GitHub admin calls: the repo's visibility and its labels. */
-function fakeGitHub(options: { private?: boolean; labels?: string[] } = {}) {
+const MAIN_SHA = "1111111111111111111111111111111111111111";
+const TAG_SHA = "2222222222222222222222222222222222222222";
+
+/**
+ * A fake of the repo's GitHub admin calls: the repo's visibility, its labels,
+ * its Actions permissions, and the commits of the tool's own repo.
+ */
+function fakeGitHub(
+  options: {
+    private?: boolean;
+    labels?: string[];
+    actions?: ActionsPolicy | Error;
+    /** The tool repo's refs and the commits they point at. */
+    refs?: Record<string, string>;
+  } = {},
+) {
   const labels = [...(options.labels ?? ["bug", "ready-for-agent"])];
   const created: { name: string; color: string; description: string }[] = [];
+  const refs = options.refs ?? { main: MAIN_SHA };
   const admin: RepoAdmin = {
     repo: () => Promise.resolve({ fullName: "acme/widgets", private: options.private ?? false }),
+    actionsPolicy: () =>
+      options.actions instanceof Error
+        ? Promise.reject(options.actions)
+        : Promise.resolve(options.actions ?? { allowedActions: "all", patternsAllowed: [], shaPinningRequired: false }),
+    commitSha: (repo, ref) => Promise.resolve(repo === "grimfeld/agentic-metrics" ? refs[ref] : undefined),
     labels: () => Promise.resolve([...labels]),
     createLabel: (label) => {
       created.push(label);
@@ -39,11 +59,12 @@ function fakeGitHub(options: { private?: boolean; labels?: string[] } = {}) {
   return { admin, created };
 }
 
-async function init(admin: RepoAdmin, args: string[] = []): Promise<number> {
+async function init(admin: RepoAdmin, args: string[] = [], version = "9.9.9"): Promise<number> {
   stdout = "";
   return main(["init", ...args], {
     cwd,
     admin,
+    version,
     stdout: (text) => (stdout += text),
     stderr: (text) => (stderr += text),
   });
@@ -154,10 +175,85 @@ describe("init", () => {
     assert.match(workflow, /issue_comment:\n\s+types: \[created\]/);
     assert.match(workflow, /pull-requests: write/);
     assert.match(workflow, /issues: write/);
-    assert.match(workflow, /uses: grimfeld\/agentic-metrics\/action@main/);
+    assert.ok(workflow.includes(`uses: grimfeld/agentic-metrics/action@${MAIN_SHA} # main\n`), workflow);
     assert.match(workflow, /ready-label: 'ready'/);
     assert.match(workflow, /bug-label: 'bug'/);
     assert.ok(workflow.includes("branch-regex: '^it''s-(\\d+)'"), workflow);
+  });
+
+  it("pins the Action to the commit of the release tag matching the CLI's version", async () => {
+    const { admin } = fakeGitHub({ refs: { main: MAIN_SHA, "v1.2.0": TAG_SHA } });
+    assert.equal(await init(admin, [], "1.2.0"), 0, stderr);
+
+    const workflow = readFileSync(join(cwd, WORKFLOW), "utf8");
+    assert.ok(workflow.includes(`uses: grimfeld/agentic-metrics/action@${TAG_SHA} # v1.2.0\n`), workflow);
+  });
+
+  it("refuses to install a workflow it can't pin, writing nothing", async () => {
+    const { admin, created } = fakeGitHub({ refs: {} });
+    assert.equal(await init(admin), 1);
+
+    assert.match(stderr, /grimfeld\/agentic-metrics/);
+    assert.equal(existsSync(join(cwd, WORKFLOW)), false);
+    assert.equal(existsSync(join(cwd, ".agentic-metrics.json")), false);
+    assert.deepEqual(created, []);
+  });
+
+  it("prints the pattern to allow when the repo allows only selected actions and none covers the Action", async () => {
+    const { admin } = fakeGitHub({
+      actions: { allowedActions: "selected", patternsAllowed: ["pnpm/action-setup@*", "grimfeld/other/*"], shaPinningRequired: true },
+    });
+    assert.equal(await init(admin), 0, stderr);
+
+    assert.match(stdout, /grimfeld\/agentic-metrics\/action@\*/);
+    assert.match(stdout, /Settings > Actions > General/);
+  });
+
+  it("asks for nothing when an allowed pattern already covers the Action", async () => {
+    // grimfeld/lifeline's settings.
+    const { admin } = fakeGitHub({
+      actions: {
+        allowedActions: "selected",
+        patternsAllowed: ["superfly/flyctl-actions/*", "pnpm/action-setup@*", "grimfeld/agentic-metrics/action@*"],
+        shaPinningRequired: true,
+      },
+    });
+    assert.equal(await init(admin), 0, stderr);
+
+    assert.match(stdout, /allowed \(by grimfeld\/agentic-metrics\/action@\*\)/);
+    assert.doesNotMatch(stdout, /add grimfeld/);
+  });
+
+  it("counts an owner-wide pattern as covering the Action", async () => {
+    const { admin } = fakeGitHub({ actions: { allowedActions: "selected", patternsAllowed: ["grimfeld/*"], shaPinningRequired: false } });
+    assert.equal(await init(admin), 0, stderr);
+
+    assert.match(stdout, /allowed \(by grimfeld\/\*\)/);
+  });
+
+  it("says nothing of permissions when the repo allows all actions", async () => {
+    const { admin } = fakeGitHub({ actions: { allowedActions: "all", patternsAllowed: [], shaPinningRequired: false } });
+    assert.equal(await init(admin), 0, stderr);
+
+    assert.doesNotMatch(stdout, /actions permissions/);
+  });
+
+  it("still onboards when the Actions settings can't be read, naming the pattern to check", async () => {
+    const { admin } = fakeGitHub({ actions: new Error("HTTP 403: Must have admin rights to Repository.") });
+    assert.equal(await init(admin), 0, stderr);
+
+    assert.ok(existsSync(join(cwd, WORKFLOW)));
+    assert.match(stdout, /not read \(HTTP 403.*grimfeld\/agentic-metrics\/action@\*/);
+  });
+
+  it("warns about a kept workflow that isn't pinned when the repo requires SHA pinning", async () => {
+    mkdirSync(join(cwd, ".github/workflows"), { recursive: true });
+    writeFileSync(join(cwd, WORKFLOW), "    steps:\n      - uses: grimfeld/agentic-metrics/action@main\n");
+    const { admin } = fakeGitHub({ actions: { allowedActions: "all", patternsAllowed: [], shaPinningRequired: true } });
+    assert.equal(await init(admin), 0, stderr);
+
+    assert.equal(readFileSync(join(cwd, WORKFLOW), "utf8"), "    steps:\n      - uses: grimfeld/agentic-metrics/action@main\n");
+    assert.match(stdout, /requires actions pinned to a full commit SHA/);
   });
 
   it("is safe to run again: keeps the config and workflow, creates no label twice", async () => {
