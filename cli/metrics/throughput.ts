@@ -44,6 +44,12 @@ export const throughput: Metric<Throughput> = {
 
   anonymize: (value) => value,
 
+  figure: {
+    label: "tickets",
+    of: ({ weeks }) => weeks.reduce((sum, week) => sum + week.tickets, 0),
+    format: String,
+  },
+
   section({ weeks }) {
     const rows = weeks
       .map((w) => `<tr><td>${w.week}</td><td>${String(w.tickets)}</td><td>${String(w.pullRequests)}</td></tr>`)

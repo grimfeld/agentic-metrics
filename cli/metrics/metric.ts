@@ -19,6 +19,26 @@ export interface MetricResult<V> {
   coverage: Coverage;
 }
 
+export interface Figure<V> {
+  /** What the number is, e.g. `p50`; shown beside the metric's name. */
+  label: string;
+  of(value: V): number;
+  /** Plain text. */
+  format(figure: number): string;
+  /**
+   * False for a metric no ticket owns (orchestration time is repo-level), or
+   * that the autonomy level itself defines: it keeps its trend but is left
+   * out of the comparison by autonomy level.
+   */
+  byAutonomy?: boolean;
+}
+
+/** A metric's figure over a subset of tickets: a month's, or an autonomy level's. */
+export interface FigureResult {
+  value: number | typeof UNKNOWN;
+  coverage: Coverage;
+}
+
 export interface Metric<V> {
   /** Its key in the dataset's `metrics`. Never rename one: published datasets use it. */
   id: string;
@@ -34,6 +54,19 @@ export interface Metric<V> {
   headline?(value: V): string;
   /** A report section of its own (HTML), for metrics shown beyond a card. */
   section?(value: V): string;
+  /**
+   * One number summarising a value, for trends over time and the comparison
+   * by autonomy level: the metric is computed over each month's tickets and
+   * over each level's, and this reads the figure off each result. It is given
+   * the value as published (anonymized when the dataset is). A metric without
+   * one has no trend and no comparison.
+   */
+  figure?: Figure<V>;
+  /**
+   * A CV-ready sentence quoting a known value, plain text; the report adds the
+   * coverage. Never called on an unknown value.
+   */
+  sentence?(value: V): string;
   methodology: {
     /** HTML. */
     definition: string;
