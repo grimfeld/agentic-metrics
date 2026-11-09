@@ -1,0 +1,67 @@
+[
+ {
+  "data": {
+   "repository": {
+    "issues": {
+     "pageInfo": {
+      "hasNextPage": true,
+      "endCursor": "Y3Vyc29yOnYyOpK0MjAyNi0xMC0xOVQwMDowMDowMFrOAAAAAw=="
+     },
+     "nodes": [
+      {
+       "number": 104,
+       "createdAt": "2026-10-18T20:00:00Z",
+       "closedAt": "2026-10-19T20:00:01Z",
+       "timelineItems": {
+        "nodes": [
+         { "__typename": "LabeledEvent", "createdAt": "2026-10-19T08:00:00Z", "label": { "name": "ready-for-agent" } }
+        ]
+       }
+      },
+      {
+       "number": 105,
+       "createdAt": "2026-10-19T00:00:00Z",
+       "closedAt": "2026-10-19T20:00:01Z",
+       "timelineItems": { "nodes": [] }
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "data": {
+   "repository": {
+    "issues": {
+     "pageInfo": {
+      "hasNextPage": false,
+      "endCursor": "Y3Vyc29yOnYyOpK0MjAyNi0xMC0yMFQxMjowMDowMFrOAAAABA=="
+     },
+     "nodes": [
+      {
+       "number": 106,
+       "createdAt": "2026-10-20T12:00:00Z",
+       "closedAt": "2026-10-28T12:00:01Z",
+       "timelineItems": {
+        "nodes": [
+         { "__typename": "LabeledEvent", "createdAt": "2026-10-20T12:00:00Z", "label": { "name": "bug" } },
+         { "__typename": "LabeledEvent", "createdAt": "2026-10-21T00:00:00Z", "label": { "name": "ready-for-agent" } }
+        ]
+       }
+      },
+      {
+       "number": 107,
+       "createdAt": "2026-10-20T08:00:00Z",
+       "closedAt": null,
+       "timelineItems": {
+        "nodes": [
+         { "__typename": "LabeledEvent", "createdAt": "2026-10-20T08:00:01Z", "label": { "name": "ready-for-agent" } }
+        ]
+       }
+      }
+     ]
+    }
+   }
+  }
+ }
+]
