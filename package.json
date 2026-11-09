@@ -20,7 +20,8 @@
     "typecheck": "tsc",
     "test": "node --test \"test/**/*.test.ts\"",
     "check": "npm run lint && npm run typecheck && npm test",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "prototype:report": "node prototype/report-redesign/build.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
