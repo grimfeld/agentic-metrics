@@ -38,7 +38,7 @@ function textOf(attribute: string, value: string, repo?: string): string {
 }
 
 function section(repo: string): string {
-  const match = new RegExp(`<section class="repo" data-repo="${repo}">([\\s\\S]*?)</section><!-- /repo -->`).exec(html);
+  const match = new RegExp(`<section class="repo"[^>]* data-repo="${repo}">([\\s\\S]*?)</section><!-- /repo -->`).exec(html);
   assert.ok(match, `no section for ${repo}`);
   return match[1] ?? "";
 }
@@ -93,6 +93,18 @@ describe("report", () => {
     assert.match(leadTime, /Coverage: grimfeld\/agentic-metrics 0 of 0 tickets; grimfeld\/lifeline 5 of 5 tickets/);
     assert.match(textOf("data-methodology", "throughput"), /^Throughput Tickets and pull requests delivered per week/);
     assert.doesNotMatch(html, /data-methodology="firstRunCiRate"/);
+  });
+
+  it("links each repo's raw dataset from its own section", () => {
+    assert.match(section("grimfeld/lifeline"), /<a href="datasets\/grimfeld\/lifeline\.json">/);
+    assert.match(section("grimfeld/agentic-metrics"), /<a href="datasets\/grimfeld\/agentic-metrics\.json">/);
+  });
+
+  it("lists every tracked repo at the top, linking to its section", () => {
+    const nav = textOf("id", "repos");
+    assert.equal(nav, "grimfeld/agentic-metrics grimfeld/lifeline");
+    assert.match(html, /<a href="#grimfeld\/lifeline">/);
+    assert.match(html, /<section class="repo" id="grimfeld\/lifeline" data-repo="grimfeld\/lifeline">/);
   });
 
   it("links each raw dataset from Methodology, copied next to the report", () => {
