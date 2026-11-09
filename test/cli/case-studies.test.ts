@@ -156,6 +156,14 @@ describe("case studies", () => {
     assert.match(page, /<li><strong>Before:<\/strong> <code>a \*\*b\*\*<\/code> 2 \* 3<\/li>/);
   });
 
+  it("keeps a list item's indented continuation lines inside it, one per line", async () => {
+    await run(["collect"]);
+    write(`${DRAFTS}/106.md`, "---\napproved: true\n---\n\n- Migration on a copy:\n  Before: three\n  After: two\n- Typecheck clean\n\nAfter.\n");
+    await run(["report"]);
+    const page = read("report/grimfeld--lifeline/case-studies/106.html");
+    assert.match(page, /<ul><li>Migration on a copy:<br>Before: three<br>After: two<\/li><li>Typecheck clean<\/li><\/ul>\n<p>After\.<\/p>/);
+  });
+
   it("renders a fenced code block as code, keeping its language and its text", async () => {
     await run(["collect"]);
     write(
