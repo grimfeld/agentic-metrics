@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../../cli/main.ts";
@@ -38,7 +38,8 @@ afterEach(() => {
   rmSync(cwd, { recursive: true, force: true });
 });
 
-async function collect() {
+async function collect(config?: object) {
+  if (config) writeFileSync(join(cwd, ".agentic-metrics.json"), JSON.stringify(config));
   const status = await main(["collect"], {
     cwd,
     github: fixtureSource(GITHUB),
@@ -51,6 +52,14 @@ async function collect() {
   return JSON.parse(readFileSync(join(cwd, "datasets/grimfeld/agentic-metrics.json"), "utf8")) as {
     metrics: Record<string, { value: unknown; coverage: unknown }>;
   };
+}
+
+/** The throughput CV sentence of the report rendered from the collected dataset. */
+async function throughputSentence(): Promise<string | undefined> {
+  const status = await main(["report"], { cwd, github: fixtureSource(GITHUB), now: () => NOW, stdout: () => undefined });
+  assert.equal(status, 0);
+  const html = readFileSync(join(cwd, "report/index.html"), "utf8");
+  return /<li data-sentence="throughput"><p class="sentence">([^<]*)<\/p>/.exec(html)?.[1];
 }
 
 function perTicket<Row extends { ticket: string }>(rows: Row[]): Record<string, Omit<Row, "ticket">> {
@@ -100,5 +109,16 @@ describe("a batch's commits credited to the tickets it delivers", () => {
       value.tickets.map(({ ticket, actualHours, ratio }) => ({ ticket, actualHours, ratio })),
       [{ ticket: "#18", actualHours: 72, ratio: 3 }],
     );
+  });
+
+  it("words throughput with correct plurals", async () => {
+    await collect();
+    assert.match((await throughputSentence()) ?? "", /^Delivered 5 tickets in 1 pull request over 1 week\b/);
+  });
+
+  it("says so when every ticket came through integration PRs", async () => {
+    // PR #30 excluded: #19 too is delivered by the batch alone.
+    await collect({ exclude: { branches: ["ticket-"] } });
+    assert.match((await throughputSentence()) ?? "", /^Delivered 5 tickets, all through integration pull requests, over 1 week\b/);
   });
 });
