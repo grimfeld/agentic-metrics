@@ -121,3 +121,81 @@ describe("comparison by autonomy level", () => {
     assert.deepEqual(anonymizedDataset.byAutonomy, dataset.byAutonomy);
   });
 });
+
+/** The visible text of the first element carrying `attribute="value"` in `page`. */
+function textOf(page: string, attribute: string, value: string): string {
+  const match = new RegExp(`<(\\w+)[^>]* ${attribute}="${value}"[^>]*>([\\s\\S]*?)</\\1>`).exec(page);
+  assert.ok(match, `no element with ${attribute}="${value}"`);
+  return (match[2] ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/** The CV sentences of a page, keyed by their `data-sentence`, as the Copy button copies them. */
+function sentences(page: string): Map<string, string> {
+  const items = [...page.matchAll(/<li data-sentence="([^"]+)"><p class="sentence">([^<]*)<\/p><button type="button" data-copy="([^"]*)">Copy<\/button><\/li>/g)];
+  return new Map(
+    items.map((item) => {
+      assert.equal(item[2], item[3], "the Copy button copies the sentence shown");
+      return [item[1] ?? "", item[2] ?? ""];
+    }),
+  );
+}
+
+describe("report: trends", () => {
+  it("shows a row per metric, a column per month, each figure with its coverage", () => {
+    assert.equal(textOf(html, "data-trend", "periods"), "Metric 2026-10 4 tickets 2026-11 1 ticket");
+    assert.equal(textOf(html, "data-trend", "humanMessagesPerTicket"), "Human messages per ticket p50 3 3 of 4 2 1 of 1");
+    assert.equal(textOf(html, "data-trend", "leadTime"), "Lead time p50 12 h 4 of 4 10 h 1 of 1");
+    assert.equal(textOf(html, "data-trend", "estimateVsActual"), "Estimate vs actual p50 actual / estimate 0.31 2 of 4 unknown 0 of 1");
+    for (const metric of METRICS) assert.match(html, new RegExp(`data-trend="${metric.id}"`), metric.id);
+  });
+});
+
+describe("report: comparison by autonomy level", () => {
+  it("shows each metric's figure per level, with its coverage", () => {
+    assert.equal(textOf(html, "data-autonomy", "levels"), "Metric Full 3 tickets Assisted 1 ticket Manual 1 ticket");
+    assert.equal(textOf(html, "data-autonomy", "humanMessagesPerTicket"), "Human messages per ticket p50 2 3 of 3 3 1 of 1 unknown 0 of 1");
+    assert.equal(textOf(html, "data-autonomy", "regressionRate"), "Regression rate of tickets 33.3% 3 of 3 100% 1 of 1 100% 1 of 1");
+    assert.doesNotMatch(html, /data-autonomy="orchestrationTime"/);
+  });
+});
+
+describe("report: CV-ready sentences", () => {
+  it("quotes each known metric with its coverage", () => {
+    const all = sentences(html);
+    assert.equal(all.get("humanMessagesPerTicket"), "A median of 2 human messages per ticket (p90 3), over 4 of 5 tickets.");
+    assert.equal(
+      all.get("leadTime"),
+      "Median lead time of 12 h from a ticket being ready to its last PR merging (p90 7.5 d), over 5 of 5 tickets.",
+    );
+  });
+
+  it("compares the fully autonomous tickets with the other levels that are known", () => {
+    assert.equal(
+      sentences(html).get("humanMessagesPerTicket:autonomy"),
+      "Human messages per ticket (p50): 2 on fully autonomous tickets (3 of 3 tickets), against 3 on assisted ones (1 of 1 tickets).",
+    );
+  });
+
+  it("states the trend from the first known month to the last", () => {
+    assert.equal(
+      sentences(html).get("leadTime:trend"),
+      "Lead time (p50) went from 12 h in October 2026 (4 of 4 tickets) to 10 h in November 2026 (1 of 1 tickets).",
+    );
+  });
+
+  it("never turns an unknown into a sentence", () => {
+    const all = sentences(html);
+    assert.ok(all.size > 0);
+    for (const id of ["firstRunCiRate", "fixCycles", "scheduledFailures", "batchHealth"]) {
+      assert.ok(![...all.keys()].some((key) => key.split(":")[0] === id), id);
+    }
+    assert.equal(all.get("estimateVsActual:trend"), undefined, "one known month is no trend");
+    for (const text of all.values()) assert.doesNotMatch(text, /unknown/);
+  });
+
+  it("are written for an anonymized repo too, from its aggregates", () => {
+    assert.equal(sentences(anonymizedHtml).get("humanMessagesPerTicket"), "A median of 2 human messages per ticket (p90 3), over 4 of 5 tickets.");
+    assert.match(anonymizedHtml, /data-trend="leadTime"/);
+    assert.match(anonymizedHtml, /data-autonomy="leadTime"/);
+  });
+});

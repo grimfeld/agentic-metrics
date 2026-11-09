@@ -29,7 +29,7 @@ export const netLinesRemoved: Metric<NetLinesRemoved> = {
   figure: { label: "net removed", of: ({ netLinesRemoved }) => netLinesRemoved, format: String },
 
   sentence: ({ linesAdded, linesDeleted, ticketsNetRemoving }) =>
-    `${String(linesDeleted)} lines deleted for ${String(linesAdded)} added; ${String(ticketsNetRemoving)} ticket${ticketsNetRemoving === 1 ? "" : "s"} removed more code than they added`,
+    `${String(linesDeleted)} lines deleted for ${String(linesAdded)} added; ${String(ticketsNetRemoving)} ticket${ticketsNetRemoving === 1 ? "" : "s"} removed more code than ${ticketsNetRemoving === 1 ? "it" : "they"} added`,
 
   section({ linesAdded, linesDeleted, netLinesRemoved, ticketsNetRemoving }) {
     return `<p><strong>${String(netLinesRemoved)}</strong> net lines removed: ${String(linesDeleted)} deleted, ${String(linesAdded)} added. Tickets removing more than they added: ${String(ticketsNetRemoving)}.</p>`;

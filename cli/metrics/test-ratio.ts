@@ -60,7 +60,7 @@ export const testRatio: Metric<TestRatio> = {
 
   anonymize: (value) => value,
 
-  figure: { label: "test lines per production line", of: ({ ratio }) => ratio, format: String },
+  figure: { label: "ratio", of: ({ ratio }) => ratio, format: String },
 
   sentence: ({ testLinesAdded, productionLinesAdded, ratio }) =>
     `${String(ratio)} test lines written per production line (${String(testLinesAdded)} test lines for ${String(productionLinesAdded)} production lines)`,

@@ -70,7 +70,7 @@ export const subAgents: Metric<SubAgents> = {
 
   anonymize: ({ total, p50, p90, models }) => ({ total, p50, p90, models }),
 
-  figure: { label: "p50 per ticket", of: ({ p50 }) => p50, format: String },
+  figure: { label: "p50", of: ({ p50 }) => p50, format: String },
 
   sentence: ({ total, p50, p90 }) => `${String(total)} sub-agents run, a median of ${String(p50)} per ticket (p90 ${String(p90)})`,
 
