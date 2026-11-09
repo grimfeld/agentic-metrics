@@ -66,6 +66,15 @@ export interface Metric<V> {
    */
   anonymize(value: V): V;
   /**
+   * Set by a repo-level metric (orchestration time), whose coverage is not the
+   * tickets it is computed over: it stays known over 0 tickets, and is unknown
+   * instead when `measured` says its value measured nothing. Any other
+   * metric's value or figure over 0 tickets is unknown. `compute` already
+   * returns unknown in both cases; the report reads a dataset written before
+   * it did the same way.
+   */
+  repoLevel?: { measured(value: V): boolean };
+  /**
    * A headline card at the top of the repo's section, for the few metrics
    * that have one: `order` places it among the cards (lowest first), `card`
    * renders its known value (HTML).

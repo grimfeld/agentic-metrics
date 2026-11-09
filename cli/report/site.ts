@@ -13,7 +13,7 @@
 // `<repo>` is `owner--name`, or the alias of an anonymized repo.
 import { posix } from "node:path";
 import { draftFile, type CaseStudy } from "../case-studies.ts";
-import { datasetPath, type Dataset } from "../dataset.ts";
+import { asReported, datasetPath, type Dataset } from "../dataset.ts";
 import { METRICS } from "../metrics/index.ts";
 import type { Metric } from "../metrics/metric.ts";
 
@@ -39,7 +39,8 @@ export interface Site {
 }
 
 export function buildSite(datasets: readonly Dataset[], caseStudies: ReadonlyMap<string, readonly CaseStudy[]>): Site {
-  const repos = [...datasets]
+  const repos = datasets
+    .map(asReported)
     .sort((a, b) => a.repo.localeCompare(b.repo))
     .map((dataset) => ({
       dataset,

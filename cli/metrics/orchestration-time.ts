@@ -41,6 +41,9 @@ export const orchestrationTime: Metric<OrchestrationTime> = {
     };
   },
 
+  // Older datasets wrote 0 h over no session; a known value always has one.
+  repoLevel: { measured: ({ sessions }) => sessions > 0 },
+
   // Repo-level only: nothing per ticket to drop.
   anonymize: (value) => value,
 

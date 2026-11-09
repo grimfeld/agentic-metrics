@@ -7,7 +7,7 @@ import type { PublishMode } from "./config.ts";
 import type { Repo } from "./github/load.ts";
 import type { LinkedWork } from "./linker.ts";
 import { METRICS } from "./metrics/index.ts";
-import type { Metric, MetricResult } from "./metrics/metric.ts";
+import type { FigureResult, Metric, MetricResult } from "./metrics/metric.ts";
 import { UNKNOWN } from "./metrics/metric.ts";
 import { anonymizeByAutonomy, anonymizeTrends, byAutonomy, trends, type ByAutonomy, type Trends } from "./trends.ts";
 
@@ -94,4 +94,40 @@ export function buildDataset(repo: Repo, work: LinkedWork, now: Date, publish: P
 /** Where a repo's dataset lives, relative to the datasets folder: `<owner>/<name>.json`, or `<alias>.json`. */
 export function datasetPath(repo: string): string {
   return `${repo}.json`;
+}
+
+/**
+ * The dataset as the report reads it: unknown, never zero. `collect` already
+ * writes a value over 0 tickets, or a repo-level value that measured nothing,
+ * as unknown (see `Metric.repoLevel`); a dataset written before it did is read
+ * the same way.
+ */
+export function asReported(dataset: Dataset): Dataset {
+  const metrics = Object.fromEntries(
+    Object.entries(dataset.metrics).map(([id, result]) => {
+      const metric = METRICS.find((m) => m.id === id);
+      const { value } = result;
+      if (value === UNKNOWN) return [id, result];
+      const known = metric?.repoLevel ? metric.repoLevel.measured(value) : result.coverage.tickets > 0;
+      return [id, known ? result : { ...result, value: UNKNOWN }];
+    }),
+  );
+  // A repo-level figure over a month or level is unknown when the value is: nothing measured overall, nothing in part.
+  const figure = (id: string) => (result: FigureResult): FigureResult => {
+    if (typeof result.value !== "number") return result;
+    const repoLevel = METRICS.some((m) => m.id === id && m.repoLevel);
+    const known = repoLevel ? metrics[id]?.value !== UNKNOWN : result.coverage.tickets > 0;
+    return known ? result : { ...result, value: UNKNOWN };
+  };
+  const { trends, byAutonomy } = dataset;
+  return {
+    ...dataset,
+    metrics,
+    ...(trends && { trends: { ...trends, metrics: Object.fromEntries(Object.entries(trends.metrics).map(([id, results]) => [id, results.map(figure(id))])) } }),
+    ...(byAutonomy && {
+      byAutonomy: Object.fromEntries(
+        Object.entries(byAutonomy).map(([id, levels]) => [id, Object.fromEntries(Object.entries(levels).map(([level, result]) => [level, figure(id)(result)]))]),
+      ) as ByAutonomy,
+    }),
+  };
 }
