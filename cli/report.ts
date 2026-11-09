@@ -5,6 +5,7 @@ import type { CaseStudy } from "./case-studies.ts";
 import { renderMarkdown } from "./markdown.ts";
 import type { Dataset } from "./dataset.ts";
 import { datasetPath } from "./dataset.ts";
+import { escapeHtml } from "./metrics/html.ts";
 import { METRICS, findMetric } from "./metrics/index.ts";
 import type { MetricResult } from "./metrics/metric.ts";
 import { UNKNOWN } from "./metrics/metric.ts";
@@ -16,10 +17,6 @@ const HEADLINES = [
   { id: "humanMessagesPerTicket", name: "Human messages per ticket" },
   { id: "regressionRate", name: "Regression rate" },
 ] as const;
-
-export function escapeHtml(text: string): string {
-  return text.replace(/[&<>"']/g, (c) => `&#${String(c.charCodeAt(0))};`);
-}
 
 function coverageText(result: MetricResult<unknown>): string {
   return `${String(result.coverage.tickets)} of ${String(result.coverage.of)} tickets`;

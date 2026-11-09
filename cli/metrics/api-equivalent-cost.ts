@@ -3,7 +3,7 @@ import { usageByModel, type ModelUsage } from "../pricing/cost.ts";
 import { CURRENT_PRICE_TABLE } from "../pricing/price-table.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
-import { escapeText } from "./html.ts";
+import { escapeHtml } from "./html.ts";
 import { percentile } from "./stats.ts";
 
 /** Tokens of one model, and their cost at API list prices. */
@@ -65,7 +65,7 @@ function modelTable(rows: ModelCost[]): string {
   const body = rows
     .map(
       (row) =>
-        `<tr><td>${escapeText(row.model)}</td><td>${String(row.input)}</td><td>${String(row.output)}</td><td>${String(row.cacheCreation)}</td><td>${String(row.cacheRead)}</td><td>${usdOrUnknown(row.apiEquivalentUsd)}</td></tr>`,
+        `<tr><td>${escapeHtml(row.model)}</td><td>${String(row.input)}</td><td>${String(row.output)}</td><td>${String(row.cacheCreation)}</td><td>${String(row.cacheRead)}</td><td>${usdOrUnknown(row.apiEquivalentUsd)}</td></tr>`,
     )
     .join("");
   return `<table><thead><tr><th>Model</th><th>Input</th><th>Output</th><th>Cache writes</th><th>Cache reads</th><th>API equivalent</th></tr></thead><tbody>${body}</tbody></table>`;
@@ -114,8 +114,8 @@ export const apiEquivalentCost: Metric<ApiEquivalentCost> = {
 
   section({ priceTable, apiEquivalentUsd, unpricedModels, perTicketUsd, byModel, orchestration, perTicket }) {
     const spread = perTicketUsd ? ` (p50 ${usd(perTicketUsd.p50)}, p90 ${usd(perTicketUsd.p90)} per ticket)` : "";
-    const unpriced = unpricedModels.length > 0 ? ` Not priced, so left out: ${unpricedModels.map(escapeText).join(", ")}.` : "";
-    const summary = `<p><strong>${usd(apiEquivalentUsd)}</strong> API equivalent over the tickets with transcripts${spread}, and ${usdOrUnknown(orchestration.apiEquivalentUsd)} API equivalent on no ticket (orchestration), at Anthropic API list prices of ${escapeText(priceTable)}. Not what was billed.${unpriced}</p>`;
+    const unpriced = unpricedModels.length > 0 ? ` Not priced, so left out: ${unpricedModels.map(escapeHtml).join(", ")}.` : "";
+    const summary = `<p><strong>${usd(apiEquivalentUsd)}</strong> API equivalent over the tickets with transcripts${spread}, and ${usdOrUnknown(orchestration.apiEquivalentUsd)} API equivalent on no ticket (orchestration), at Anthropic API list prices of ${escapeHtml(priceTable)}. Not what was billed.${unpriced}</p>`;
     const tickets = perTicket
       ? `<table><thead><tr><th>Ticket</th><th>API equivalent</th></tr></thead><tbody>${perTicket.map((row) => `<tr><td>${row.ticket}</td><td>${usdOrUnknown(row.apiEquivalentUsd)}</td></tr>`).join("")}</tbody></table>`
       : "";

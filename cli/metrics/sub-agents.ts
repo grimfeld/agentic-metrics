@@ -1,7 +1,7 @@
 import type { Ticket } from "../linker.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
-import { escapeText } from "./html.ts";
+import { escapeHtml } from "./html.ts";
 import { percentile } from "./stats.ts";
 
 export interface ModelCount {
@@ -71,7 +71,7 @@ export const subAgents: Metric<SubAgents> = {
   anonymize: ({ total, p50, p90, models }) => ({ total, p50, p90, models }),
 
   section({ total, p50, p90, models, perTicket }) {
-    const mix = (rows: ModelCount[]) => rows.map((row) => `${escapeText(row.model)} ${String(row.subAgents)}`).join(", ") || "none";
+    const mix = (rows: ModelCount[]) => rows.map((row) => `${escapeHtml(row.model)} ${String(row.subAgents)}`).join(", ") || "none";
     const summary = `<p>${String(total)} sub-agent${total === 1 ? "" : "s"} on the tickets with transcripts (p50 ${String(p50)}, p90 ${String(p90)} per ticket). Models: ${mix(models)}.</p>`;
     if (!perTicket) return summary;
     const rows = perTicket.map((row) => `<tr><td>${row.ticket}</td><td>${String(row.subAgents)}</td><td>${mix(row.models)}</td></tr>`).join("");

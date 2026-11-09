@@ -2,7 +2,7 @@
 // <h4>, under the report's repo and section headings), `-`/`*` lists, `>`
 // quotes and paragraphs; inline `code` and [links](https://…). Everything else
 // is text: all input is escaped first, so no raw HTML gets through.
-import { escapeHtml } from "./report.ts";
+import { escapeHtml } from "./metrics/html.ts";
 
 function inline(text: string): string {
   return escapeHtml(text)
