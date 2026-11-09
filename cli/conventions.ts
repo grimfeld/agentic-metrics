@@ -3,6 +3,13 @@
 // (which reminds about them), so both read the same lines the same way.
 
 /**
+ * The label that marks an issue as a regression: `collect` counts only issues
+ * carrying it, `init` creates it, and the Action adds it to an issue that gains
+ * a `caused-by: #N` line.
+ */
+export const REGRESSION_LABEL = "regression";
+
+/**
  * A line starting with `caused-by: #N`, any case. A mention mid-line (such as
  * the Action's question) is not one, and nor is `owner/repo#N`: work in another
  * repo cannot be traced to a ticket here.

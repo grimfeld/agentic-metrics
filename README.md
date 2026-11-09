@@ -81,7 +81,7 @@ Each ticket gets an autonomy level. `full`: a transcript with at most one human 
 { "autonomy": { "fullMaxFollowUps": 1, "fullMinClaudeCommitShare": 1 } }
 ```
 
-A regression is an issue labelled `regression` with a line starting `caused-by: #N` in its body or a comment; `#N` is the ticket or PR that caused it.
+A regression is an issue labelled `regression` with a line starting `caused-by: #N` in its body or a comment; `#N` is the ticket or PR that caused it. The [GitHub Action](#github-action) adds the label when such a line is written.
 
 CI metrics (first-run CI rate, fix cycles, scheduled failures, batch health) read the repo's GitHub Actions runs. `ciWorkflow` names the main check workflow by path (`.github/workflows/check.yml`), file name or name; unset, it is the workflow that ran on the most PRs. A batch drops a PR it names (`#N` in its title or description) that merged only after it.
 
@@ -119,7 +119,9 @@ on:
   pull_request:
     types: [opened, edited, reopened]
   issues:
-    types: [labeled]
+    types: [opened, edited, labeled]
+  issue_comment:
+    types: [created]
 permissions:
   contents: read
   pull-requests: write
@@ -137,7 +139,7 @@ jobs:
 
 When a PR's description references no issue and its branch name carries one (`spec-376-…`, `spec/363-…`, `ticket-16`, `16-title`), the Action appends `Closes #N`. A description that already mentions an issue (`#12`, `owner/repo#12`, an issue link) is left alone, and so are PRs from forks. It needs only the default workflow token. `branch-regex` overrides the built-in pattern; the number is its first capture group that matched.
 
-When an issue gets the bug label (`bug-label`, default `bug`), the Action asks "Regression? Reply `caused-by: #N`", unless the issue already carries a `caused-by: #N` line. When a ticket gets the ready label (`ready-label`, default `ready-for-agent`) and no comment starts with `estimate: <n><h|d|w>`, it posts a one-line estimate reminder. Each reminder carries a hidden marker and is posted at most once per issue, however often the label is removed and added again.
+When an issue's description (on opening or editing) or a new comment has a line starting `caused-by: #N`, the Action adds the `regression` label, which `collect` needs to count the regression. `owner/repo#N` is not accepted: work in another repo can't be traced. When an issue gets the bug label (`bug-label`, default `bug`), the Action asks "Regression? Reply `caused-by: #N`", unless the issue already carries a `caused-by: #N` line. When a ticket gets the ready label (`ready-label`, default `ready-for-agent`) and no comment starts with `estimate: <n><h|d|w>`, it posts a one-line estimate reminder. Each reminder carries a hidden marker and is posted at most once per issue, however often the label is removed and added again.
 
 ## Repository layout
 

@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { decide } from "../../action/decide.ts";
+import { decide, type Operation } from "../../action/decide.ts";
 
 const FIXTURES = join(import.meta.dirname, "../fixtures/action");
 
@@ -51,18 +51,18 @@ describe("Action: Closes #N from the branch name", () => {
   it("does not mistake an HTML entity for an issue reference", () => {
     const [operation] = decide({ name: "pull_request", payload: withBody("Tom &#38; Jerry") });
 
-    assert.equal(operation?.body, "Tom &#38; Jerry\n\nCloses #376 <!-- agentic-metrics:closes -->");
+    assert.equal(bodyOf(operation), "Tom &#38; Jerry\n\nCloses #376 <!-- agentic-metrics:closes -->");
   });
 
   it("writes only the Closes line when the description is empty", () => {
     const [operation] = decide({ name: "pull_request", payload: withBody(null) });
 
-    assert.equal(operation?.body, "Closes #376 <!-- agentic-metrics:closes -->");
+    assert.equal(bodyOf(operation), "Closes #376 <!-- agentic-metrics:closes -->");
   });
 
   it("does not add a second line once its own Closes line is there", () => {
     const [first] = decide({ name: "pull_request", payload: fixture("pull-request-opened.json") });
-    const rerun = decide({ name: "pull_request", payload: withBody(first?.body ?? "", "edited") });
+    const rerun = decide({ name: "pull_request", payload: withBody(bodyOf(first) ?? "", "edited") });
 
     assert.deepEqual(rerun, []);
   });
@@ -76,7 +76,7 @@ describe("Action: Closes #N from the branch name", () => {
     it(`reads #${String(issue)} from the default branch pattern in ${branch}`, () => {
       const [operation] = decide({ name: "pull_request", payload: withBranch(branch) });
 
-      assert.equal(operation?.body.endsWith(`Closes #${String(issue)} <!-- agentic-metrics:closes -->`), true);
+      assert.equal(bodyOf(operation)?.endsWith(`Closes #${String(issue)} <!-- agentic-metrics:closes -->`), true);
     });
   }
 
@@ -92,7 +92,7 @@ describe("Action: Closes #N from the branch name", () => {
     const [operation] = decide({ name: "pull_request", payload: withBranch("wip/88") }, options);
     const none = decide({ name: "pull_request", payload: fixture("pull-request-opened.json") }, options);
 
-    assert.equal(operation?.body.endsWith("Closes #88 <!-- agentic-metrics:closes -->"), true);
+    assert.equal(bodyOf(operation)?.endsWith("Closes #88 <!-- agentic-metrics:closes -->"), true);
     assert.deepEqual(none, []);
   });
 
@@ -132,8 +132,9 @@ describe("Action: regression question on the bug label", () => {
 
   it("does not ask when the bug already names its cause", () => {
     const comments = [{ body: "Found it.\ncaused-by: #376" }];
+    const operations = decide({ name: "issues", payload: fixture("issues-labeled-bug.json"), comments });
 
-    assert.deepEqual(decide({ name: "issues", payload: fixture("issues-labeled-bug.json"), comments }), []);
+    assert.deepEqual(operations.filter((operation) => operation.kind === "create-issue-comment"), []);
   });
 
   it("still asks when the only caused-by names another repo, which cannot be traced", () => {
@@ -162,6 +163,59 @@ describe("Action: regression question on the bug label", () => {
 
     assert.deepEqual(decide({ name: "issues", payload: enhancement, comments: [] }), []);
     assert.deepEqual(decide({ name: "issues", payload: unlabeled, comments: [] }), []);
+  });
+});
+
+const LABEL_REGRESSION = { kind: "add-issue-labels", owner: "grimfeld", repo: "lifeline", issueNumber: 402, labels: ["regression"] };
+
+describe("Action: regression label from a caused-by line", () => {
+  it("labels an issue opened with a caused-by line as a regression", () => {
+    const payload = withIssue(fixture("issues-labeled-bug.json"), { action: "opened", body: "Filter resets.\ncaused-by: #376" });
+
+    assert.deepEqual(decide({ name: "issues", payload, comments: [] }), [LABEL_REGRESSION]);
+  });
+
+  it("labels an issue whose body is edited to add a caused-by line", () => {
+    const payload = withIssue(fixture("issues-labeled-bug.json"), { action: "edited", body: "caused-by: #376" });
+
+    assert.deepEqual(decide({ name: "issues", payload, comments: [] }), [LABEL_REGRESSION]);
+  });
+
+  it("labels an issue when a new comment carries a caused-by line", () => {
+    assert.deepEqual(decide({ name: "issue_comment", payload: fixture("issue-comment-created.json") }), [LABEL_REGRESSION]);
+  });
+
+  it("labels a newly labelled bug whose earlier comment already names its cause", () => {
+    const comments = [{ body: "caused-by: #376" }];
+
+    assert.deepEqual(decide({ name: "issues", payload: fixture("issues-labeled-bug.json"), comments }), [LABEL_REGRESSION]);
+  });
+
+  it("does nothing when the issue already has the regression label", () => {
+    const opened = withIssue(fixture("issues-labeled-bug.json"), {
+      action: "opened",
+      body: "caused-by: #376",
+      labels: ["bug", "Regression"],
+    });
+    const comment = fixture("issue-comment-created.json");
+    (comment["issue"] as Record<string, unknown>)["labels"] = [{ name: "regression" }];
+
+    assert.deepEqual(decide({ name: "issues", payload: opened, comments: [] }), []);
+    assert.deepEqual(decide({ name: "issue_comment", payload: comment }), []);
+  });
+
+  it("ignores comments without a caused-by line, edited comments, cross-repo causes and pull requests", () => {
+    const plain = fixture("issue-comment-created.json");
+    (plain["comment"] as Record<string, unknown>)["body"] = "Is this caused-by: #376? Not sure.";
+    const edited = { ...fixture("issue-comment-created.json"), action: "edited" };
+    const crossRepo = withIssue(fixture("issues-labeled-bug.json"), { action: "opened", body: "caused-by: grimfeld/other#376" });
+    const onPr = fixture("issue-comment-created.json");
+    (onPr["issue"] as Record<string, unknown>)["pull_request"] = { url: "https://api.github.com/repos/grimfeld/lifeline/pulls/402" };
+
+    assert.deepEqual(decide({ name: "issue_comment", payload: plain }), []);
+    assert.deepEqual(decide({ name: "issue_comment", payload: edited }), []);
+    assert.deepEqual(decide({ name: "issues", payload: crossRepo, comments: [] }), []);
+    assert.deepEqual(decide({ name: "issue_comment", payload: onPr }), []);
   });
 });
 
@@ -201,6 +255,18 @@ describe("Action: estimate reminder on the ready label", () => {
   });
 });
 
+function withIssue(
+  payload: Record<string, unknown>,
+  { action, body, labels = ["bug"] }: { action: string; body: string; labels?: string[] },
+): Record<string, unknown> {
+  payload["action"] = action;
+  delete payload["label"];
+  const issue = payload["issue"] as Record<string, unknown>;
+  issue["body"] = body;
+  issue["labels"] = labels.map((name) => ({ name }));
+  return payload;
+}
+
 function withLabel(payload: Record<string, unknown>, name: string): Record<string, unknown> {
   payload["label"] = { name };
   return payload;
@@ -217,4 +283,8 @@ function withBranch(branch: string): Record<string, unknown> {
   const payload = fixture("pull-request-opened.json");
   (payload["pull_request"] as { head: { ref: string } }).head.ref = branch;
   return payload;
+}
+
+function bodyOf(operation: Operation | undefined): string | undefined {
+  return operation !== undefined && "body" in operation ? operation.body : undefined;
 }

@@ -14,11 +14,9 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import { REGRESSION_LABEL } from "../conventions.ts";
 
 export type GitHubRequest = "repo" | "pull-requests" | "issues" | "regressions" | "workflow-runs";
-
-/** The label that marks a bug as a regression; `init` creates it. */
-export const REGRESSION_LABEL = "regression";
 
 export interface ReadOptions {
   /**

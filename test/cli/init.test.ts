@@ -140,7 +140,8 @@ describe("init", () => {
 
     const workflow = readFileSync(join(cwd, WORKFLOW), "utf8");
     assert.match(workflow, /pull_request:\n\s+types: \[opened, edited, reopened\]/);
-    assert.match(workflow, /issues:\n\s+types: \[labeled\]/);
+    assert.match(workflow, /issues:\n\s+types: \[opened, edited, labeled\]/);
+    assert.match(workflow, /issue_comment:\n\s+types: \[created\]/);
     assert.match(workflow, /pull-requests: write/);
     assert.match(workflow, /issues: write/);
     assert.match(workflow, /uses: grimfeld\/agentic-metrics\/action@main/);

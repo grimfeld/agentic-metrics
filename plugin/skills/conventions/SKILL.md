@@ -29,7 +29,7 @@ caused-by: #N
 ```
 
 - `#N` is the ticket or PR that introduced the cause. A PR is resolved to its ticket.
-- Add the `regression` label to the bug as well.
+- The bug also needs the `regression` label: the agentic-metrics Action adds it when the line is posted; add it by hand in a repo without the Action.
 - Post it as soon as the cause is found. No reply when the bug is not a regression.
 
 ## `autonomy:*` label on a ticket

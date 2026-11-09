@@ -1,10 +1,10 @@
 // Pure decision function for the GitHub Action: an event payload in, a list of
 // operations out. It performs no I/O; `main.ts` carries the operations out.
 import { DEFAULT_BRANCH_REGEX, issueNumberFromBranch } from "../cli/branch.ts";
-import { causedBy, estimateHours } from "../cli/conventions.ts";
+import { causedBy, estimateHours, REGRESSION_LABEL } from "../cli/conventions.ts";
 
 export type GitHubEvent = {
-  /** `GITHUB_EVENT_NAME`, e.g. `pull_request` or `issues`. */
+  /** `GITHUB_EVENT_NAME`: `pull_request`, `issues` or `issue_comment`. */
   name: string;
   /** The parsed `GITHUB_EVENT_PATH` file. */
   payload: Record<string, unknown>;
@@ -16,7 +16,8 @@ export type IssueComment = { body: string | null };
 
 export type Operation =
   | { kind: "update-pr-body"; owner: string; repo: string; pullNumber: number; body: string }
-  | { kind: "create-issue-comment"; owner: string; repo: string; issueNumber: number; body: string };
+  | { kind: "create-issue-comment"; owner: string; repo: string; issueNumber: number; body: string }
+  | { kind: "add-issue-labels"; owner: string; repo: string; issueNumber: number; labels: string[] };
 
 export type Options = {
   /**
@@ -41,6 +42,7 @@ export const ESTIMATE_MARKER = "<!-- agentic-metrics:estimate-reminder -->";
 export const CLOSES_MARKER = "<!-- agentic-metrics:closes -->";
 
 const PR_ACTIONS = new Set(["opened", "edited", "reopened"]);
+const ISSUE_ACTIONS = new Set(["opened", "edited", "labeled"]);
 
 // Any `#N` (bare or `owner/repo#N`, which covers closing keywords) or a link to an issue or PR.
 // `&#38;` is an HTML entity, not a reference.
@@ -49,17 +51,35 @@ const ISSUE_REFERENCE = /(?:^|[^&])#\d+\b|github\.com\/[\w.-]+\/[\w.-]+\/(?:issu
 export function decide(event: GitHubEvent, options: Options = {}): Operation[] {
   if (event.name === "pull_request") return decidePullRequest(event.payload as PullRequestPayload, options);
   if (event.name === "issues") return decideIssue(event.payload as IssuesPayload, event.comments ?? [], options);
+  if (event.name === "issue_comment") return decideIssueComment(event.payload as IssueCommentPayload);
   return [];
 }
 
 function decideIssue(payload: IssuesPayload, comments: IssueComment[], options: Options): Operation[] {
-  if (payload.action !== "labeled") return [];
+  if (!ISSUE_ACTIONS.has(payload.action)) return [];
   // Labelling a PR fires `issues` too; reminders are for issues only.
   if (payload.issue.pull_request !== undefined) return [];
+  const operations = regressionLabel(payload, [payload.issue.body, ...comments.map((c) => c.body)]);
+  if (payload.action !== "labeled") return operations;
   const label = payload.label?.name ?? "";
-  if (sameLabel(label, options.bugLabel ?? DEFAULT_BUG_LABEL)) return regressionQuestion(payload, comments);
-  if (sameLabel(label, options.readyLabel ?? DEFAULT_READY_LABEL)) return estimateReminder(payload, comments);
-  return [];
+  if (sameLabel(label, options.bugLabel ?? DEFAULT_BUG_LABEL)) return [...operations, ...regressionQuestion(payload, comments)];
+  if (sameLabel(label, options.readyLabel ?? DEFAULT_READY_LABEL)) return [...operations, ...estimateReminder(payload, comments)];
+  return operations;
+}
+
+// A comment on a PR fires `issue_comment` too; regressions are issues only.
+function decideIssueComment(payload: IssueCommentPayload): Operation[] {
+  if (payload.action !== "created" || payload.issue.pull_request !== undefined) return [];
+  return regressionLabel(payload, [payload.comment.body]);
+}
+
+// `collect` counts only issues carrying the regression label, so an issue that
+// names its cause gets the label without anyone adding it by hand.
+function regressionLabel(payload: IssuesPayload, texts: (string | null)[]): Operation[] {
+  if ((payload.issue.labels ?? []).some((label) => sameLabel(label.name, REGRESSION_LABEL))) return [];
+  if (causedBy(texts).length === 0) return [];
+  const { owner, repo, issueNumber } = target(payload);
+  return [{ kind: "add-issue-labels", owner, repo, issueNumber, labels: [REGRESSION_LABEL] }];
 }
 
 function regressionQuestion(payload: IssuesPayload, comments: IssueComment[]): Operation[] {
@@ -98,13 +118,11 @@ function sameLabel(a: string, b: string): boolean {
 }
 
 function comment(payload: IssuesPayload, body: string): Operation {
-  return {
-    kind: "create-issue-comment",
-    owner: payload.repository.owner.login,
-    repo: payload.repository.name,
-    issueNumber: payload.issue.number,
-    body,
-  };
+  return { kind: "create-issue-comment", ...target(payload), body };
+}
+
+function target(payload: IssuesPayload) {
+  return { owner: payload.repository.owner.login, repo: payload.repository.name, issueNumber: payload.issue.number };
 }
 
 function decidePullRequest(payload: PullRequestPayload, options: Options): Operation[] {
@@ -147,6 +165,8 @@ type PullRequestPayload = {
 type IssuesPayload = {
   action: string;
   label?: { name: string };
-  issue: { number: number; body: string | null; pull_request?: unknown };
+  issue: { number: number; body: string | null; labels?: { name: string }[]; pull_request?: unknown };
   repository: { name: string; owner: { login: string } };
 };
+
+type IssueCommentPayload = IssuesPayload & { comment: { body: string | null } };

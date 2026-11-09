@@ -9,7 +9,7 @@ import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { DEFAULT_BRANCH_REGEX } from "./branch.ts";
 import { CONFIG_FILE, isAlias, readConfig, type PublishMode } from "./config.ts";
-import { REGRESSION_LABEL } from "./github/source.ts";
+import { REGRESSION_LABEL } from "./conventions.ts";
 
 /** The GitHub calls `init` makes: the CLI's boundary to the repo's settings. */
 export interface RepoAdmin {
@@ -136,7 +136,9 @@ on:
   pull_request:
     types: [opened, edited, reopened]
   issues:
-    types: [labeled]
+    types: [opened, edited, labeled]
+  issue_comment:
+    types: [created]
 permissions:
   contents: read
   pull-requests: write
