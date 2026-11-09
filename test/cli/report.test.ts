@@ -56,7 +56,24 @@ describe("report", () => {
   it("shows the metrics not computed yet as unknown", () => {
     assert.equal(textOf("data-metric", "firstRunCiRate", "grimfeld/lifeline"), "First-run CI rate unknown not measured yet");
     assert.equal(textOf("data-metric", "humanMessagesPerTicket", "grimfeld/lifeline"), "Human messages per ticket unknown not measured yet");
-    assert.equal(textOf("data-metric", "regressionRate", "grimfeld/lifeline"), "Regression rate unknown not measured yet");
+  });
+
+  it("shows the regression rate on its card, with its coverage", () => {
+    assert.equal(textOf("data-metric", "regressionRate", "grimfeld/lifeline"), "Regression rate 60% 4 regressions 5 of 5 tickets");
+    assert.equal(textOf("data-metric", "regressionRate", "grimfeld/agentic-metrics"), "Regression rate unknown 0 of 0 tickets");
+  });
+
+  it("lists regressions per ticket, and the untraced ones", () => {
+    assert.equal(
+      textOf("data-section", "regressionRate", "grimfeld/lifeline"),
+      "Regression rate Ticket Regressions #104 #141 PR #136 #142 #106 #140, #145 Untraced: #143, #144",
+    );
+  });
+
+  it("defines regression rate in Methodology, with its coverage per repo", () => {
+    const entry = textOf("data-methodology", "regressionRate");
+    assert.match(entry, /^Regression rate The share of delivered tickets that caused at least one regression/);
+    assert.match(entry, /Coverage: grimfeld\/agentic-metrics 0 of 0 tickets; grimfeld\/lifeline 5 of 5 tickets/);
   });
 
   it("shows a metric with no data as unknown, with its coverage", () => {

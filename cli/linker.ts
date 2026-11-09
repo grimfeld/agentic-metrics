@@ -2,7 +2,7 @@
 // that closes it; a PR that closes no issue of this repo is a ticket of its own.
 // Only PRs merged into the default branch deliver work, so only they count.
 import type { Config } from "./config.ts";
-import type { GitHubData, Issue, PullRequest } from "./github/load.ts";
+import type { GitHubData, Issue, PullRequest, RegressionIssue } from "./github/load.ts";
 
 export interface Ticket {
   /** `#104` for an issue, `PR #136` for a PR that is its own ticket. */
@@ -21,6 +21,8 @@ export interface LinkedWork {
   tickets: Ticket[];
   /** PRs merged into the default branch. */
   pullRequests: PullRequest[];
+  /** Issues labelled as regressions, whether or not their cause is delivered work. */
+  regressions: RegressionIssue[];
 }
 
 export function link(data: GitHubData, config: Config): LinkedWork {
@@ -43,7 +45,7 @@ export function link(data: GitHubData, config: Config): LinkedWork {
   }
 
   tickets.sort((a, b) => a.doneAt.getTime() - b.doneAt.getTime());
-  return { tickets, pullRequests };
+  return { tickets, pullRequests, regressions: data.regressions };
 }
 
 /** The first time the ready label was added before the work was done, else the issue's creation. */

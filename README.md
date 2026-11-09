@@ -41,6 +41,8 @@ npx agentic-metrics report    # renders datasets/ as report/index.html
 { "readyLabel": "ready-for-agent" }
 ```
 
+A regression is an issue labelled `regression` with a line starting `caused-by: #N` in its body or a comment; `#N` is the ticket or PR that caused it.
+
 ### Published report
 
 This repo publishes the report for every tracked repo on its GitHub Pages. Datasets are committed under `datasets/<owner>/<repo>.json`, so every published number can be checked against its raw data, which each repo's section links. To track a repo, run `collect` from this repo and commit the dataset:
