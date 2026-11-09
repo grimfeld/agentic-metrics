@@ -100,8 +100,12 @@ async function collect(github: GitHubSource, config?: object): Promise<Dataset> 
   return JSON.parse(readFileSync(join(cwd, "datasets/grimfeld/lifeline.json"), "utf8")) as Dataset;
 }
 
+/** The lead time's p50 and p90, or `unknown`. */
 function leadTimes(dataset: Dataset): unknown {
-  return dataset.metrics["leadTime"]?.value;
+  const value = dataset.metrics["leadTime"]?.value;
+  if (typeof value !== "object" || value === null) return value;
+  const { p50Hours, p90Hours } = value as { p50Hours: number; p90Hours: number };
+  return { p50Hours, p90Hours };
 }
 
 describe("linking a PR to its ticket", () => {

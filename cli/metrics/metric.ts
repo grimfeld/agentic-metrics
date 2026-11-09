@@ -33,9 +33,15 @@ export interface Figure<V> {
   byAutonomy?: boolean;
 }
 
+/**
+ * A figure an `anonymized` dataset withholds because it covers too few tickets
+ * to stand for more than one ticket's own numbers.
+ */
+export const SUPPRESSED = "suppressed";
+
 /** A metric's figure over a subset of tickets: a month's, or an autonomy level's. */
 export interface FigureResult {
-  value: number | typeof UNKNOWN;
+  value: number | typeof UNKNOWN | typeof SUPPRESSED;
   coverage: Coverage;
 }
 
@@ -50,8 +56,12 @@ export interface Metric<V> {
    * publishes per-ticket data by default. `section` must render its result.
    */
   anonymize(value: V): V;
-  /** The figure on its headline card, for the metrics that have one. */
-  headline?(value: V): string;
+  /**
+   * A headline card at the top of the repo's section, for the few metrics
+   * that have one: `order` places it among the cards (lowest first), `card`
+   * renders its known value (HTML).
+   */
+  headline?: { order: number; card(value: V): string };
   /** A report section of its own (HTML), for metrics shown beyond a card. */
   section?(value: V): string;
   /**

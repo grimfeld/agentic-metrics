@@ -86,7 +86,18 @@ describe("collect, incremental", () => {
     // Lead times: #1 24 h, PR #11 30 h, #2 36 h (from its ready label, added after the first run).
     const dataset = JSON.parse(incremental) as { tickets: number; metrics: Record<string, unknown> };
     assert.equal(dataset.tickets, 3);
-    assert.deepEqual(dataset.metrics["leadTime"], { value: { p50Hours: 30, p90Hours: 36 }, coverage: { tickets: 3, of: 3 } });
+    assert.deepEqual(dataset.metrics["leadTime"], {
+      value: {
+        p50Hours: 30,
+        p90Hours: 36,
+        tickets: [
+          { ticket: "#1", hours: 24 },
+          { ticket: "PR #11", hours: 30 },
+          { ticket: "#2", hours: 36 },
+        ],
+      },
+      coverage: { tickets: 3, of: 3 },
+    });
   });
 
   // Runs are read on their creation time. Before: nightly run 2 (created

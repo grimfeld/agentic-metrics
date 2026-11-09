@@ -1,10 +1,13 @@
+import { escapeHtml } from "./html.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
-import { formatHours, percentile } from "./stats.ts";
+import { formatHours, hoursBetween, percentile, round } from "./stats.ts";
 
 export interface LeadTime {
   p50Hours: number;
   p90Hours: number;
+  /** Each ticket's lead time, in delivery order, so the percentiles can be traced. Absent once anonymized. */
+  tickets?: { ticket: string; hours: number }[];
 }
 
 export const leadTime: Metric<LeadTime> = {
@@ -12,30 +15,46 @@ export const leadTime: Metric<LeadTime> = {
   name: "Lead time",
 
   compute({ tickets }) {
-    const hours = tickets.flatMap((ticket) =>
-      ticket.readyAt ? [(ticket.doneAt.getTime() - ticket.readyAt.getTime()) / 3_600_000] : [],
+    const rows = tickets.flatMap((ticket) =>
+      ticket.readyAt ? [{ ticket: ticket.id, hours: hoursBetween(ticket.readyAt, ticket.doneAt) }] : [],
     );
-    const coverage = { tickets: hours.length, of: tickets.length };
-    if (hours.length === 0) return { value: UNKNOWN, coverage };
-    const round = (value: number) => Math.round(value * 10) / 10;
-    return { value: { p50Hours: round(percentile(hours, 50)), p90Hours: round(percentile(hours, 90)) }, coverage };
+    const coverage = { tickets: rows.length, of: tickets.length };
+    if (rows.length === 0) return { value: UNKNOWN, coverage };
+    const hours = rows.map((row) => row.hours);
+    return {
+      value: {
+        p50Hours: round(percentile(hours, 50), 1),
+        p90Hours: round(percentile(hours, 90), 1),
+        tickets: rows.map((row) => ({ ...row, hours: round(row.hours, 1) })),
+      },
+      coverage,
+    };
   },
 
-  anonymize: (value) => value,
+  // Per-ticket rows name tickets: an anonymized dataset keeps the percentiles only.
+  anonymize: ({ p50Hours, p90Hours }) => ({ p50Hours, p90Hours }),
 
   figure: { label: "p50", of: ({ p50Hours }) => p50Hours, format: formatHours },
 
   sentence: ({ p50Hours, p90Hours }) =>
     `Median lead time of ${formatHours(p50Hours)} from a ticket being ready to its last PR merging (p90 ${formatHours(p90Hours)})`,
 
-  headline({ p50Hours, p90Hours }) {
-    return `${formatHours(p50Hours)} <small>p50</small> · ${formatHours(p90Hours)} <small>p90</small>`;
+  headline: {
+    order: 1,
+    card: ({ p50Hours, p90Hours }) => `${formatHours(p50Hours)} <small>p50</small> · ${formatHours(p90Hours)} <small>p90</small>`,
+  },
+
+  section({ p50Hours, p90Hours, tickets }) {
+    const summary = `<p>p50 <strong>${formatHours(p50Hours)}</strong>, p90 <strong>${formatHours(p90Hours)}</strong>.</p>`;
+    if (!tickets?.length) return summary;
+    const rows = tickets.map((t) => `<tr><td>${escapeHtml(t.ticket)}</td><td>${formatHours(t.hours)}</td></tr>`).join("");
+    return `${summary}<table><thead><tr><th>Ticket</th><th>Lead time</th></tr></thead><tbody>${rows}</tbody></table>`;
   },
 
   methodology: {
     definition:
       "Time from a ticket becoming ready to its last PR merging into the default branch, as the median (p50) and the 90th percentile (p90, nearest rank). A ticket becomes ready when the repo's ready label is first added; a ticket never labelled ready before it was done starts at its creation. A PR linked to no issue starts when it was opened. Integration PRs and excluded PRs are not tickets.",
     limits:
-      "Tickets whose issue GitHub did not return have no start and are left out. Time waiting in a batch or integration branch counts, since the ticket is not delivered until its PR reaches the default branch: a PR merged into an integration branch is done when that branch's integration PR merges.",
+      "An issue closed with no merged PR (work pushed straight to the default branch, or closed as done by hand) is not a delivered ticket and is not counted. Tickets whose issue GitHub did not return have no start and are left out. Time waiting in a batch or integration branch counts, since the ticket is not delivered until its PR reaches the default branch: a PR merged into an integration branch is done when that branch's integration PR merges.",
   },
 };

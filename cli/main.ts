@@ -1,8 +1,10 @@
 // The `agentic-metrics` CLI: `collect` writes the current repo's dataset,
 // `report` renders the datasets as a static HTML report, `init` onboards a repo.
+import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
 import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
-import { parseArgs } from "node:util";
+import { parseArgs, promisify } from "node:util";
 import { classifyAutonomy } from "./autonomy.ts";
 import { CASE_STUDIES_DIR, readApproved, writeDrafts, type CaseStudy } from "./case-studies.ts";
 import { CONFIG_FILE, readConfig } from "./config.ts";
@@ -34,6 +36,8 @@ export interface Dependencies {
    * or at `--checkout` with `--repo`; with an injected GitHub source, to none.
    */
   transcripts?: TranscriptSource;
+  /** The `owner/name` of the GitHub repo cloned at `dir`, if any. Defaults to its git `origin` remote. */
+  localRepo?: (dir: string) => Promise<string | undefined>;
   now?: () => Date;
   stdout?: (text: string) => void;
   stderr?: (text: string) => void;
@@ -46,7 +50,7 @@ const USAGE = `Usage:
   agentic-metrics init [--alias name] [--publish full|anonymized|none]
       Onboard the current repo: write ${CONFIG_FILE} with every field set
       (Dependabot excluded; publish anonymized for a private repo, under
-      --alias or an alias derived from the repo), create the \`regression\`
+      --alias or a random alias), create the \`regression\`
       and \`autonomy:*\` labels, and install the GitHub Action workflow.
       Safe to run again: an existing config or workflow is kept.
   agentic-metrics collect [--repo owner/name [--checkout dir]] [--datasets dir] [--local dir] [--case-studies dir] [--full]
@@ -58,9 +62,11 @@ const USAGE = `Usage:
       The first run reads the whole history; later runs read only what
       changed since, from a cache in ~/.cache/agentic-metrics. --full
       reads everything again (e.g. after a metric definition changes).
-      Claude Code transcripts are read from the same cache, for the clone in
-      the current folder, or in --checkout with --repo (without it, another
-      repo's transcript metrics are unknown).
+      The repo's clone, the current folder or --checkout with --repo, holds
+      its ${CONFIG_FILE} and names its Claude Code transcripts (read from
+      the same cache). --repo naming another repo than the current folder's
+      without --checkout reads the current folder's config and no transcripts,
+      with a warning.
       A repo published \`full\` gets a case-study draft per candidate in
       <case-studies>/<owner>/<name>/ (default: case-studies); an existing
       draft is never overwritten.
@@ -77,7 +83,7 @@ export async function main(argv: string[], deps: Dependencies): Promise<number> 
   try {
     switch (command) {
       case "collect":
-        await collect(rest, deps, stdout);
+        await collect(rest, deps, stdout, stderr);
         return 0;
       case "report":
         await report(rest, deps, stdout);
@@ -95,7 +101,7 @@ export async function main(argv: string[], deps: Dependencies): Promise<number> 
   }
 }
 
-async function collect(args: string[], deps: Dependencies, stdout: (text: string) => void): Promise<void> {
+async function collect(args: string[], deps: Dependencies, stdout: (text: string) => void, stderr: (text: string) => void): Promise<void> {
   const { values } = parseArgs({
     args,
     options: {
@@ -107,7 +113,17 @@ async function collect(args: string[], deps: Dependencies, stdout: (text: string
       "case-studies": { type: "string", default: CASE_STUDIES_DIR },
     },
   });
-  const config = readConfig(deps.cwd);
+  // The measured repo's clone holds its config and names its transcripts: the
+  // current folder, unless --repo names another repo and --checkout is not given.
+  const checkout =
+    values.checkout ??
+    (!values.repo || sameRepo(await (deps.localRepo ?? originRepo)(deps.cwd), values.repo) ? deps.cwd : undefined);
+  const config = readConfig(checkout === undefined ? deps.cwd : resolve(deps.cwd, checkout));
+  if (values.repo && checkout === undefined) {
+    stderr(
+      `agentic-metrics: ${values.repo} has no --checkout: reading ${CONFIG_FILE} from ${deps.cwd}, and its transcript metrics are unknown. Pass --checkout <its clone>.\n`,
+    );
+  }
   const now = deps.now ?? (() => new Date());
   const source = deps.github ?? ghSource({ cwd: deps.cwd, repo: values.repo });
   const cacheDir = deps.cacheDir ?? (deps.github ? undefined : defaultCacheDir());
@@ -119,7 +135,6 @@ async function collect(args: string[], deps: Dependencies, stdout: (text: string
       `${data.repo.fullName} is published anonymized${config.publish ? "" : " (it is private)"}: set "alias" in ${CONFIG_FILE}, or set "publish"`,
     );
   }
-  const checkout = values.checkout ?? (values.repo ? undefined : deps.cwd);
   const transcripts =
     deps.transcripts ??
     (deps.github || checkout === undefined ? noTranscripts : transcriptCache({ dir: cacheDir ?? defaultCacheDir(), repoDir: resolve(deps.cwd, checkout) }));
@@ -161,6 +176,22 @@ async function initCommand(args: string[], deps: Dependencies, stdout: (text: st
   stdout(lines.map((line) => `${line}\n`).join(""));
 }
 
+const git = promisify(execFile);
+
+/** `owner/name` of the GitHub repo `dir`'s `origin` remote points at; undefined when it is no clone of one. */
+async function originRepo(dir: string): Promise<string | undefined> {
+  try {
+    const { stdout } = await git("git", ["-C", dir, "remote", "get-url", "origin"]);
+    return /github\.com[:/]([^/\s]+\/[^/\s]+?)(?:\.git)?\/?$/.exec(stdout.trim())?.[1];
+  } catch {
+    return undefined;
+  }
+}
+
+function sameRepo(a: string | undefined, b: string): boolean {
+  return a !== undefined && a.toLowerCase() === b.toLowerCase();
+}
+
 async function writeJson(path: string, value: unknown): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, `${JSON.stringify(value, null, 2)}\n`);
@@ -176,7 +207,8 @@ async function report(args: string[], deps: Dependencies, stdout: (text: string)
     },
   });
   const datasetsDir = resolve(deps.cwd, values.datasets);
-  const files = (await readdir(datasetsDir, { recursive: true })).filter((file) => file.endsWith(".json"));
+  // No datasets folder yet (nothing collected): an empty report, not a crash.
+  const files = existsSync(datasetsDir) ? (await readdir(datasetsDir, { recursive: true })).filter((file) => file.endsWith(".json")) : [];
   const read = await Promise.all(
     files.map(async (file) => {
       const dataset = JSON.parse(await readFile(join(datasetsDir, file), "utf8")) as Dataset;
@@ -189,7 +221,6 @@ async function report(args: string[], deps: Dependencies, stdout: (text: string)
   // A `none` dataset never belongs in the datasets folder; if one is there, it stays out of the report.
   const published = read.filter(({ dataset }) => dataset.publish !== "none");
   const datasets = published.map(({ dataset }) => dataset);
-  if (datasets.length === 0) throw new Error(`no dataset in ${datasetsDir}; run collect first`);
 
   const out = resolve(deps.cwd, values.out);
   await mkdir(out, { recursive: true });
@@ -204,5 +235,6 @@ async function report(args: string[], deps: Dependencies, stdout: (text: string)
     if (dataset.publish === "full") caseStudies.set(dataset.repo, await readApproved(join(caseStudiesDir, dataset.repo)));
   }
   await writeFile(join(out, "index.html"), renderReport(datasets, caseStudies));
-  stdout(`${String(datasets.length)} datasets -> ${join(out, "index.html")}\n`);
+  const summary = datasets.length === 0 ? `no dataset in ${datasetsDir} (run collect first); empty report` : `${String(datasets.length)} datasets`;
+  stdout(`${summary} -> ${join(out, "index.html")}\n`);
 }

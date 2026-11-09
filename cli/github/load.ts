@@ -1,4 +1,5 @@
 // Turns the GitHub source's raw `gh api` answers into the CLI's GitHub model.
+import { ACTION_WORKFLOW, causedBy } from "../conventions.ts";
 import type { GitHubSource } from "./source.ts";
 
 export interface Repo {
@@ -122,7 +123,7 @@ export interface GitHubData {
   pullRequests: PullRequest[];
   issues: Issue[];
   regressions: RegressionIssue[];
-  /** Actions runs, newest first, GitHub's own `dynamic` runs left out. */
+  /** Actions runs, newest first, GitHub's own `dynamic` runs and the installed agentic-metrics workflow's left out. */
   workflowRuns: WorkflowRun[];
 }
 
@@ -271,7 +272,8 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
   const runPages = (await source.read("workflow-runs")) as { workflow_runs: RawRun[] }[];
   const workflowRuns = runPages
     .flatMap((page) => page.workflow_runs)
-    .filter((run) => run.event !== "dynamic")
+    // GitHub's own runs (CodeQL, Dependabot) and the Action `init` installs are not CI.
+    .filter((run) => run.event !== "dynamic" && run.path !== ACTION_WORKFLOW)
     .map((run): WorkflowRun => {
       const conclusion = run.status === "completed" ? (run.conclusion ?? undefined) : undefined;
       const first = run.run_attempt <= 1 ? { status: run.status, conclusion: run.conclusion } : run.first_attempt;
@@ -297,14 +299,6 @@ const REFERENCE = /(?<![\w/])#(\d+)\b/g;
 
 function references(text: string): number[] {
   return [...new Set([...text.matchAll(REFERENCE)].map((match) => Number(match[1])))];
-}
-
-/** A line starting with `caused-by: #N`, any case. A mention mid-line (such as the Action's question) is not one. */
-const CAUSED_BY = /^[ \t]*caused-by:[ \t]*#(\d+)\b/gim;
-
-function causedBy(texts: string[]): number[] {
-  const numbers = texts.flatMap((text) => [...text.matchAll(CAUSED_BY)].map((match) => Number(match[1])));
-  return [...new Set(numbers)];
 }
 
 type RawLabels = { nodes: { name: string }[] } | null;

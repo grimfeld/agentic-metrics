@@ -9,8 +9,8 @@ export interface ScheduledFailures {
   failed: number;
   /** Scheduled runs on the default branch that gave a result. */
   runs: number;
-  /** The same per workflow, by path. */
-  workflows: { workflow: string; failed: number; runs: number }[];
+  /** The same per workflow, by path. Absent once anonymized: a workflow's name can name the repo or client. */
+  workflows?: { workflow: string; failed: number; runs: number }[];
 }
 
 export const scheduledFailures: Metric<ScheduledFailures> = {
@@ -36,7 +36,7 @@ export const scheduledFailures: Metric<ScheduledFailures> = {
     return { value: { failed: sum("failed"), runs: sum("runs"), workflows: rows }, coverage };
   },
 
-  anonymize: (value) => value,
+  anonymize: ({ failed, runs }) => ({ failed, runs }),
 
   // Repo level: no ticket owns a scheduled run.
   figure: { label: "of runs failed", of: ({ failed, runs }) => percent(failed / runs), format: formatPercent, byAutonomy: false },
@@ -44,10 +44,12 @@ export const scheduledFailures: Metric<ScheduledFailures> = {
   sentence: ({ failed, runs }) => `${String(failed)} of ${String(runs)} scheduled CI runs on the default branch failed`,
 
   section({ failed, runs, workflows }) {
+    const summary = `<p><strong>${String(failed)}</strong> of ${String(runs)} scheduled runs on the default branch failed.</p>`;
+    if (!workflows) return summary;
     const rows = workflows
       .map((row) => `<tr><td><code>${escapeHtml(row.workflow)}</code></td><td>${String(row.failed)}</td><td>${String(row.runs)}</td></tr>`)
       .join("");
-    return `<p><strong>${String(failed)}</strong> of ${String(runs)} scheduled runs on the default branch failed.</p><table><thead><tr><th>Workflow</th><th>Failed</th><th>Runs</th></tr></thead><tbody>${rows}</tbody></table>`;
+    return `${summary}<table><thead><tr><th>Workflow</th><th>Failed</th><th>Runs</th></tr></thead><tbody>${rows}</tbody></table>`;
   },
 
   methodology: {

@@ -1,0 +1,24 @@
+{
+  "action": "created",
+  "issue": {
+    "number": 402,
+    "title": "Library: shelf filter resets after reload",
+    "body": "Pick a shelf filter, reload the page: the filter is gone.",
+    "state": "open",
+    "labels": [{ "name": "bug" }],
+    "user": { "login": "grimfeld", "type": "User" },
+    "comments_url": "https://api.github.com/repos/grimfeld/lifeline/issues/402/comments"
+  },
+  "comment": {
+    "id": 2001,
+    "body": "Found it: the filter state moved to a query param in #376.\ncaused-by: #376",
+    "user": { "login": "grimfeld", "type": "User" }
+  },
+  "repository": {
+    "full_name": "grimfeld/lifeline",
+    "name": "lifeline",
+    "owner": { "login": "grimfeld" },
+    "default_branch": "main"
+  },
+  "sender": { "login": "grimfeld", "type": "User" }
+}

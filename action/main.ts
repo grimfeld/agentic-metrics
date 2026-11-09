@@ -59,17 +59,23 @@ async function issueComments(payload: Record<string, unknown>): Promise<IssueCom
 }
 
 async function perform(operation: Operation): Promise<void> {
-  const { owner, repo, body } = operation;
+  const { owner, repo } = operation;
   switch (operation.kind) {
     case "update-pr-body": {
       const pullNumber = String(operation.pullNumber);
-      await request("PATCH", `${api}/repos/${owner}/${repo}/pulls/${pullNumber}`, { body });
+      await request("PATCH", `${api}/repos/${owner}/${repo}/pulls/${pullNumber}`, { body: operation.body });
       console.log(`agentic-metrics: linked ${owner}/${repo}#${pullNumber} to its issue.`);
+      return;
+    }
+    case "add-issue-labels": {
+      const issueNumber = String(operation.issueNumber);
+      await request("POST", `${api}/repos/${owner}/${repo}/issues/${issueNumber}/labels`, { labels: operation.labels });
+      console.log(`agentic-metrics: labelled ${owner}/${repo}#${issueNumber} ${operation.labels.join(", ")}.`);
       return;
     }
     case "create-issue-comment": {
       const issueNumber = String(operation.issueNumber);
-      await request("POST", `${api}/repos/${owner}/${repo}/issues/${issueNumber}/comments`, { body });
+      await request("POST", `${api}/repos/${owner}/${repo}/issues/${issueNumber}/comments`, { body: operation.body });
       console.log(`agentic-metrics: commented on ${owner}/${repo}#${issueNumber}.`);
       return;
     }

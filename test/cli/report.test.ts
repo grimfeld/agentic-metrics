@@ -94,14 +94,27 @@ describe("report", () => {
     assert.match(textOf("data-methodology", "throughput"), /^Throughput Tickets and pull requests delivered per week/);
   });
 
-  it("shows the test ratio and net lines removed", () => {
+  it("shows the test ratio and net lines removed, with each ticket's lines", () => {
     assert.equal(
       textOf("data-section", "testRatio", "grimfeld/lifeline"),
-      "Test lines per production line 0.59 test lines added per production line: 65 test lines for 110 production lines.",
+      "Test lines per production line 0.59 test lines added per production line: 65 test lines for 110 production lines. " +
+        "Ticket Test lines Production lines #104 30 80 #105 30 80 #106 30 30 PR #137 5 0",
     );
     assert.equal(
       textOf("data-section", "netLinesRemoved", "grimfeld/lifeline"),
-      "Net lines removed -240 net lines removed: 145 deleted, 385 added. Tickets removing more than they added: 1.",
+      "Net lines removed -240 net lines removed: 145 deleted, 385 added. Tickets removing more than they added: 1. " +
+        "Ticket Added Deleted Net removed #104 120 30 -90 #105 120 30 -90 PR #136 200 5 -195 #106 60 110 50 PR #137 5 0 -5",
+    );
+  });
+
+  it("says in Methodology that an issue closed with no PR is not a delivered ticket", () => {
+    for (const id of ["throughput", "leadTime"]) assert.match(textOf("data-methodology", id), /closed with no (merged )?PR/, id);
+  });
+
+  it("shows each ticket's lead time", () => {
+    assert.equal(
+      textOf("data-section", "leadTime", "grimfeld/lifeline"),
+      "Lead time p50 12 h , p90 7.5 d . Ticket Lead time #104 12 h #105 20 h PR #136 6 h #106 7.5 d PR #137 10 h",
     );
   });
 
@@ -148,5 +161,27 @@ describe("report", () => {
       readFileSync(join(cwd, "report/datasets/grimfeld/lifeline.json"), "utf8"),
       readFileSync(join(cwd, "datasets/grimfeld/lifeline.json"), "utf8"),
     );
+  });
+});
+
+describe("report with no dataset", () => {
+  it("renders an empty-state page, not a crash, when the datasets folder is missing or empty", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "am-report-empty-"));
+    try {
+      for (const datasets of ["missing", "."]) {
+        let stdout = "";
+        let stderr = "";
+        const status = await main(["report", "--datasets", datasets, "--out", "site"], {
+          cwd: dir,
+          stdout: (text) => (stdout += text),
+          stderr: (text) => (stderr += text),
+        });
+        assert.equal(status, 0, stderr);
+        assert.match(stdout, /no dataset/i);
+        assert.match(readFileSync(join(dir, "site/index.html"), "utf8"), /No repo tracked yet/);
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

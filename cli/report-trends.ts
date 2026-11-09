@@ -7,13 +7,13 @@ import { AUTONOMY_LEVELS, type AutonomyLevel } from "./autonomy.ts";
 import type { Dataset } from "./dataset.ts";
 import { escapeHtml } from "./metrics/html.ts";
 import { METRICS } from "./metrics/index.ts";
-import type { Coverage, Figure, FigureResult, Metric } from "./metrics/metric.ts";
-import { UNKNOWN } from "./metrics/metric.ts";
+import type { Figure, FigureResult, Metric } from "./metrics/metric.ts";
+import { coverageText, plural } from "./metrics/stats.ts";
+import { SUPPRESSED, UNKNOWN } from "./metrics/metric.ts";
+import { MIN_ANONYMIZED_TICKETS } from "./trends.ts";
 
 const LEVEL_NAMES: Record<AutonomyLevel, string> = { full: "Full", assisted: "Assisted", manual: "Manual" };
 
-const plural = (count: number, word: string) => `${String(count)} ${word}${count === 1 ? "" : "s"}`;
-const coverageOf = ({ tickets, of }: Coverage) => `${String(tickets)} of ${String(of)} tickets`;
 
 /** `2026-10` as `October 2026`. */
 function monthName(period: string): string {
@@ -34,7 +34,12 @@ function rowHeader(metric: Metric<unknown>, figure: Figure<unknown>): string {
 }
 
 function cell(figure: Figure<unknown>, result: FigureResult): string {
-  const value = result.value === UNKNOWN ? `<span class="unknown">unknown</span>` : escapeHtml(figure.format(result.value));
+  const value =
+    result.value === UNKNOWN
+      ? `<span class="unknown">unknown</span>`
+      : result.value === SUPPRESSED
+        ? `<span class="unknown" title="Withheld: fewer than ${String(MIN_ANONYMIZED_TICKETS)} tickets">—</span>`
+        : escapeHtml(figure.format(result.value));
   return `<td>${value} <small>${String(result.coverage.tickets)} of ${String(result.coverage.of)}</small></td>`;
 }
 
@@ -76,20 +81,20 @@ export function cvSentences(dataset: Dataset): { key: string; text: string }[] {
     const result = dataset.metrics[metric.id];
     if (!metric.sentence || !result || result.value === UNKNOWN) continue;
     const text = metric.sentence(result.value);
-    if (text !== undefined) sentences.push({ key: metric.id, text: `${text}, over ${coverageOf(result.coverage)}.` });
+    if (text !== undefined) sentences.push({ key: metric.id, text: `${text}, over ${coverageText(result.coverage)}.` });
   }
 
   for (const { metric, figure, results } of withFigures(dataset.byAutonomy)) {
     const full = results.full;
-    if (full.value === UNKNOWN) continue;
+    if (typeof full.value !== "number") continue;
     const others = (["assisted", "manual"] as const).flatMap((level) => {
       const other = results[level];
-      return other.value === UNKNOWN ? [] : [`${figure.format(other.value)} on ${level} ones (${coverageOf(other.coverage)})`];
+      return typeof other.value !== "number" ? [] : [`${figure.format(other.value)} on ${level} ones (${coverageText(other.coverage)})`];
     });
     if (others.length === 0) continue;
     sentences.push({
       key: `${metric.id}:autonomy`,
-      text: `${metric.name} (${figure.label}): ${figure.format(full.value)} on fully autonomous tickets (${coverageOf(full.coverage)}), against ${others.join(" and ")}.`,
+      text: `${metric.name} (${figure.label}): ${figure.format(full.value)} on fully autonomous tickets (${coverageText(full.coverage)}), against ${others.join(" and ")}.`,
     });
   }
 
@@ -97,14 +102,14 @@ export function cvSentences(dataset: Dataset): { key: string; text: string }[] {
   for (const { metric, figure, results } of withFigures(dataset.trends?.metrics)) {
     const known = results.flatMap((result, index) => {
       const period = periods[index]?.period;
-      return result.value === UNKNOWN || period === undefined ? [] : [{ value: result.value, coverage: result.coverage, period }];
+      return typeof result.value !== "number" || period === undefined ? [] : [{ value: result.value, coverage: result.coverage, period }];
     });
     const from = known[0];
     const to = known.at(-1);
     if (!from || !to || known.length < 2) continue;
     sentences.push({
       key: `${metric.id}:trend`,
-      text: `${metric.name} (${figure.label}) went from ${figure.format(from.value)} in ${monthName(from.period)} (${coverageOf(from.coverage)}) to ${figure.format(to.value)} in ${monthName(to.period)} (${coverageOf(to.coverage)}).`,
+      text: `${metric.name} (${figure.label}) went from ${figure.format(from.value)} in ${monthName(from.period)} (${coverageText(from.coverage)}) to ${figure.format(to.value)} in ${monthName(to.period)} (${coverageText(to.coverage)}).`,
     });
   }
   return sentences;

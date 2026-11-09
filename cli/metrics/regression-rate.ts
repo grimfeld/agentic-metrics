@@ -1,7 +1,7 @@
 import type { Ticket } from "../linker.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
-import { formatPercent, percent } from "./stats.ts";
+import { formatPercent, percent, plural, share } from "./stats.ts";
 
 export interface RegressionRate {
   /** Share of delivered tickets with at least one regression traced to them, 0 to 1. */
@@ -48,7 +48,7 @@ export const regressionRate: Metric<RegressionRate> = {
     });
     return {
       value: {
-        rate: Math.round((perTicket.length / tickets.length) * 1000) / 1000,
+        rate: share(perTicket.length, tickets.length),
         regressions: traced,
         regressedTickets: perTicket.length,
         untraced,
@@ -63,15 +63,16 @@ export const regressionRate: Metric<RegressionRate> = {
   figure: { label: "of tickets", of: ({ rate }) => percent(rate), format: formatPercent },
 
   sentence: ({ rate, regressions, regressedTickets }) =>
-    `Regression rate of ${formatPercent(percent(rate))}: ${String(regressions)} regression${regressions === 1 ? "" : "s"} traced to ${String(regressedTickets)} delivered ticket${regressedTickets === 1 ? "" : "s"}`,
+    `Regression rate of ${formatPercent(percent(rate))}: ${plural(regressions, "regression")} traced to ${plural(regressedTickets, "delivered ticket")}`,
 
-  headline({ rate, regressions }) {
-    return `${String(Math.round(rate * 1000) / 10)}% <small>${String(regressions)} regression${regressions === 1 ? "" : "s"}</small>`;
+  headline: {
+    order: 4,
+    card: ({ rate, regressions }) => `${formatPercent(percent(rate))} <small>${plural(regressions, "regression")}</small>`,
   },
 
   section({ perTicket, untraced, regressions, regressedTickets }) {
     if (!perTicket || !untraced) {
-      return `<p>${String(regressions)} regression${regressions === 1 ? "" : "s"} traced to ${String(regressedTickets)} ticket${regressedTickets === 1 ? "" : "s"}.</p>`;
+      return `<p>${plural(regressions, "regression")} traced to ${plural(regressedTickets, "ticket")}.</p>`;
     }
     const rows = perTicket
       .map((row) => `<tr><td>${row.ticket}</td><td>${row.bugs.map((bug) => `#${String(bug)}`).join(", ")}</td></tr>`)

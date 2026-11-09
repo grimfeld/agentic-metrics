@@ -109,7 +109,17 @@ describe("init", () => {
     assert.equal(typeof alias, "string");
     assert.doesNotMatch(String(alias), /acme|widgets/i);
     assert.equal(readConfig(cwd).alias, alias);
-    assert.match(stdout, new RegExp(`${String(alias)}.*derived`));
+    assert.match(stdout, new RegExp(`${String(alias)}.*random`));
+  });
+
+  it("picks a random alias, so the repo's name can't be recovered from it by hashing", async () => {
+    const { admin } = fakeGitHub({ private: true });
+    assert.equal(await init(admin), 0, stderr);
+    const first = configFile()["alias"];
+    rmSync(join(cwd, ".agentic-metrics.json"));
+    assert.equal(await init(admin), 0, stderr);
+
+    assert.notEqual(configFile()["alias"], first);
   });
 
   it("refuses an alias that isn't a plain name, writing nothing", async () => {
@@ -140,7 +150,8 @@ describe("init", () => {
 
     const workflow = readFileSync(join(cwd, WORKFLOW), "utf8");
     assert.match(workflow, /pull_request:\n\s+types: \[opened, edited, reopened\]/);
-    assert.match(workflow, /issues:\n\s+types: \[labeled\]/);
+    assert.match(workflow, /issues:\n\s+types: \[opened, edited, labeled\]/);
+    assert.match(workflow, /issue_comment:\n\s+types: \[created\]/);
     assert.match(workflow, /pull-requests: write/);
     assert.match(workflow, /issues: write/);
     assert.match(workflow, /uses: grimfeld\/agentic-metrics\/action@main/);

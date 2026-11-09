@@ -4,7 +4,7 @@ import { autonomy } from "./autonomy.ts";
 import { batchHealth } from "./batch-health.ts";
 import { estimateVsActual } from "./estimate-vs-actual.ts";
 import { firstRunCiRate } from "./first-run-ci.ts";
-import { fixCyclesMetric } from "./fix-cycles.ts";
+import { fixCycles } from "./fix-cycles.ts";
 import { humanMessagesPerTicket } from "./human-messages.ts";
 import { leadTime } from "./lead-time.ts";
 import { orchestrationTime } from "./orchestration-time.ts";
@@ -21,7 +21,7 @@ export const METRICS: readonly Metric<unknown>[] = [
   leadTime,
   throughput,
   firstRunCiRate,
-  fixCyclesMetric,
+  fixCycles,
   scheduledFailures,
   batchHealth,
   regressionRate,
@@ -35,7 +35,3 @@ export const METRICS: readonly Metric<unknown>[] = [
   size,
   estimateVsActual,
 ];
-
-export function findMetric(id: string): Metric<unknown> | undefined {
-  return METRICS.find((metric) => metric.id === id);
-}

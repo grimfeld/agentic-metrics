@@ -9,32 +9,26 @@ import { renderMarkdown } from "./markdown.ts";
 import type { Dataset } from "./dataset.ts";
 import { datasetPath } from "./dataset.ts";
 import { escapeHtml } from "./metrics/html.ts";
-import { METRICS, findMetric } from "./metrics/index.ts";
-import type { MetricResult } from "./metrics/metric.ts";
+import { METRICS } from "./metrics/index.ts";
+import type { Metric } from "./metrics/metric.ts";
 import { UNKNOWN } from "./metrics/metric.ts";
+import { coverageText } from "./metrics/stats.ts";
+import { MIN_ANONYMIZED_TICKETS } from "./trends.ts";
 
-/** The headline cards, in order. A metric not computed yet shows as unknown under this name. */
-const HEADLINES = [
-  { id: "leadTime", name: "Lead time" },
-  { id: "firstRunCiRate", name: "First-run CI rate" },
-  { id: "humanMessagesPerTicket", name: "Human messages per ticket" },
-  { id: "regressionRate", name: "Regression rate" },
-] as const;
+/** The metrics with a headline card, in card order. */
+const HEADLINES = METRICS.filter((metric) => metric.headline).sort((a, b) => (a.headline?.order ?? 0) - (b.headline?.order ?? 0));
 
-function coverageText(result: MetricResult<unknown>): string {
-  return `${String(result.coverage.tickets)} of ${String(result.coverage.of)} tickets`;
-}
-
-function card(dataset: Dataset, id: string, fallbackName: string): string {
-  const metric = findMetric(id);
+/** A metric's headline card; a dataset written before the metric existed shows it as not measured yet. */
+function card(dataset: Dataset, metric: Metric<unknown>): string {
+  const id = metric.id;
   const result = dataset.metrics[id];
-  const name = escapeHtml(metric?.name ?? fallbackName);
-  if (!metric || !result) {
+  const name = escapeHtml(metric.name);
+  if (!result) {
     return `<article class="card" data-metric="${id}"><h3>${name}</h3><p class="value unknown">unknown</p><p class="coverage">not measured yet</p></article>`;
   }
-  const value = result.value === UNKNOWN || !metric.headline ? UNKNOWN : metric.headline(result.value);
+  const value = result.value === UNKNOWN || !metric.headline ? UNKNOWN : metric.headline.card(result.value);
   const unknownClass = value === UNKNOWN ? " unknown" : "";
-  return `<article class="card" data-metric="${id}"><h3>${name}</h3><p class="value${unknownClass}">${value}</p><p class="coverage">${coverageText(result)}</p></article>`;
+  return `<article class="card" data-metric="${id}"><h3>${name}</h3><p class="value${unknownClass}">${value}</p><p class="coverage">${coverageText(result.coverage)}</p></article>`;
 }
 
 /** Approved case studies, for a `full` dataset only. */
@@ -48,7 +42,7 @@ function caseStudySection(dataset: Dataset, studies: readonly CaseStudy[] | unde
 
 function repoSection(dataset: Dataset, studies?: readonly CaseStudy[]): string {
   const repo = escapeHtml(dataset.repo);
-  const cards = HEADLINES.map(({ id, name }) => card(dataset, id, name)).join("\n");
+  const cards = HEADLINES.map((metric) => card(dataset, metric)).join("\n");
   const sections = METRICS.flatMap((metric) => {
     const result = dataset.metrics[metric.id];
     if (!metric.section || !result) return [];
@@ -90,7 +84,7 @@ function methodology(datasets: Dataset[]): string {
   const entries = METRICS.flatMap((metric) => {
     const coverage = datasets.flatMap((dataset) => {
       const result = dataset.metrics[metric.id];
-      return result ? [`${escapeHtml(dataset.repo)} ${coverageText(result)}`] : [];
+      return result ? [`${escapeHtml(dataset.repo)} ${coverageText(result.coverage)}`] : [];
     });
     if (coverage.length === 0) return [];
     return [`<article data-methodology="${metric.id}"><h3>${escapeHtml(metric.name)}</h3>
@@ -101,9 +95,12 @@ function methodology(datasets: Dataset[]): string {
   const links = datasets
     .map((dataset) => `<li><a href="datasets/${escapeHtml(datasetPath(dataset.repo))}">${escapeHtml(dataset.repo)}</a></li>`)
     .join("");
+  const anonymized = datasets.some((dataset) => dataset.publish === "anonymized")
+    ? `\n<p>An anonymized repo's trends and comparison by autonomy level show a figure covering fewer than ${String(MIN_ANONYMIZED_TICKETS)} tickets as —: it would be those tickets' own numbers.</p>`
+    : "";
   return `<section id="methodology">
 <h2>Methodology</h2>
-<p>Every number is derived from GitHub data and from the local cache of Claude Code transcripts, of which only counts reach the dataset. A metric whose source is missing is shown as <em>unknown</em>, never as zero. Coverage is the number of tickets a metric is computed over, out of the tickets delivered.</p>
+<p>Every number is derived from GitHub data and from the local cache of Claude Code transcripts, of which only counts reach the dataset. A metric whose source is missing is shown as <em>unknown</em>, never as zero. Coverage is the number of tickets a metric is computed over, out of the tickets delivered.</p>${anonymized}
 ${entries}
 <h3>Raw data</h3>
 <ul class="datasets">${links}</ul>
@@ -146,7 +143,7 @@ export function renderReport(datasets: Dataset[], caseStudies: ReadonlyMap<strin
 <body>
 <h1>Agentic metrics</h1>
 <nav id="repos">${sorted.map((dataset) => `<a href="#${escapeHtml(dataset.repo)}">${escapeHtml(dataset.repo)}</a>`).join(" ")}</nav>
-${sorted.map((dataset) => repoSection(dataset, caseStudies.get(dataset.repo))).join("\n")}
+${sorted.length === 0 ? `<p class="empty">No repo tracked yet: run <code>agentic-metrics collect</code> and commit its dataset.</p>` : sorted.map((dataset) => repoSection(dataset, caseStudies.get(dataset.repo))).join("\n")}
 ${methodology(sorted)}
 <script>${COPY_SCRIPT}</script>
 </body>

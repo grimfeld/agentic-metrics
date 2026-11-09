@@ -2,7 +2,7 @@ import type { Ticket } from "../linker.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
 import { escapeHtml } from "./html.ts";
-import { percentile } from "./stats.ts";
+import { percentile, plural } from "./stats.ts";
 
 export interface ModelCount {
   /** A model id, or `unknown` for a sub-agent whose model was never written. */
@@ -76,7 +76,7 @@ export const subAgents: Metric<SubAgents> = {
 
   section({ total, p50, p90, models, perTicket }) {
     const mix = (rows: ModelCount[]) => rows.map((row) => `${escapeHtml(row.model)} ${String(row.subAgents)}`).join(", ") || "none";
-    const summary = `<p>${String(total)} sub-agent${total === 1 ? "" : "s"} on the tickets with transcripts (p50 ${String(p50)}, p90 ${String(p90)} per ticket). Models: ${mix(models)}.</p>`;
+    const summary = `<p>${plural(total, "sub-agent")} on the tickets with transcripts (p50 ${String(p50)}, p90 ${String(p90)} per ticket). Models: ${mix(models)}.</p>`;
     if (!perTicket) return summary;
     const rows = perTicket.map((row) => `<tr><td>${row.ticket}</td><td>${String(row.subAgents)}</td><td>${mix(row.models)}</td></tr>`).join("");
     return `${summary}<table><thead><tr><th>Ticket</th><th>Sub-agents</th><th>Models</th></tr></thead><tbody>${rows}</tbody></table>`;

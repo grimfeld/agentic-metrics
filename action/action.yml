@@ -1,5 +1,5 @@
 name: agentic-metrics
-description: Fill in agentic-metrics conventions from GitHub data (Closes #N, regression question, estimate reminder).
+description: Fill in agentic-metrics conventions from GitHub data (Closes #N, regression label and question, estimate reminder).
 author: grimfeld
 inputs:
   github-token:

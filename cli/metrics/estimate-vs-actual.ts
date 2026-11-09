@@ -1,9 +1,10 @@
+import { estimateHours } from "../conventions.ts";
 import type { Comment } from "../github/load.ts";
 import type { Ticket } from "../linker.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
 import { SIZE_HEADERS, sizeCells, sizeOf, type TicketSize } from "./size.ts";
-import { formatHours, percentile } from "./stats.ts";
+import { formatHours, hoursBetween, percentile, round } from "./stats.ts";
 
 export interface EstimatedTicket extends TicketSize {
   estimateHours: number;
@@ -20,19 +21,13 @@ export interface EstimateVsActual {
   tickets: EstimatedTicket[];
 }
 
-/** `estimate: 2d` at the start of a line; decimals allowed. */
-const ESTIMATE = /^\s*estimate:\s*(\d+(?:\.\d+)?)\s*([hdw])\b/im;
-const UNIT_HOURS = { h: 1, d: 24, w: 168 } as const;
 
 /** The earliest estimate posted by a person, in hours. */
 function estimateOf(comments: readonly Comment[]): { at: Date; hours: number } | undefined {
   for (const comment of comments) {
     if (comment.byBot) continue;
-    const match = ESTIMATE.exec(comment.body);
-    if (match) {
-      const unit = (match[2] ?? "h").toLowerCase() as keyof typeof UNIT_HOURS;
-      return { at: comment.at, hours: Number(match[1]) * UNIT_HOURS[unit] };
-    }
+    const hours = estimateHours(comment.body);
+    if (hours !== undefined) return { at: comment.at, hours };
   }
   return undefined;
 }
@@ -41,8 +36,6 @@ function firstCommitAt(ticket: Ticket): Date | undefined {
   const times = ticket.pullRequests.flatMap((pr) => (pr.firstCommitAt ? [pr.firstCommitAt.getTime()] : []));
   return times.length > 0 ? new Date(Math.min(...times)) : undefined;
 }
-
-const round = (value: number, places: number) => Math.round(value * 10 ** places) / 10 ** places;
 
 export const estimateVsActual: Metric<EstimateVsActual> = {
   id: "estimateVsActual",
@@ -59,7 +52,7 @@ export const estimateVsActual: Metric<EstimateVsActual> = {
         excludedLate++;
         continue;
       }
-      const actualHours = (ticket.doneAt.getTime() - start.getTime()) / 3_600_000;
+      const actualHours = hoursBetween(start, ticket.doneAt);
       const { ticket: id, ...size } = sizeOf(ticket);
       estimated.push({
         ticket: id,

@@ -9,7 +9,7 @@ import type { LinkedWork } from "./linker.ts";
 import { METRICS } from "./metrics/index.ts";
 import type { Metric, MetricResult } from "./metrics/metric.ts";
 import { UNKNOWN } from "./metrics/metric.ts";
-import { byAutonomy, trends, type ByAutonomy, type Trends } from "./trends.ts";
+import { anonymizeByAutonomy, anonymizeTrends, byAutonomy, trends, type ByAutonomy, type Trends } from "./trends.ts";
 
 export const SCHEMA_VERSION = 2;
 
@@ -64,6 +64,8 @@ export function buildDataset(repo: Repo, work: LinkedWork, now: Date, publish: P
       return [metric.id, { ...result, value: publishValue(metric, result.value) }];
     }),
   );
+  const monthly = trends(work, METRICS, publishValue);
+  const byLevel = byAutonomy(work, METRICS, publishValue);
   const dataset: Dataset = {
     schemaVersion: SCHEMA_VERSION,
     repo: anonymized && alias ? alias : repo.fullName,
@@ -73,8 +75,8 @@ export function buildDataset(repo: Repo, work: LinkedWork, now: Date, publish: P
     pullRequests: work.pullRequests.length,
     integrationPullRequests: work.integrationPullRequests.length,
     metrics,
-    trends: trends(work, METRICS, publishValue),
-    byAutonomy: byAutonomy(work, METRICS, publishValue),
+    trends: anonymized ? anonymizeTrends(monthly) : monthly,
+    byAutonomy: anonymized ? anonymizeByAutonomy(byLevel) : byLevel,
   };
   if (anonymized) return dataset;
   return {

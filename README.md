@@ -30,7 +30,7 @@ A repo overrides one by name: `.agentic-metrics/addenda/<skill>.md` at its root 
 
 `/agentic-metrics:init` (or `npx agentic-metrics init` from the repo root) onboards a repo in one step:
 
-- writes `.agentic-metrics.json` with every field set: ready label `ready-for-agent`, the built-in branch pattern, `integration/` batches, Dependabot excluded, the default autonomy thresholds, and `publish` (`anonymized` for a private repo, else `full`; `--publish` overrides). An anonymized repo gets `--alias name`, or an alias derived from a hash of the repo's name, which `init` reports so you can change it. `ciWorkflow` is set when exactly one existing workflow runs on pull requests; otherwise `init` says so, and you should set it, since the installed workflow runs on every PR too;
+- writes `.agentic-metrics.json` with every field set: ready label `ready-for-agent`, the built-in branch pattern, `integration/` batches, Dependabot excluded, the default autonomy thresholds, and `publish` (`anonymized` for a private repo, else `full`; `--publish` overrides). An anonymized repo gets `--alias name`, or a random alias (`repo-` and 8 hex digits, not derived from the repo's name), which `init` reports so you can change it. `ciWorkflow` is set when exactly one existing workflow runs on pull requests; otherwise `init` says so, and you should set it, since the installed workflow runs on every PR too;
 - creates the `regression`, `autonomy:full`, `autonomy:assisted` and `autonomy:manual` labels that are missing;
 - installs `.github/workflows/agentic-metrics.yml` (see [GitHub Action](#github-action)), passing the config's ready label and branch pattern.
 
@@ -47,7 +47,7 @@ npx agentic-metrics report    # renders datasets/ as report/index.html
 
 The first `collect` on a repo reads its whole history. Later runs read only the PRs and issues updated since the last run and merge them into a local cache of raw GitHub items, `~/.cache/agentic-metrics/github/<owner>/<repo>/` (or under `$AGENTIC_METRICS_CACHE_DIR`), so the dataset comes out the same as a full re-collection. `collect --full` reads everything again, for example after a metric definition changes. Editing a request's query also triggers a full read of that request on the next run.
 
-`collect --repo owner/name` measures another repo. Per-repo settings live in `.agentic-metrics.json` at the repo root. All fields are optional:
+`collect --repo owner/name` measures another repo; pass its clone as `--checkout dir` too, so that its config and transcripts are read (without it, `collect` warns that it reads the current folder's config and no transcripts). Per-repo settings live in `.agentic-metrics.json` at the repo root. All fields are optional:
 
 ```json
 { "readyLabel": "ready-for-agent", "publish": "anonymized", "alias": "client-a" }
@@ -81,9 +81,9 @@ Each ticket gets an autonomy level. `full`: a transcript with at most one human 
 { "autonomy": { "fullMaxFollowUps": 1, "fullMinClaudeCommitShare": 1 } }
 ```
 
-A regression is an issue labelled `regression` with a line starting `caused-by: #N` in its body or a comment; `#N` is the ticket or PR that caused it.
+A regression is an issue labelled `regression` with a line starting `caused-by: #N` in its body or a comment; `#N` is the ticket or PR that caused it. The [GitHub Action](#github-action) adds the label when such a line is written.
 
-CI metrics (first-run CI rate, fix cycles, scheduled failures, batch health) read the repo's GitHub Actions runs. `ciWorkflow` names the main check workflow by path (`.github/workflows/check.yml`), file name or name; unset, it is the workflow that ran on the most PRs. A batch drops a PR it names (`#N` in its title or description) that merged only after it.
+CI metrics (first-run CI rate, fix cycles, scheduled failures, batch health) read the repo's GitHub Actions runs. `ciWorkflow` names the main check workflow by path (`.github/workflows/check.yml`), file name or name; unset, it is the workflow that ran on the most PRs. The `agentic-metrics.yml` workflow `init` installs is never CI. A batch drops a PR it names (`#N` in its title or description) that merged only after it.
 
 ```json
 { "ciWorkflow": "check.yml" }
@@ -103,11 +103,17 @@ This repo publishes the report for every tracked repo on its GitHub Pages. Datas
 npx agentic-metrics collect --repo owner/name   # writes datasets/owner/name.json
 ```
 
-`.github/workflows/pages.yml` renders `datasets/` and deploys it on every push to `main` that touches `datasets/` or `cli/`, or by hand from the Actions tab. One-time setting: Settings > Pages > Build and deployment > Source: **GitHub Actions**.
+`.github/workflows/pages.yml` renders `datasets/` (an empty-state page while there is none) and deploys it on every push to `main` that touches `datasets/` or `cli/`, or by hand from the Actions tab. One-time setting: Settings > Pages > Build and deployment > Source: **GitHub Actions**.
 
-Each repo's section shows trends (every metric per month of delivery), a comparison by autonomy level (`full`, `assisted`, `manual`), and CV-ready sentences with a Copy button. A sentence quotes only known values, each with its coverage. All three come from the dataset (`trends`, `byAutonomy`), so an anonymized repo gets them too, from aggregates only.
+Each repo's section shows trends (every metric per month of delivery), a comparison by autonomy level (`full`, `assisted`, `manual`), and CV-ready sentences with a Copy button. A sentence quotes only known values, each with its coverage. All three come from the dataset (`trends`, `byAutonomy`), so an anonymized repo gets them too, from aggregates only, with any figure covering fewer than 3 tickets withheld (shown as —; `"suppressed"` in the dataset).
 
-Adding a metric: write one file in `cli/metrics/` holding its computation (its dataset field), how the report shows it, and its Methodology entry. Give it a `figure` (one number read off its value, computed again over each month's and each autonomy level's tickets) so it has a trend and a comparison, and a `sentence` for the CV sentences. Then list it in `cli/metrics/index.ts`. Its tests go in `test/cli/`, fixtures in, dataset and HTML out. To read something new from GitHub, add a request to `cli/github/source.ts` and a recorded `gh api` answer to each folder in `test/fixtures/github/`. If the request lists items that carry an update time, give it an entry in `INCREMENTAL` in the same file and it is cached and read incrementally too (a list filtered on something that can change, like a label, can't be: an item leaving the filter would stay in the cache).
+Adding a metric: write one file in `cli/metrics/` holding its computation (its dataset field), how the report shows it, and its Methodology entry. Give it a `figure` (one number read off its value, computed again over each month's and each autonomy level's tickets) so it has a trend and a comparison, and a `sentence` for the CV sentences. Then list it in `cli/metrics/index.ts`. To give it a headline card, set its `headline` (`order` among the cards, and the card's HTML). Its tests go in `test/cli/`, fixtures in, dataset and HTML out. If it lists tickets, its `anonymize` must drop them.
+
+Reading something new from GitHub touches these places:
+
+1. `cli/github/source.ts`: add the request's name to `GitHubRequest`, its query (GraphQL text or REST path) and its case in `ghSource`'s `read`. If it lists items that carry an update time, give it an entry in `INCREMENTAL` and it is cached and read incrementally too (a list filtered on something that can change, like a label, can't be: an item leaving the filter would stay in the cache).
+2. `cli/github/load.ts`: the raw shape of its answer (`Raw…`), the model type the metrics read (added to `GitHubData`), and the mapping in `loadGitHub`.
+3. `test/fixtures/github/`: a recorded `gh api` answer, `<request>.json`, in every folder (`ci`, `empty`, `lifeline`, `private`, and `history/before` and `history/after`), and in the answers built inline by `test/cli/linking.test.ts`.
 
 ## GitHub Action
 
@@ -119,7 +125,9 @@ on:
   pull_request:
     types: [opened, edited, reopened]
   issues:
-    types: [labeled]
+    types: [opened, edited, labeled]
+  issue_comment:
+    types: [created]
 permissions:
   contents: read
   pull-requests: write
@@ -137,7 +145,7 @@ jobs:
 
 When a PR's description references no issue and its branch name carries one (`spec-376-…`, `spec/363-…`, `ticket-16`, `16-title`), the Action appends `Closes #N`. A description that already mentions an issue (`#12`, `owner/repo#12`, an issue link) is left alone, and so are PRs from forks. It needs only the default workflow token. `branch-regex` overrides the built-in pattern; the number is its first capture group that matched.
 
-When an issue gets the bug label (`bug-label`, default `bug`), the Action asks "Regression? Reply `caused-by: #N`", unless the issue already carries a `caused-by: #N` line. When a ticket gets the ready label (`ready-label`, default `ready-for-agent`) and no comment starts with `estimate: <n><h|d|w>`, it posts a one-line estimate reminder. Each reminder carries a hidden marker and is posted at most once per issue, however often the label is removed and added again.
+When an issue's description (on opening or editing) or a new comment has a line starting `caused-by: #N`, the Action adds the `regression` label, which `collect` needs to count the regression. `owner/repo#N` is not accepted: work in another repo can't be traced. When an issue gets the bug label (`bug-label`, default `bug`), the Action asks "Regression? Reply `caused-by: #N`", unless the issue already carries a `caused-by: #N` line. When a ticket gets the ready label (`ready-label`, default `ready-for-agent`) and no comment starts with `estimate: <n><h|d|w>`, it posts a one-line estimate reminder. Each reminder carries a hidden marker and is posted at most once per issue, however often the label is removed and added again.
 
 ## Repository layout
 

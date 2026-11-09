@@ -12,7 +12,7 @@ export interface Ci {
   defaultBranch: string;
   /** The main check workflow's path; undefined when no run matches the config, or no PR has a run. */
   mainWorkflow: string | undefined;
-  /** Every run but GitHub's own `dynamic` ones, newest first. */
+  /** Every run but GitHub's own `dynamic` ones and the installed agentic-metrics workflow's, newest first. */
   runs: WorkflowRun[];
 }
 

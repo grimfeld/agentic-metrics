@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../../cli/main.ts";
@@ -67,7 +67,18 @@ describe("collect", () => {
     await collect("lifeline");
 
     assert.deepEqual(dataset().metrics["leadTime"], {
-      value: { p50Hours: 12, p90Hours: 180 },
+      value: {
+        p50Hours: 12,
+        p90Hours: 180,
+        // Per ticket, in delivery order: traceable in a `full` dataset.
+        tickets: [
+          { ticket: "#104", hours: 12 },
+          { ticket: "#105", hours: 20 },
+          { ticket: "PR #136", hours: 6 },
+          { ticket: "#106", hours: 180 },
+          { ticket: "PR #137", hours: 10 },
+        ],
+      },
       coverage: { tickets: 5, of: 5 },
     });
   });
@@ -78,10 +89,33 @@ describe("collect", () => {
     writeFileSync(join(cwd, ".agentic-metrics.json"), JSON.stringify({ readyLabel: "bug" }));
     await collect("lifeline");
 
-    assert.deepEqual(dataset().metrics["leadTime"], {
-      value: { p50Hours: 20, p90Hours: 192 },
-      coverage: { tickets: 5, of: 5 },
+    const { p50Hours, p90Hours } = dataset().metrics["leadTime"]?.value as { p50Hours: number; p90Hours: number };
+    assert.deepEqual({ p50Hours, p90Hours }, { p50Hours: 20, p90Hours: 192 });
+  });
+
+  it("reads another repo's config from its checkout", async () => {
+    mkdirSync(join(cwd, "clone"));
+    writeFileSync(join(cwd, "clone", ".agentic-metrics.json"), JSON.stringify({ readyLabel: "bug" }));
+    await collect("lifeline", ["--repo", "grimfeld/lifeline", "--checkout", "clone"]);
+
+    // As with `bug` as the ready label in the current folder (see above).
+    const { p50Hours, p90Hours } = dataset().metrics["leadTime"]?.value as { p50Hours: number; p90Hours: number };
+    assert.deepEqual({ p50Hours, p90Hours }, { p50Hours: 20, p90Hours: 192 });
+  });
+
+  it("warns that another repo without --checkout gets this folder's config and no transcripts", async () => {
+    let stderr = "";
+    const status = await main(["collect", "--repo", "grimfeld/lifeline"], {
+      cwd,
+      github: fixtureSource(join(FIXTURES, "lifeline")),
+      now: () => NOW,
+      stdout: () => undefined,
+      stderr: (text) => (stderr += text),
     });
+
+    assert.equal(status, 0, stderr);
+    assert.match(stderr, /grimfeld\/lifeline.*--checkout/s);
+    assert.match(stderr, /transcript/);
   });
 
   it("reports lead time as unknown, not zero, when no ticket was delivered", async () => {
