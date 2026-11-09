@@ -20,7 +20,7 @@ export interface FixCycles {
  * when a run on the head before it failed (on any attempt GitHub shows), or a
  * review requested changes between the two pushes.
  */
-function fixCycles(pr: PullRequest, ci: Ci): number | undefined {
+function fixCyclesOf(pr: PullRequest, ci: Ci): number | undefined {
   const pushes: { sha: string; at: Date; failed: boolean }[] = [];
   for (const run of pullRequestRuns(pr, ci)) {
     let push = pushes.find((p) => p.sha === run.headSha);
@@ -39,12 +39,12 @@ function fixCycles(pr: PullRequest, ci: Ci): number | undefined {
   return cycles;
 }
 
-export const fixCyclesMetric: Metric<FixCycles> = {
+export const fixCycles: Metric<FixCycles> = {
   id: "fixCycles",
   name: "Fix cycles per PR",
 
   compute({ tickets, ci }) {
-    const counts = new Map(tickets.flatMap((ticket) => ticket.pullRequests).map((pr) => [pr, fixCycles(pr, ci)]));
+    const counts = new Map(tickets.flatMap((ticket) => ticket.pullRequests).map((pr) => [pr, fixCyclesOf(pr, ci)]));
     const covered = tickets.filter((ticket) => ticket.pullRequests.some((pr) => counts.get(pr) !== undefined));
     const coverage = { tickets: covered.length, of: tickets.length };
     const measured = [...counts.entries()].flatMap(([pr, count]) => (count === undefined ? [] : [{ pullRequest: pr.number, fixCycles: count }]));
