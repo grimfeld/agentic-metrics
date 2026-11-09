@@ -1,0 +1,28 @@
+{
+  "action": "edited",
+  "number": 371,
+  "changes": { "body": { "from": "Reader: page turn animation." } },
+  "pull_request": {
+    "number": 371,
+    "title": "Reader: page turn animation",
+    "body": "Reader: page turn animation.\n\nCloses #363",
+    "draft": false,
+    "head": {
+      "ref": "spec/365-page-turn",
+      "sha": "9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b",
+      "repo": { "full_name": "grimfeld/lifeline" }
+    },
+    "base": {
+      "ref": "main",
+      "repo": { "full_name": "grimfeld/lifeline" }
+    },
+    "user": { "login": "grimfeld", "type": "User" }
+  },
+  "repository": {
+    "full_name": "grimfeld/lifeline",
+    "name": "lifeline",
+    "owner": { "login": "grimfeld" },
+    "default_branch": "main"
+  },
+  "sender": { "login": "grimfeld", "type": "User" }
+}
