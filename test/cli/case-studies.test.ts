@@ -147,6 +147,15 @@ describe("case studies", () => {
     assert.match(html, /<ul><li>one<\/li><li>two<\/li><\/ul>/);
   });
 
+  it("renders **bold** and *emphasis*, leaving a lone asterisk and code alone", async () => {
+    await run(["collect"]);
+    write(`${DRAFTS}/106.md`, "---\napproved: true\n---\n\n**Door:** two-way, *soft* and __not bold__\n\n- **Before:** `a **b**` 2 * 3\n");
+    await run(["report"]);
+    const page = read("report/grimfeld--lifeline/case-studies/106.html");
+    assert.match(page, /<p><strong>Door:<\/strong> two-way, <em>soft<\/em> and __not bold__<\/p>/);
+    assert.match(page, /<li><strong>Before:<\/strong> <code>a \*\*b\*\*<\/code> 2 \* 3<\/li>/);
+  });
+
   it("renders a fenced code block as code, keeping its language and its text", async () => {
     await run(["collect"]);
     write(

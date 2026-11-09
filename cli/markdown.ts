@@ -1,14 +1,22 @@
 // The little Markdown a case study needs, as HTML: headings (`#` renders as
 // <h4>, under the report's repo and section headings), `-`/`*` lists, `>`
 // quotes, fenced code blocks (```diff renders as <pre><code
-// class="language-diff">) and paragraphs; inline `code` and
-// [links](https://…). Everything else is text: all input is escaped first, so
+// class="language-diff">) and paragraphs; inline `code`, **bold**, *emphasis*
+// and [links](https://…). Everything else is text: all input is escaped first, so
 // no raw HTML gets through.
 import { escapeHtml } from "./metrics/html.ts";
 
+/** `**strong**` and `*em*` around text that neither starts nor ends with a space. */
+function emphasis(html: string): string {
+  return html.replace(/\*\*(\S(?:[^*]*?\S)?)\*\*/g, "<strong>$1</strong>").replace(/\*(\S(?:[^*]*?\S)?)\*/g, "<em>$1</em>");
+}
+
 function inline(text: string): string {
+  // Code spans are left as they are: no emphasis or link inside them.
   return escapeHtml(text)
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .split(/(`[^`]+`)/)
+    .map((part, i) => (i % 2 === 1 ? `<code>${part.slice(1, -1)}</code>` : emphasis(part)))
+    .join("")
     .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2">$1</a>');
 }
 
