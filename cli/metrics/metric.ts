@@ -2,6 +2,7 @@
 // everything about it end to end: how it is computed from linked work (its
 // dataset field), how the report shows it, and its Methodology entry. Adding a
 // metric means adding a file and listing it in `index.ts`.
+import type { DeliveredTicket } from "../dataset.ts";
 import type { LinkedWork } from "../linker.ts";
 import type { Chart, ChartInput } from "../report/charts.ts";
 
@@ -63,7 +64,10 @@ export interface Metric<V> {
    * renders its known value (HTML).
    */
   headline?: { order: number; card(value: V): string };
-  /** A report section of its own (HTML), for metrics shown beyond a card. */
+  /**
+   * A summary of its value in words (HTML), on its metric page: what its
+   * tiles and per-ticket table don't say. Given anonymized values too.
+   */
   section?(value: V): string;
   /**
    * One number summarising a value, for trends over time and the comparison
@@ -82,6 +86,12 @@ export interface Metric<V> {
    */
   chart?: { title: string; draw(input: ChartInput<V>): Chart };
   /**
+   * Its per-ticket table, on its metric page (`report/ticket-table.ts`): the
+   * rows its value is computed from, so that any figure can be checked. Shown
+   * only for a dataset that keeps per-ticket data, never an anonymized one.
+   */
+  ticketTable?: TicketTable<V>;
+  /**
    * A CV-ready sentence quoting a known value, plain text with no final
    * period; the report adds the coverage. Never called on an unknown value;
    * undefined when the value has nothing worth quoting.
@@ -94,3 +104,38 @@ export interface Metric<V> {
     limits: string;
   };
 }
+
+/**
+ * The rows a metric's value is computed from: one per ticket, or per PR,
+ * batch or workflow when that is what the metric counts. The page shows them
+ * in the order given, and sorts them by any column on a heading's click.
+ */
+export interface TicketTable<V> {
+  /**
+   * What a row is, as the first column's heading, when rows are not tickets:
+   * `PR`, `Batch`, `Workflow`. Absent, each row is a delivered ticket keyed by
+   * its id (`#104`, `PR #136`), and the page adds its title, link and
+   * delivery date.
+   */
+  rowHeading?: string;
+  /** The value columns' headings, in order. */
+  columns: readonly string[];
+  /**
+   * The rows of a known value as published, given the dataset's delivered
+   * tickets in delivery order; undefined when the value holds none.
+   */
+  rows(value: V, delivered: readonly DeliveredTicket[]): TableRow[] | undefined;
+}
+
+export interface TableRow {
+  /** The row's key, plain text: a ticket's id, or a PR, batch or workflow. */
+  id: string;
+  /** One per value column. */
+  cells: TableCell[];
+}
+
+/**
+ * Plain text, sorted as text; or a number's text with the number it sorts by.
+ * `UNKNOWN` reads as unknown and sorts last, whichever the direction.
+ */
+export type TableCell = string | { text: string; sort: number };

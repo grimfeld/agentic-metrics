@@ -70,20 +70,16 @@ export const regressionRate: Metric<RegressionRate> = {
     card: ({ rate, regressions }) => `${formatPercent(percent(rate))} <small>${plural(regressions, "regression")}</small>`,
   },
 
-  section({ perTicket, untraced, regressions, regressedTickets }) {
-    if (!perTicket || !untraced) {
-      return `<p>${plural(regressions, "regression")} traced to ${plural(regressedTickets, "ticket")}.</p>`;
-    }
-    const rows = perTicket
-      .map((row) => `<tr><td>${row.ticket}</td><td>${row.bugs.map((bug) => `#${String(bug)}`).join(", ")}</td></tr>`)
-      .join("");
-    const table = perTicket.length
-      ? `<table><thead><tr><th>Ticket</th><th>Regressions</th></tr></thead><tbody>${rows}</tbody></table>`
-      : "<p>No regression traced to a delivered ticket.</p>";
-    const rest = untraced.length
-      ? `<p>Untraced: ${untraced.map((bug) => `#${String(bug)}`).join(", ")}</p>`
-      : "";
-    return table + rest;
+  section({ untraced, regressions, regressedTickets }) {
+    const traced = `<p><strong>${plural(regressions, "regression")}</strong> traced to ${plural(regressedTickets, "delivered ticket")}.</p>`;
+    if (!untraced?.length) return traced;
+    return `${traced}<p>Untraced, and left out of the rate: ${untraced.map((bug) => `#${String(bug)}`).join(", ")}.</p>`;
+  },
+
+  ticketTable: {
+    columns: ["Regressions", "Regression issues"],
+    rows: ({ perTicket }) =>
+      perTicket?.map((row) => ({ id: row.ticket, cells: [{ text: String(row.bugs.length), sort: row.bugs.length }, row.bugs.map((bug) => `#${String(bug)}`).join(", ")] })),
   },
 
   methodology: {

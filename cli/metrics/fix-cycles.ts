@@ -68,11 +68,13 @@ export const fixCycles: Metric<FixCycles> = {
   sentence: ({ perPullRequest, pullRequests }) =>
     `${String(perPullRequest)} CI fix cycles per pull request on average, over ${String(pullRequests)} pull requests`,
 
-  section({ perPullRequest, total, pullRequests, withFixCycles }) {
-    const summary = `<p><strong>${String(perPullRequest)}</strong> fix cycles per PR: ${String(total)} over ${String(pullRequests)} PRs with a CI run.</p>`;
-    if (!withFixCycles?.length) return summary;
-    const rows = withFixCycles.map((row) => `<tr><td>PR #${String(row.pullRequest)}</td><td>${String(row.fixCycles)}</td></tr>`).join("");
-    return `${summary}<table><thead><tr><th>PR</th><th>Fix cycles</th></tr></thead><tbody>${rows}</tbody></table>`;
+  section: ({ perPullRequest, total, pullRequests }) =>
+    `<p><strong>${String(perPullRequest)}</strong> fix cycles per PR: ${String(total)} over ${String(pullRequests)} PRs with a CI run. The PRs that needed none are left out of the table.</p>`,
+
+  ticketTable: {
+    rowHeading: "PR",
+    columns: ["Fix cycles"],
+    rows: ({ withFixCycles }) => withFixCycles?.map((row) => ({ id: `PR #${String(row.pullRequest)}`, cells: [{ text: String(row.fixCycles), sort: row.fixCycles }] })),
   },
 
   methodology: {

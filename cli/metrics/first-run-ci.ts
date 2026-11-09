@@ -12,6 +12,8 @@ export interface FirstRunCiRate {
   pullRequests: number;
   /** The main check workflow's path. Absent once anonymized: a workflow's name can name the repo or client. */
   workflow?: string;
+  /** Each PR with a first CI result, by number. Absent once anonymized. */
+  perPullRequest?: { pullRequest: number; firstRun: "passed" | "failed" }[];
 }
 
 export const firstRunCiRate: Metric<FirstRunCiRate> = {
@@ -22,11 +24,13 @@ export const firstRunCiRate: Metric<FirstRunCiRate> = {
     const results = new Map(tickets.flatMap((ticket) => ticket.pullRequests).map((pr) => [pr, firstResult(pr, ci)]));
     const covered = tickets.filter((ticket) => ticket.pullRequests.some((pr) => results.get(pr) !== undefined));
     const coverage = { tickets: covered.length, of: tickets.length };
-    const judged = [...results.values()].filter((result) => result !== undefined);
-    if (judged.length === 0 || ci.mainWorkflow === undefined) return { value: UNKNOWN, coverage };
-    const passed = judged.filter((result) => result === "passed").length;
+    const perPullRequest = [...results.entries()]
+      .flatMap(([pr, firstRun]) => (firstRun === undefined ? [] : [{ pullRequest: pr.number, firstRun }]))
+      .sort((a, b) => a.pullRequest - b.pullRequest);
+    if (perPullRequest.length === 0 || ci.mainWorkflow === undefined) return { value: UNKNOWN, coverage };
+    const passed = perPullRequest.filter((row) => row.firstRun === "passed").length;
     return {
-      value: { rate: share(passed, judged.length), passed, pullRequests: judged.length, workflow: ci.mainWorkflow },
+      value: { rate: share(passed, perPullRequest.length), passed, pullRequests: perPullRequest.length, workflow: ci.mainWorkflow, perPullRequest },
       coverage,
     };
   },
@@ -45,6 +49,12 @@ export const firstRunCiRate: Metric<FirstRunCiRate> = {
 
   section({ rate, passed, pullRequests, workflow }) {
     return `<p><strong>${formatPercent(percent(rate))}</strong> of PRs passed CI on the first try: ${String(passed)} of ${String(pullRequests)}${workflow === undefined ? "" : `, judged on <code>${escapeHtml(workflow)}</code>`}.</p>`;
+  },
+
+  ticketTable: {
+    rowHeading: "PR",
+    columns: ["First CI run"],
+    rows: ({ perPullRequest }) => perPullRequest?.map((row) => ({ id: `PR #${String(row.pullRequest)}`, cells: [row.firstRun] })),
   },
 
   methodology: {

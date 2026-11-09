@@ -79,20 +79,22 @@ export const batchHealth: Metric<BatchHealth> = {
       ? undefined
       : `${formatPercent(percent(greenRate))} of integration batches passed CI on their first run (${String(greenOnFirstRun)} of ${String(withCi)}, over ${String(batches)} batches)`,
 
-  section({ batches, withCi, greenOnFirstRun, greenRate, dropped, perBatch }) {
+  section({ batches, withCi, greenOnFirstRun, greenRate, dropped }) {
     const green =
       greenRate === undefined
         ? `No batch has a CI result`
         : `<strong>${formatPercent(percent(greenRate))}</strong> of batches were green on their first CI run (${String(greenOnFirstRun)} of ${String(withCi)})`;
-    const summary = `<p>${green}; ${plural(dropped, "PR")} dropped from ${plural(batches, "batch", "batches")}.</p>`;
-    if (!perBatch) return summary;
-    const rows = perBatch
-      .map(
-        (batch) =>
-          `<tr><td>PR #${String(batch.pullRequest)}</td><td>${batch.firstRun}</td><td>${batch.dropped.map((n) => `#${String(n)}`).join(", ")}</td></tr>`,
-      )
-      .join("");
-    return `${summary}<table><thead><tr><th>Batch</th><th>First CI run</th><th>Dropped</th></tr></thead><tbody>${rows}</tbody></table>`;
+    return `<p>${green}; ${plural(dropped, "PR")} dropped from ${plural(batches, "batch", "batches")}.</p>`;
+  },
+
+  ticketTable: {
+    rowHeading: "Batch",
+    columns: ["First CI run", "Dropped PRs", "Dropped"],
+    rows: ({ perBatch }) =>
+      perBatch?.map((batch) => ({
+        id: `PR #${String(batch.pullRequest)}`,
+        cells: [batch.firstRun, { text: String(batch.dropped.length), sort: batch.dropped.length }, batch.dropped.map((n) => `#${String(n)}`).join(", ")],
+      })),
   },
 
   methodology: {

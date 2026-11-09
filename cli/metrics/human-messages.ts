@@ -38,10 +38,11 @@ export const humanMessagesPerTicket: Metric<HumanMessages> = {
     card: ({ p50, p90 }) => `${String(p50)} <small>p50</small> · ${String(p90)} <small>p90</small>`,
   },
 
-  section({ perTicket, mean }) {
-    if (!perTicket) return `<p>Mean ${String(mean)} per ticket with transcripts.</p>`;
-    const rows = perTicket.map((row) => `<tr><td>${row.ticket}</td><td>${String(row.messages)}</td></tr>`).join("");
-    return `<p>Mean ${String(mean)}.</p><table><thead><tr><th>Ticket</th><th>Human messages</th></tr></thead><tbody>${rows}</tbody></table>`;
+  section: ({ mean }) => `<p>Mean <strong>${String(mean)}</strong> human messages per ticket with transcripts.</p>`,
+
+  ticketTable: {
+    columns: ["Human messages"],
+    rows: ({ perTicket }) => perTicket?.map((row) => ({ id: row.ticket, cells: [{ text: String(row.messages), sort: row.messages }] })),
   },
 
   methodology: {
