@@ -41,6 +41,11 @@ function subAgentsOf(ticket: Ticket): Map<string, string> {
   return agents;
 }
 
+/** `claude-opus-5-5 2, claude-haiku-5-5 1`, or `none`. Plain text. */
+function mix(rows: readonly ModelCount[]): string {
+  return rows.map((row) => `${row.model} ${String(row.subAgents)}`).join(", ") || "none";
+}
+
 function modelMix(agents: Iterable<string>): ModelCount[] {
   const counts = new Map<string, number>();
   for (const model of agents) counts.set(model, (counts.get(model) ?? 0) + 1);
@@ -74,12 +79,24 @@ export const subAgents: Metric<SubAgents> = {
 
   sentence: ({ total, p50, p90 }) => `${String(total)} sub-agents run, a median of ${String(p50)} per ticket (p90 ${String(p90)})`,
 
-  section({ total, p50, p90, models, perTicket }) {
-    const mix = (rows: ModelCount[]) => rows.map((row) => `${escapeHtml(row.model)} ${String(row.subAgents)}`).join(", ") || "none";
-    const summary = `<p>${plural(total, "sub-agent")} on the tickets with transcripts (p50 ${String(p50)}, p90 ${String(p90)} per ticket). Models: ${mix(models)}.</p>`;
-    if (!perTicket) return summary;
-    const rows = perTicket.map((row) => `<tr><td>${row.ticket}</td><td>${String(row.subAgents)}</td><td>${mix(row.models)}</td></tr>`).join("");
-    return `${summary}<table><thead><tr><th>Ticket</th><th>Sub-agents</th><th>Models</th></tr></thead><tbody>${rows}</tbody></table>`;
+  // A model whose sub-agents never wrote it is `unknown`: a count of sub-agents, not an unknown count.
+  chart: {
+    title: "Sub-agents by model",
+    draw: ({ value: { total, models } }) => ({
+      kind: "comparison",
+      data: models.map((row) => ({ label: row.model, value: row.subAgents })),
+      format: String,
+      heads: ["Model", "Sub-agents"],
+      description: `${plural(total, "sub-agent")} on the tickets with transcripts, by the model each ran on: ${mix(models)}.`,
+    }),
+  },
+
+  section: ({ total, p50, p90, models }) =>
+    `<p><strong>${plural(total, "sub-agent")}</strong> on the tickets with transcripts: half the tickets had up to ${String(p50)}, nine in ten up to ${String(p90)}. Models: ${escapeHtml(mix(models))}.</p>`,
+
+  ticketTable: {
+    columns: ["Sub-agents", "Models"],
+    rows: ({ perTicket }) => perTicket?.map((row) => ({ id: row.ticket, cells: [{ text: String(row.subAgents), sort: row.subAgents }, mix(row.models)] })),
   },
 
   methodology: {

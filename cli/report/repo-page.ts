@@ -1,29 +1,20 @@
 // A repo's page: `<repo>/index.html`. Number tiles, one per metric (headline
 // metrics first), each with a sparkline of its monthly trend and linking to
 // the metric's page; a grid of chart cards, one per metric that declares a
-// chart; the CV-ready sentences and the case-study cards. Below them, the
-// detail of the metrics whose detail is not yet on their own page
-// (`ON_METRIC_PAGES`): trends, the comparison by autonomy level and each
-// metric's own section.
+// chart; the CV-ready sentences and the case-study cards. Each metric's
+// detail (its summary, monthly trend, comparison by autonomy level and
+// per-ticket table) is on its own page.
 // An anonymized repo's dataset holds aggregates only, so its page does too.
 import { escapeHtml } from "../metrics/html.ts";
 import type { Metric } from "../metrics/metric.ts";
-import { UNKNOWN } from "../metrics/metric.ts";
 import { METRICS } from "../metrics/index.ts";
 import { coverageText } from "../metrics/stats.ts";
-import { autonomySection, sentenceSection, trendSection } from "../report-trends.ts";
-import { sparkline } from "./charts.ts";
+import { sentenceSection } from "../report-trends.ts";
+import { drawnValue, sparkline } from "./charts.ts";
 import { HEADLINES, tileValue } from "./headline.ts";
 import { metricChart } from "./metric-chart.ts";
 import { chip, layout } from "./shell.ts";
 import { PATHS, type PageContext, type SiteRepo, type SiteStudy } from "./site.ts";
-
-/**
- * The metrics whose summary, monthly trend, comparison by autonomy level and
- * per-ticket table are on their metric page, and no longer under Detail here.
- * Once every metric's are, Detail goes.
- */
-const ON_METRIC_PAGES = new Set(["leadTime", "throughput", "firstRunCiRate", "fixCycles", "scheduledFailures", "batchHealth", "regressionRate", "humanMessagesPerTicket"]);
 
 /** Number tiles and a grid of chart cards: the repo page's, and each metric page's. */
 export const DASHBOARD_CSS = `
@@ -53,7 +44,6 @@ const CSS = `${DASHBOARD_CSS}
 .study-card { display: block; text-decoration: none; background: var(--plane); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
 .study-card:hover { background: var(--wash); }
 .study-card b { display: block; font-weight: 600; margin-bottom: 2px; }
-.detail-heading { font-size: 16px; margin: 24px 0 8px; }
 `;
 
 function tile(ctx: PageContext, repo: SiteRepo, metric: Metric<unknown>): string {
@@ -62,7 +52,7 @@ function tile(ctx: PageContext, repo: SiteRepo, metric: Metric<unknown>): string
   const value = tileValue(metric, dataset);
   const unknown = value.includes('class="unknown"') ? " unknown" : "";
   const coverage = result ? coverageText(result.coverage) : "not measured yet";
-  const trend = (dataset.trends?.metrics[metric.id] ?? []).map((figure) => figure.value);
+  const trend = (dataset.trends?.metrics[metric.id] ?? []).map((month) => drawnValue(metric.figure, month.value));
   const size = metric.headline ? " lg" : "";
   const inner = `<h3>${escapeHtml(metric.name)}</h3><p class="value${unknown}">${value}</p><div class="foot"><p class="coverage">${coverage}</p>${sparkline(trend)}</div>`;
   // A metric missing from a dataset written before it existed has no page to link to.
@@ -107,18 +97,6 @@ function studyCards(ctx: PageContext, repo: SiteRepo): string {
   return `<section class="card wide" data-section="case-studies"><h2>Case studies</h2><div class="studies">${cards}</div></section>`;
 }
 
-function metricSections(ctx: PageContext, repo: SiteRepo, metrics: readonly Metric<unknown>[]): string {
-  return metrics
-    .flatMap((metric) => {
-      const result = repo.dataset.metrics[metric.id];
-      if (!metric.section || !result) return [];
-      const body = result.value === UNKNOWN ? `<p class="unknown">unknown</p>` : metric.section(result.value);
-      const heading = `<a href="${escapeHtml(ctx.link(PATHS.metric(repo, metric)))}">${escapeHtml(metric.name)}</a>`;
-      return [`<section class="metric card" data-section="${metric.id}"><h3>${heading}</h3>${body}</section>`];
-    })
-    .join("\n");
-}
-
 export function repoPage(ctx: PageContext, repo: SiteRepo): string {
   const { dataset } = repo;
   const name = escapeHtml(dataset.repo);
@@ -131,20 +109,10 @@ export function repoPage(ctx: PageContext, repo: SiteRepo): string {
   ].join("");
   const sentences = sentenceSection(dataset).replace(/^<section class="([^"]*)"/, '<section class="$1 card wide"');
   const studies = studyCards(ctx, repo);
-  const detailed = METRICS.filter((metric) => !ON_METRIC_PAGES.has(metric.id));
   const body = `<section class="repo" id="${name}" data-repo="${name}">
 ${tiles(ctx, repo)}
 ${charts(ctx, repo)}
 ${sentences || studies ? `<div class="chart-grid">\n${sentences}\n${studies}\n</div>` : ""}
-<h2 class="detail-heading">Detail</h2>
-${wrap(trendSection(dataset, detailed))}
-${wrap(autonomySection(dataset, detailed))}
-${metricSections(ctx, repo, detailed.filter((metric) => repo.metrics.includes(metric)))}
 </section><!-- /repo -->`;
   return layout(ctx, { title: dataset.repo, chips, body, css: CSS });
-}
-
-/** A summary section as a card. */
-function wrap(section: string): string {
-  return section.replace(/^<section class="([^"]*)"/, '<section class="$1 card"');
 }

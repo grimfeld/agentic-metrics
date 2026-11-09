@@ -1,10 +1,11 @@
 import { estimateHours } from "../conventions.ts";
 import type { Comment } from "../github/load.ts";
 import { ownCommits, type Ticket } from "../linker.ts";
-import type { Metric } from "./metric.ts";
+import { trendLine } from "../report/charts.ts";
+import type { Figure, Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
-import { SIZE_HEADERS, sizeCells, sizeOf, type TicketSize } from "./size.ts";
-import { formatHours, hoursBetween, percentile, round } from "./stats.ts";
+import { SIZE_COLUMNS, sizeCells, sizeOf, type TicketSize } from "./size.ts";
+import { formatHours, hoursBetween, percentile, plural, round } from "./stats.ts";
 
 export interface EstimatedTicket extends TicketSize {
   estimateHours: number;
@@ -41,6 +42,8 @@ function firstCommitAt(ticket: Ticket): Date | undefined {
   return times.length > 0 ? new Date(Math.min(...times)) : undefined;
 }
 
+const ESTIMATE_FIGURE: Figure<EstimateVsActual> = { label: "p50 actual / estimate", of: ({ p50Ratio }) => p50Ratio, format: String };
+
 export const estimateVsActual: Metric<EstimateVsActual> = {
   id: "estimateVsActual",
   name: "Estimate vs actual",
@@ -74,21 +77,46 @@ export const estimateVsActual: Metric<EstimateVsActual> = {
   // Per-ticket rows name tickets: an anonymized dataset keeps the medians only.
   anonymize: (value) => ({ ...value, tickets: [] }),
 
-  figure: { label: "p50 actual / estimate", of: ({ p50Ratio }) => p50Ratio, format: String },
+  figure: ESTIMATE_FIGURE,
+
+  // One dot per ticket against the estimate (1); an anonymized dataset keeps no ticket, so its monthly medians.
+  chart: {
+    title: "Actual / estimate per ticket",
+    draw(input) {
+      const { p50Ratio, tickets } = input.value;
+      if (tickets.length === 0) return trendLine(input, ESTIMATE_FIGURE, "Estimate vs actual");
+      const over = tickets.filter((t) => t.ratio > 1).length;
+      return {
+        kind: "distribution",
+        data: tickets.map((t) => ({ label: t.ticket, value: t.ratio })),
+        markers: [
+          { label: "p50", value: p50Ratio },
+          { label: "estimate", value: 1 },
+        ],
+        format: String,
+        heads: ["Ticket", "Actual / estimate"],
+        description: `Actual time over the estimate for each of ${plural(tickets.length, "ticket")}, ${String(over)} over 1 (took longer than estimated): p50 ${String(p50Ratio)}.`,
+      };
+    },
+  },
 
   sentence: ({ p50Ratio }) => `Tickets took a median ${String(p50Ratio)} times their up-front estimate`,
 
-  section({ p50Ratio, excludedLate, tickets }) {
-    const rows = tickets
-      .map(
-        (t) =>
-          `<tr><td>${t.ticket}</td><td>${formatHours(t.estimateHours)}</td><td>${formatHours(t.actualHours)}</td><td>${String(t.ratio)}</td>${sizeCells(t)}</tr>`,
-      )
-      .join("");
-    const median = `<p>Median actual / estimate: <strong>${String(p50Ratio)}</strong>. Left out because the estimate came after the first commit: ${String(excludedLate)}.</p>`;
-    if (tickets.length === 0) return median;
-    return `${median}
-<table><thead><tr><th>Ticket</th><th>Estimate</th><th>Actual</th><th>Actual / estimate</th>${SIZE_HEADERS}</tr></thead><tbody>${rows}</tbody></table>`;
+  section: ({ p50Ratio, excludedLate }) =>
+    `<p>Median actual / estimate: <strong>${String(p50Ratio)}</strong>. Left out because the estimate came after the first commit: ${String(excludedLate)}.</p>`,
+
+  ticketTable: {
+    columns: ["Estimate", "Actual", "Actual / estimate", ...SIZE_COLUMNS],
+    rows: ({ tickets }) =>
+      tickets.map((t) => ({
+        id: t.ticket,
+        cells: [
+          { text: formatHours(t.estimateHours), sort: t.estimateHours },
+          { text: formatHours(t.actualHours), sort: t.actualHours },
+          { text: String(t.ratio), sort: t.ratio },
+          ...sizeCells(t),
+        ],
+      })),
   },
 
   methodology: {

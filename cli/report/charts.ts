@@ -73,11 +73,21 @@ export function monthLabel(period: string): string {
   return new Date(`${period}-01T00:00:00Z`).toLocaleString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
 }
 
+/** A figure as a chart draws it: negated for one that reads the other way round (`Figure.drawNegated`). */
+export function drawnValue(figure: Figure<unknown> | undefined, value: ChartValue): ChartValue {
+  return figure?.drawNegated && typeof value === "number" ? -value : value;
+}
+
+/** How a chart formats a value it drew: the figure's own format, given the figure back. */
+function drawnFormat(figure: Figure<unknown>): (value: number) => string {
+  return (value) => figure.format(figure.drawNegated ? -value : value);
+}
+
 /** A figure's results as data: `unknown` and `suppressed` stay what they are, with the coverage as the note. */
 function figureDatum(label: string, result: FigureResult, figure: Figure<unknown>, series?: 1 | 2 | 3): Datum {
   return {
     label,
-    value: result.value,
+    value: drawnValue(figure, result.value),
     ...(typeof result.value === "number" ? { text: figure.format(result.value) } : {}),
     note: `${String(result.coverage.tickets)} of ${String(result.coverage.of)}`,
     ...(series ? { series } : {}),
@@ -86,7 +96,7 @@ function figureDatum(label: string, result: FigureResult, figure: Figure<unknown
 
 /** A metric's figure by month, as a line: for a chart hook with nothing finer, and for metric pages. */
 export function trendLine(input: ChartInput<unknown>, figure: Figure<unknown>, what: string): Chart {
-  const format = (value: number) => figure.format(value);
+  const format = drawnFormat(figure);
   const data = input.trend.map(({ period, result }) => figureDatum(monthLabel(period), result, figure));
   const known = data.filter((d) => typeof d.value === "number");
   const gaps = data.length - known.length;
@@ -106,7 +116,7 @@ export function trendLine(input: ChartInput<unknown>, figure: Figure<unknown>, w
 export function autonomyComparison(input: ChartInput<unknown>, figure: Figure<unknown>, what: string): Chart | undefined {
   const levels = input.byAutonomy;
   if (!levels) return undefined;
-  const format = (value: number) => figure.format(value);
+  const format = drawnFormat(figure);
   const data = AUTONOMY_LEVELS.map((level) => figureDatum(LEVEL_NAMES[level], levels[level], figure, LEVEL_SERIES[level]));
   return {
     kind: "comparison",

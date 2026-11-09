@@ -10,7 +10,7 @@ import type { Figure, FigureResult, Metric } from "../metrics/metric.ts";
 import { SUPPRESSED, UNKNOWN } from "../metrics/metric.ts";
 import { coverageText } from "../metrics/stats.ts";
 import { MIN_ANONYMIZED_TICKETS } from "../trends.ts";
-import { autonomyComparison, monthLabel, renderChart, sparkline, trendLine } from "./charts.ts";
+import { autonomyComparison, drawnValue, monthLabel, renderChart, sparkline, trendLine } from "./charts.ts";
 import { tileValue } from "./headline.ts";
 import { chartInput, metricChart } from "./metric-chart.ts";
 import { DASHBOARD_CSS } from "./repo-page.ts";
@@ -37,7 +37,7 @@ function tiles(repo: SiteRepo, metric: Metric<unknown>): string {
   const result = dataset.metrics[metric.id];
   const trend = dataset.trends?.metrics[metric.id] ?? [];
   const coverage = `<p class="coverage">${result ? coverageText(result.coverage) : "not measured yet"}</p>`;
-  const items = [tile("value", metric.name, tileValue(metric, dataset), `${coverage}${sparkline(trend.map((figure) => figure.value))}`, true)];
+  const items = [tile("value", metric.name, tileValue(metric, dataset), `${coverage}${sparkline(trend.map((month) => drawnValue(metric.figure, month.value)))}`, true)];
   const { figure } = metric;
   if (figure && trend.length) {
     const known = trend.filter((month) => typeof month.value === "number").length;

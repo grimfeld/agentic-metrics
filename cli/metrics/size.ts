@@ -1,7 +1,8 @@
 import { batchDiffCommits, hasOwnDiff, type Ticket } from "../linker.ts";
-import type { Metric } from "./metric.ts";
+import { trendLine } from "../report/charts.ts";
+import type { Figure, Metric, TableCell } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
-import { percentile } from "./stats.ts";
+import { percentile, plural } from "./stats.ts";
 
 export interface TicketSize {
   ticket: string;
@@ -38,6 +39,11 @@ export function sizeOf(ticket: Ticket): TicketSize {
   return { ticket: ticket.id, diffLines, filesTouched, subTickets };
 }
 
+/** The size proxies' columns of a per-ticket table, with `sizeCells`. */
+export const SIZE_COLUMNS = ["Diff lines", "Files", "Sub-tickets"] as const;
+
+const SIZE_FIGURE: Figure<Size> = { label: "p50 diff lines", of: ({ p50DiffLines }) => p50DiffLines, format: String };
+
 export const size: Metric<Size> = {
   id: "size",
   name: "Ticket size",
@@ -61,19 +67,35 @@ export const size: Metric<Size> = {
   // Per-ticket rows name tickets: an anonymized dataset keeps the medians only.
   anonymize: (value) => ({ ...value, tickets: [] }),
 
-  figure: { label: "p50 diff lines", of: ({ p50DiffLines }) => p50DiffLines, format: String },
+  figure: SIZE_FIGURE,
+
+  // One dot per ticket; an anonymized dataset keeps no ticket, so its monthly medians.
+  chart: {
+    title: "Diff lines per ticket",
+    draw(input) {
+      const { p50DiffLines, tickets } = input.value;
+      if (tickets.length === 0) return trendLine(input, SIZE_FIGURE, "Ticket size");
+      const lines = tickets.map((t) => t.diffLines);
+      return {
+        kind: "distribution",
+        data: tickets.map((t) => ({ label: t.ticket, value: t.diffLines })),
+        markers: [{ label: "p50", value: p50DiffLines }],
+        format: String,
+        heads: ["Ticket", "Diff lines"],
+        description: `Diff lines of each of ${plural(tickets.length, "ticket")}, from ${String(Math.min(...lines))} to ${String(Math.max(...lines))}: p50 ${String(p50DiffLines)}.`,
+      };
+    },
+  },
 
   sentence: ({ p50DiffLines, p50FilesTouched }) =>
     `A median ticket of ${String(p50DiffLines)} changed lines across ${String(p50FilesTouched)} files`,
 
-  section({ p50DiffLines, p50FilesTouched, tickets }) {
-    const rows = tickets
-      .map((t) => `<tr><td>${t.ticket}</td>${sizeCells(t)}</tr>`)
-      .join("");
-    const median = `<p>Median ticket: ${String(p50DiffLines)} lines changed in ${String(p50FilesTouched)} files.</p>`;
-    if (tickets.length === 0) return median;
-    return `${median}
-<table><thead><tr><th>Ticket</th>${SIZE_HEADERS}</tr></thead><tbody>${rows}</tbody></table>`;
+  section: ({ p50DiffLines, p50FilesTouched }) =>
+    `<p>Median ticket: <strong>${String(p50DiffLines)}</strong> lines changed in <strong>${String(p50FilesTouched)}</strong> files.</p>`,
+
+  ticketTable: {
+    columns: SIZE_COLUMNS,
+    rows: ({ tickets }) => tickets.map((t) => ({ id: t.ticket, cells: sizeCells(t) })),
   },
 
   methodology: {
@@ -84,8 +106,10 @@ export const size: Metric<Size> = {
   },
 };
 
-export const SIZE_HEADERS = "<th>Diff lines</th><th>Files</th><th>Sub-tickets</th>";
-
-export function sizeCells(t: TicketSize): string {
-  return `<td>${String(t.diffLines)}</td><td>${String(t.filesTouched)}</td><td>${t.subTickets === null ? UNKNOWN : String(t.subTickets)}</td>`;
+export function sizeCells(t: TicketSize): TableCell[] {
+  return [
+    { text: String(t.diffLines), sort: t.diffLines },
+    { text: String(t.filesTouched), sort: t.filesTouched },
+    t.subTickets === null ? UNKNOWN : { text: String(t.subTickets), sort: t.subTickets },
+  ];
 }

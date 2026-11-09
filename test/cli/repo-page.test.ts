@@ -101,11 +101,30 @@ describe("repo page: number tiles", () => {
   });
 });
 
+describe("repo page: no detail", () => {
+  it("leaves each metric's summary, trend, comparison and tables to its page", () => {
+    assert.doesNotMatch(full, />Detail</);
+    for (const { id } of METRICS) assert.doesNotMatch(full, new RegExp(`data-section="${id}"`), id);
+    assert.doesNotMatch(full, /data-trend=|data-autonomy=|data-section="tickets"/);
+  });
+});
+
 describe("repo page: chart grid", () => {
   const charted = METRICS.filter((metric) => metric.chart).map((metric) => metric.id);
 
   it("has a card for each metric that declares a chart, in report order", () => {
-    assert.deepEqual(charted, ["leadTime", "throughput", "apiEquivalentCost", "autonomy"]);
+    assert.deepEqual(charted, [
+      "leadTime",
+      "throughput",
+      "orchestrationTime",
+      "subAgents",
+      "apiEquivalentCost",
+      "autonomy",
+      "testRatio",
+      "netLinesRemoved",
+      "size",
+      "estimateVsActual",
+    ]);
     const cards = [...full.matchAll(/<section class="card chart-card" data-chart="(\w+)">/g)].map((match) => match[1]);
     assert.deepEqual(cards, charted);
   });

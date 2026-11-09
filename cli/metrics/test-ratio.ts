@@ -1,5 +1,4 @@
 import type { PullRequest } from "../github/load.ts";
-import { escapeHtml } from "./html.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
 import { round } from "./stats.ts";
@@ -76,13 +75,36 @@ export const testRatio: Metric<TestRatio> = {
   sentence: ({ testLinesAdded, productionLinesAdded, ratio }) =>
     `${String(ratio)} test lines written per production line (${String(testLinesAdded)} test lines for ${String(productionLinesAdded)} production lines)`,
 
-  section({ testLinesAdded, productionLinesAdded, ratio, tickets }) {
-    const summary = `<p><strong>${String(ratio)}</strong> test lines added per production line: ${String(testLinesAdded)} test lines for ${String(productionLinesAdded)} production lines.</p>`;
-    if (!tickets?.length) return summary;
-    const rows = tickets
-      .map((t) => `<tr><td>${escapeHtml(t.ticket)}</td><td>${String(t.testLinesAdded)}</td><td>${String(t.productionLinesAdded)}</td></tr>`)
-      .join("");
-    return `${summary}<table><thead><tr><th>Ticket</th><th>Test lines</th><th>Production lines</th></tr></thead><tbody>${rows}</tbody></table>`;
+  // The two counts the ratio divides, side by side.
+  chart: {
+    title: "Lines added, test and production",
+    draw: ({ value: { testLinesAdded, productionLinesAdded, ratio } }) => ({
+      kind: "comparison",
+      data: [
+        { label: "Test", value: testLinesAdded },
+        { label: "Production", value: productionLinesAdded },
+      ],
+      format: String,
+      heads: ["Code", "Lines added"],
+      description: `${String(testLinesAdded)} test lines and ${String(productionLinesAdded)} production lines added: ${String(ratio)} test lines per production line.`,
+    }),
+  },
+
+  section: ({ testLinesAdded, productionLinesAdded, ratio }) =>
+    `<p><strong>${String(ratio)}</strong> test lines added per production line: ${String(testLinesAdded)} test lines for ${String(productionLinesAdded)} production lines.</p>`,
+
+  ticketTable: {
+    columns: ["Test lines", "Production lines", "Test / production"],
+    rows: ({ tickets }) =>
+      tickets?.map((t) => ({
+        id: t.ticket,
+        cells: [
+          { text: String(t.testLinesAdded), sort: t.testLinesAdded },
+          { text: String(t.productionLinesAdded), sort: t.productionLinesAdded },
+          // No production line added: the ratio is unknown, not infinite.
+          t.productionLinesAdded === 0 ? UNKNOWN : { text: String(round(t.testLinesAdded / t.productionLinesAdded, 2)), sort: t.testLinesAdded / t.productionLinesAdded },
+        ],
+      })),
   },
 
   methodology: {

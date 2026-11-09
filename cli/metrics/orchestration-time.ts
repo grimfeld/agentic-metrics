@@ -1,4 +1,5 @@
-import type { Metric } from "./metric.ts";
+import { trendLine } from "../report/charts.ts";
+import type { Figure, Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
 import { formatHours, msToHours, plural, round } from "./stats.ts";
 import { IDLE_CAP_MS } from "../transcripts/load.ts";
@@ -13,6 +14,9 @@ export interface OrchestrationTime {
   /** Human messages in those sessions. */
   humanMessages: number;
 }
+
+// Repo level: no ticket, so no autonomy level, owns it.
+const ORCHESTRATION_FIGURE: Figure<OrchestrationTime> = { label: "active", of: ({ hours }) => hours, format: formatHours, byAutonomy: false };
 
 export const orchestrationTime: Metric<OrchestrationTime> = {
   id: "orchestrationTime",
@@ -40,14 +44,20 @@ export const orchestrationTime: Metric<OrchestrationTime> = {
   // Repo-level only: nothing per ticket to drop.
   anonymize: (value) => value,
 
-  // Repo level: no ticket, so no autonomy level, owns it.
-  figure: { label: "active", of: ({ hours }) => hours, format: formatHours, byAutonomy: false },
+  figure: ORCHESTRATION_FIGURE,
+
+  // Repo level, so nothing per ticket to draw: its hours by month. A month with
+  // no orchestration activity is unknown, drawn as a gap, never as 0 h.
+  chart: {
+    title: "Orchestration time by month",
+    draw: (input) => trendLine(input, ORCHESTRATION_FIGURE, "Orchestration time"),
+  },
 
   sentence: ({ hours, sessions }) =>
     `${formatHours(hours)} of active orchestration (planning, grilling, batching) in ${plural(sessions, "session")} on no ticket`,
 
   section({ hours, sessions, subAgents, humanMessages }) {
-    return `<p>${formatHours(hours)} in ${plural(sessions, "session")} on no ticket, with ${plural(humanMessages, "human message")} and ${plural(subAgents, "sub-agent")}.</p>`;
+    return `<p><strong>${formatHours(hours)}</strong> in ${plural(sessions, "session")} on no ticket, with ${plural(humanMessages, "human message")} and ${plural(subAgents, "sub-agent")}.</p>`;
   },
 
   methodology: {
