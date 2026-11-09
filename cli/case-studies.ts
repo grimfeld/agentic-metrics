@@ -108,6 +108,9 @@ function ticketOfFile(file: string): string {
   return /^pr-\d+$/.test(name) ? `PR #${name.slice(3)}` : /^\d+$/.test(name) ? `#${name}` : name;
 }
 
+/** What a draft tells the human, as a comment in its front matter: never part of the story. */
+const DRAFT_INSTRUCTION = "Draft written by `agentic-metrics collect`. Edit it, then set `approved: true` to publish it in the report.";
+
 const NOTABLE_INTERVENTION = /^[ \t]*Notable intervention:.*$/gim;
 
 function hours(ticket: Ticket): string {
@@ -131,11 +134,10 @@ export function draftCaseStudy(candidate: CaseStudyCandidate, work: LinkedWork):
   const lines = [
     "---",
     "approved: false",
+    `# ${DRAFT_INSTRUCTION}`,
     "---",
     "",
     `# ${ticket.id} ${source?.title ?? ""}`.trimEnd(),
-    "",
-    `Draft written by \`agentic-metrics collect\`. Edit it, then set \`approved: true\` above to publish it in the report.`,
     "",
     `Candidate for: ${candidate.criteria.join(", ")}.`,
     "",
@@ -186,10 +188,17 @@ export interface CaseStudy {
 /** Front matter between `---` lines at the top; approved only when it holds `approved: true`. */
 const FRONT_MATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 
+/**
+ * The instruction line drafts carried in their story before it moved to the
+ * front matter. Drafts already committed may still hold it; it never renders.
+ */
+const OLD_INSTRUCTION = /^Draft written by `agentic-metrics collect`\..*(?:\r?\n|$)/gm;
+
 export function parseCaseStudy(file: string, text: string): { approved: boolean; study: CaseStudy } {
   const front = FRONT_MATTER.exec(text);
   const approved = front !== null && /^approved:[ \t]*true[ \t]*$/m.test(front[1] ?? "");
-  return { approved, study: { ticket: ticketOfFile(file), markdown: front ? text.slice(front[0].length) : text } };
+  const story = (front ? text.slice(front[0].length) : text).replace(OLD_INSTRUCTION, "");
+  return { approved, study: { ticket: ticketOfFile(file), markdown: story } };
 }
 
 /** The approved case studies in `dir` (`<case-studies>/<repo>`), by file name; none when it doesn't exist. */
