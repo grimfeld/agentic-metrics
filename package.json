@@ -1,10 +1,10 @@
 {
   "name": "agentic-metrics",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Measure an agentic engineering workflow from GitHub and Claude Code transcripts.",
   "license": "MIT",
   "type": "module",
-  "private": true,
+  "private": false,
   "engines": {
     "node": ">=24"
   },
