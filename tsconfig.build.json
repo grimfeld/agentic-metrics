@@ -1,0 +1,12 @@
+{
+  // Emits the CLI as JavaScript into dist/ for the npm package: Node does not
+  // strip types from files under node_modules, so `npx agentic-metrics` needs JS.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "rootDir": "cli",
+    "outDir": "dist",
+    "rewriteRelativeImportExtensions": true
+  },
+  "include": ["cli/**/*.ts"]
+}

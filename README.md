@@ -26,6 +26,23 @@ Addenda add the metrics conventions to third-party skills without forking them. 
 
 A repo overrides one by name: `.agentic-metrics/addenda/<skill>.md` at its root replaces the shipped addendum, adds one for a skill that has none, or, left empty, switches it off. A namespaced skill (`plugin:name`) matches on its full name first, then on `name`.
 
+## CLI
+
+Run it from a clone of the repo to measure. It reads GitHub through your `gh` login, so there's no token to set up:
+
+```
+npx agentic-metrics collect   # writes datasets/<owner>/<repo>.json
+npx agentic-metrics report    # renders datasets/ as report/index.html
+```
+
+`collect --repo owner/name` measures another repo. Per-repo settings live in `.agentic-metrics.json` at the repo root. All fields are optional:
+
+```json
+{ "readyLabel": "ready-for-agent" }
+```
+
+Adding a metric: write one file in `cli/metrics/` holding its computation (its dataset field), how the report shows it, and its Methodology entry. Then list it in `cli/metrics/index.ts`. Its tests go in `test/cli/`, fixtures in, dataset and HTML out. To read something new from GitHub, add a request to `cli/github/source.ts` and a recorded `gh api` answer to each folder in `test/fixtures/github/`.
+
 ## GitHub Action
 
 Add `.github/workflows/agentic-metrics.yml` to a repo:
@@ -54,7 +71,7 @@ When a PR's description references no issue and its branch name carries one (`sp
 - `plugin/`: the Claude Code plugin (manifest, hooks, `addenda/`, `skills/`). `.claude-plugin/marketplace.json` at the root points at it.
 - `action/`: the GitHub Action (`action.yml`; `decide.ts` is the pure decision function, `main.ts` the wrapper that calls GitHub).
 - `test/`: tests, one folder per deliverable, with fixtures under `test/fixtures/`.
-- The CLI will get its own top-level folder.
+- `cli/`: the CLI. `npm run build` emits it as JavaScript into `dist/` for the npm package, because Node doesn't strip types under `node_modules`. `npm pack` runs the build.
 
 TypeScript runs directly on Node 24 (type stripping), so source files use erasable syntax only and there is no build step for the plugin or the Action (its `runs.main` is `main.ts`, run by the runner's Node 24); `tsc` type-checks.
 
@@ -67,6 +84,7 @@ npm ci
 npm run lint        # eslint .
 npm run typecheck   # tsc
 npm test            # node --test "test/**/*.test.ts"
+npm run build       # tsc -p tsconfig.build.json (the CLI, into dist/)
 ```
 
 `npm run check` runs lint, typecheck and tests in one go.
