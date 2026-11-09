@@ -1,0 +1,27 @@
+{
+  "action": "opened",
+  "number": 402,
+  "pull_request": {
+    "number": 402,
+    "title": "Integration 2026-11-02",
+    "body": null,
+    "draft": false,
+    "head": {
+      "ref": "integration/2026-11-02",
+      "sha": "0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c",
+      "repo": { "full_name": "grimfeld/lifeline" }
+    },
+    "base": {
+      "ref": "main",
+      "repo": { "full_name": "grimfeld/lifeline" }
+    },
+    "user": { "login": "grimfeld", "type": "User" }
+  },
+  "repository": {
+    "full_name": "grimfeld/lifeline",
+    "name": "lifeline",
+    "owner": { "login": "grimfeld" },
+    "default_branch": "main"
+  },
+  "sender": { "login": "grimfeld", "type": "User" }
+}

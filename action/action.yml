@@ -1,0 +1,16 @@
+name: agentic-metrics
+description: Fill in agentic-metrics conventions from GitHub data, starting with Closes #N from the branch name.
+author: grimfeld
+inputs:
+  github-token:
+    description: Token used to edit PRs. The default workflow token is enough; no other secret is needed.
+    default: ${{ github.token }}
+  branch-regex:
+    description: >-
+      Pattern (JavaScript, case-insensitive) that finds the issue number in a branch name: the first
+      capture group that matched, or the whole match. Empty uses the built-in pattern, which reads
+      `16-title`, `spec-376-…`, `spec/363-…`, `ticket-16` and `fix/issue-12`.
+    default: ""
+runs:
+  using: node24
+  main: main.ts
