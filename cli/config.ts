@@ -52,6 +52,10 @@ const PUBLISH_MODES: readonly string[] = ["full", "anonymized", "none"];
 /** An alias is a plain name, safe as a file name and an HTML id: letters, digits, `-`, `_` and `.`, no path. */
 const ALIAS = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
+export function isAlias(alias: string): boolean {
+  return ALIAS.test(alias);
+}
+
 const DEFAULTS: Config = {
   readyLabel: "ready-for-agent",
   branchRegex: DEFAULT_BRANCH_REGEX,
