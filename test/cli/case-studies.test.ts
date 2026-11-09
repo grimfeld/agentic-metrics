@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { main } from "../../cli/main.ts";
 import { fixtureSource } from "../../cli/github/source.ts";
 import { transcriptCache } from "../../cli/transcripts/source.ts";
+import { readAllPages } from "./report-pages.ts";
 
 const GITHUB = join(import.meta.dirname, "../fixtures/github");
 const CACHE = join(import.meta.dirname, "../fixtures/transcript-cache/lifeline");
@@ -62,9 +63,10 @@ function approve(path: string) {
   write(path, read(path).replace(/^approved: false$/m, "approved: true"));
 }
 
+/** Every page of the report. */
 async function report(): Promise<string> {
   await run(["report"]);
-  return read("report/index.html");
+  return readAllPages(join(cwd, "report"));
 }
 
 describe("case studies", () => {
@@ -109,11 +111,13 @@ describe("case studies", () => {
     await run(["collect"]);
     approve(`${DRAFTS}/106.md`);
     const html = await report();
-    assert.match(html, /<section class="case-studies" data-section="case-studies">/);
-    assert.match(html, /<article class="case-study" data-ticket="#106">/);
-    assert.match(html, /<h4>#106 Lifeline issue title 106<\/h4>/);
-    assert.match(html, /Notable intervention: the human reverted the agent&#39;s schema change/);
+    assert.match(read("report/grimfeld--lifeline/index.html"), /<section class="studies card" data-section="case-studies"><h3>Case studies<\/h3><ul><li><a href="case-studies\/106\.html">Case study #106<\/a>/);
+    const page = read("report/grimfeld--lifeline/case-studies/106.html");
+    assert.match(page, /<article class="case-study card" data-ticket="#106">/);
+    assert.match(page, /<h4>#106 Lifeline issue title 106<\/h4>/);
+    assert.match(page, /Notable intervention: the human reverted the agent&#39;s schema change/);
     assert.doesNotMatch(html, /data-ticket="#104"|data-ticket="PR #136"/);
+    assert.deepEqual(readdirSync(join(cwd, "report/grimfeld--lifeline/case-studies")), ["106.html"]);
     // Drafts are not part of the published site.
     assert.equal(existsSync(join(cwd, "report/case-studies")), false);
   });
@@ -148,6 +152,6 @@ describe("case studies", () => {
     write(`${DRAFTS}/106.md`, "---\napproved: true\n---\n\n# Leak\n");
     await run(["collect"]);
     assert.deepEqual(readdirSync(join(cwd, DRAFTS)), ["106.md"]);
-    assert.doesNotMatch(read(".agentic-metrics-local/index.html"), /case-stud|Leak/);
+    assert.doesNotMatch(readAllPages(join(cwd, ".agentic-metrics-local")), /case-stud|Leak/);
   });
 });

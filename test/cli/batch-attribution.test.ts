@@ -4,6 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../../cli/main.ts";
+import { readRepo } from "./report-pages.ts";
 import { fixtureSource } from "../../cli/github/source.ts";
 import { transcriptCache } from "../../cli/transcripts/source.ts";
 
@@ -58,7 +59,7 @@ async function collect(config?: object) {
 async function throughputSentence(): Promise<string | undefined> {
   const status = await main(["report"], { cwd, github: fixtureSource(GITHUB), now: () => NOW, stdout: () => undefined });
   assert.equal(status, 0);
-  const html = readFileSync(join(cwd, "report/index.html"), "utf8");
+  const html = readRepo(join(cwd, "report"), "grimfeld/agentic-metrics");
   return /<li data-sentence="throughput"><p class="sentence">([^<]*)<\/p>/.exec(html)?.[1];
 }
 

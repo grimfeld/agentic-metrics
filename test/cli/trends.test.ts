@@ -4,6 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../../cli/main.ts";
+import { readRepo } from "./report-pages.ts";
 import { fixtureSource } from "../../cli/github/source.ts";
 import { transcriptCache } from "../../cli/transcripts/source.ts";
 import { METRICS } from "../../cli/metrics/index.ts";
@@ -40,10 +41,10 @@ async function collect(cwd: string, config?: object) {
   assert.equal(status, 0, stderr);
 }
 
-async function report(cwd: string): Promise<string> {
+async function report(cwd: string, repo: string): Promise<string> {
   const status = await main(["report"], { cwd, github: fixtureSource(join(GITHUB, "empty")), now: () => NOW, stdout: () => undefined });
   assert.equal(status, 0);
-  return readFileSync(join(cwd, "report/index.html"), "utf8");
+  return readRepo(join(cwd, "report"), repo);
 }
 
 let full: string;
@@ -57,12 +58,12 @@ before(async () => {
   full = mkdtempSync(join(tmpdir(), "am-trends-"));
   await collect(full);
   dataset = JSON.parse(readFileSync(join(full, "datasets/grimfeld/lifeline.json"), "utf8")) as Dataset;
-  html = await report(full);
+  html = await report(full, "grimfeld/lifeline");
 
   anonymized = mkdtempSync(join(tmpdir(), "am-trends-anon-"));
   await collect(anonymized, { publish: "anonymized", alias: "side-project" });
   anonymizedDataset = JSON.parse(readFileSync(join(anonymized, "datasets/side-project.json"), "utf8")) as Dataset;
-  anonymizedHtml = await report(anonymized);
+  anonymizedHtml = await report(anonymized, "side-project");
 });
 
 after(() => {

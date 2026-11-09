@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../../cli/main.ts";
 import { fixtureSource } from "../../cli/github/source.ts";
+import { readPages, repoPage } from "./report-pages.ts";
 
 const FIXTURES = join(import.meta.dirname, "../fixtures/github");
 const NOW = new Date("2026-11-09T12:00:00Z");
@@ -22,7 +23,8 @@ before(async () => {
   await run(["collect"], "lifeline");
   await run(["collect"], "empty");
   await run(["report"]);
-  html = readFileSync(join(cwd, "report/index.html"), "utf8");
+  // Each repo's page, then Methodology.
+  html = readPages(join(cwd, "report"), [repoPage("grimfeld/agentic-metrics"), repoPage("grimfeld/lifeline"), "methodology.html"]);
 });
 
 after(() => {
@@ -143,20 +145,14 @@ describe("report", () => {
     assert.match(estimate, /Coverage: grimfeld\/agentic-metrics 0 of 0 tickets; grimfeld\/lifeline 2 of 5 tickets/);
   });
 
-  it("links each repo's raw dataset from its own section", () => {
-    assert.match(section("grimfeld/lifeline"), /<a href="datasets\/grimfeld\/lifeline\.json">/);
-    assert.match(section("grimfeld/agentic-metrics"), /<a href="datasets\/grimfeld\/agentic-metrics\.json">/);
-  });
-
-  it("lists every tracked repo at the top, linking to its section", () => {
-    const nav = textOf("id", "repos");
-    assert.equal(nav, "grimfeld/agentic-metrics grimfeld/lifeline");
-    assert.match(html, /<a href="#grimfeld\/lifeline">/);
-    assert.match(html, /<section class="repo" id="grimfeld\/lifeline" data-repo="grimfeld\/lifeline">/);
+  it("links each repo's raw dataset from its own page", () => {
+    const page = (repo: string) => readPages(join(cwd, "report"), [repoPage(repo)]);
+    assert.match(page("grimfeld/lifeline"), /<a class="chip" href="\.\.\/datasets\/grimfeld\/lifeline\.json">raw dataset<\/a>/);
+    assert.match(page("grimfeld/agentic-metrics"), /<a class="chip" href="\.\.\/datasets\/grimfeld\/agentic-metrics\.json">raw dataset<\/a>/);
   });
 
   it("links each raw dataset from Methodology, copied next to the report", () => {
-    assert.match(html, /<a href="datasets\/grimfeld\/lifeline\.json">/);
+    assert.match(readPages(join(cwd, "report"), ["methodology.html"]), /<a href="datasets\/grimfeld\/lifeline\.json">/);
     assert.equal(
       readFileSync(join(cwd, "report/datasets/grimfeld/lifeline.json"), "utf8"),
       readFileSync(join(cwd, "datasets/grimfeld/lifeline.json"), "utf8"),
