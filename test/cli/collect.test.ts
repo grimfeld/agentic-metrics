@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../../cli/main.ts";
@@ -82,6 +82,30 @@ describe("collect", () => {
       value: { p50Hours: 20, p90Hours: 192 },
       coverage: { tickets: 5, of: 5 },
     });
+  });
+
+  it("reads another repo's config from its checkout", async () => {
+    mkdirSync(join(cwd, "clone"));
+    writeFileSync(join(cwd, "clone", ".agentic-metrics.json"), JSON.stringify({ readyLabel: "bug" }));
+    await collect("lifeline", ["--repo", "grimfeld/lifeline", "--checkout", "clone"]);
+
+    // As with `bug` as the ready label in the current folder (see above).
+    assert.deepEqual(dataset().metrics["leadTime"]?.value, { p50Hours: 20, p90Hours: 192 });
+  });
+
+  it("warns that another repo without --checkout gets this folder's config and no transcripts", async () => {
+    let stderr = "";
+    const status = await main(["collect", "--repo", "grimfeld/lifeline"], {
+      cwd,
+      github: fixtureSource(join(FIXTURES, "lifeline")),
+      now: () => NOW,
+      stdout: () => undefined,
+      stderr: (text) => (stderr += text),
+    });
+
+    assert.equal(status, 0, stderr);
+    assert.match(stderr, /grimfeld\/lifeline.*--checkout/s);
+    assert.match(stderr, /transcript/);
   });
 
   it("reports lead time as unknown, not zero, when no ticket was delivered", async () => {
