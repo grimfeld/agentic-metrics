@@ -116,7 +116,10 @@ describe("case studies", () => {
     assert.match(read("report/grimfeld--lifeline/index.html"), /<section class="card wide" data-section="case-studies"><h2>Case studies<\/h2><div class="studies"><a class="study-card" href="case-studies\/106\.html"><b>#106 Lifeline issue title 106<\/b><span class="muted">Case study #106<\/span><\/a><\/div>/);
     const page = read("report/grimfeld--lifeline/case-studies/106.html");
     assert.match(page, /<article class="case-study card" data-ticket="#106">/);
-    assert.match(page, /<h4>#106 Lifeline issue title 106<\/h4>/);
+    // The story's first heading is the page's title, not repeated under it.
+    assert.match(page, /<title>#106 Lifeline issue title 106 · grimfeld\/lifeline · /);
+    assert.match(page, /<h1>#106 Lifeline issue title 106 <small>Case study #106 · grimfeld\/lifeline<\/small><\/h1>/);
+    assert.doesNotMatch(page, /<h4>#106 Lifeline issue title 106<\/h4>/);
     assert.match(page, /Notable intervention: the human reverted the agent&#39;s schema change/);
     assert.doesNotMatch(html, /data-ticket="#104"|data-ticket="PR #136"/);
     assert.deepEqual(readdirSync(join(cwd, "report/grimfeld--lifeline/case-studies")), ["106.html"]);
@@ -133,18 +136,36 @@ describe("case studies", () => {
     );
     await run(["report"]);
     const page = read("report/grimfeld--lifeline/case-studies/106.html");
-    assert.match(page, /<h4>PR #88 Retire the Bible App<\/h4>\n<p>Candidate for: largest ticket\.<\/p>/);
+    assert.match(page, /<h1>PR #88 Retire the Bible App <small>/);
+    assert.match(page, /<article class="case-study card" data-ticket="#106"><p>Candidate for: largest ticket\.<\/p>/);
     assert.doesNotMatch(page, /agentic-metrics collect|approved: true/);
     assert.match(page, /<p>Draft written by hand is fine here\.<\/p>/);
   });
 
   it("renders an approved case study's Markdown as text, never as raw HTML", async () => {
     await run(["collect"]);
-    write(`${DRAFTS}/106.md`, "---\napproved: true\n---\n\n# Title\n\n<script>alert(1)</script> and [a link](https://example.com/x)\n\n- one\n- two\n");
+    write(`${DRAFTS}/106.md`, "---\napproved: true\n---\n\nIntro.\n\n# Title\n\n<script>alert(1)</script> and [a link](https://example.com/x)\n\n- one\n- two\n");
     const html = await report();
     assert.match(html, /<h4>Title<\/h4>/);
     assert.match(html, /<p>&#60;script&#62;alert\(1\)&#60;\/script&#62; and <a href="https:\/\/example\.com\/x">a link<\/a><\/p>/);
     assert.match(html, /<ul><li>one<\/li><li>two<\/li><\/ul>/);
+  });
+
+  it("renders **bold** and *emphasis*, leaving a lone asterisk and code alone", async () => {
+    await run(["collect"]);
+    write(`${DRAFTS}/106.md`, "---\napproved: true\n---\n\n**Door:** two-way, *soft* and __not bold__\n\n- **Before:** `a **b**` 2 * 3\n");
+    await run(["report"]);
+    const page = read("report/grimfeld--lifeline/case-studies/106.html");
+    assert.match(page, /<p><strong>Door:<\/strong> two-way, <em>soft<\/em> and __not bold__<\/p>/);
+    assert.match(page, /<li><strong>Before:<\/strong> <code>a \*\*b\*\*<\/code> 2 \* 3<\/li>/);
+  });
+
+  it("keeps a list item's indented continuation lines inside it, one per line", async () => {
+    await run(["collect"]);
+    write(`${DRAFTS}/106.md`, "---\napproved: true\n---\n\n- Migration on a copy:\n  Before: three\n  After: two\n- Typecheck clean\n\nAfter.\n");
+    await run(["report"]);
+    const page = read("report/grimfeld--lifeline/case-studies/106.html");
+    assert.match(page, /<ul><li>Migration on a copy:<br>Before: three<br>After: two<\/li><li>Typecheck clean<\/li><\/ul>\n<p>After\.<\/p>/);
   });
 
   it("renders a fenced code block as code, keeping its language and its text", async () => {

@@ -1,7 +1,7 @@
 import { estimateHours } from "../conventions.ts";
 import type { Comment } from "../github/load.ts";
 import { ownCommits, type Ticket } from "../linker.ts";
-import { trendLine } from "../report/charts.ts";
+import { perTicketChart } from "../report/charts.ts";
 import type { Figure, Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
 import { SIZE_COLUMNS, sizeCells, sizeOf, type TicketSize } from "./size.ts";
@@ -84,19 +84,18 @@ export const estimateVsActual: Metric<EstimateVsActual> = {
     title: "Actual / estimate per ticket",
     draw(input) {
       const { p50Ratio, tickets } = input.value;
-      if (tickets.length === 0) return trendLine(input, ESTIMATE_FIGURE, "Estimate vs actual");
-      const over = tickets.filter((t) => t.ratio > 1).length;
-      return {
-        kind: "distribution",
-        data: tickets.map((t) => ({ label: t.ticket, value: t.ratio })),
+      return perTicketChart(input, ESTIMATE_FIGURE, {
+        what: "Estimate vs actual",
+        rows: tickets.map((t) => ({ ticket: t.ticket, value: t.ratio })),
+        head: "Actual / estimate",
         markers: [
           { label: "p50", value: p50Ratio },
           { label: "estimate", value: 1 },
         ],
         format: String,
-        heads: ["Ticket", "Actual / estimate"],
-        description: `Actual time over the estimate for each of ${plural(tickets.length, "ticket")}, ${String(over)} over 1 (took longer than estimated): p50 ${String(p50Ratio)}.`,
-      };
+        description: (rows) =>
+          `Actual time over the estimate for each of ${plural(rows.length, "ticket")}, ${String(rows.filter((row) => row.value > 1).length)} over 1 (took longer than estimated): p50 ${String(p50Ratio)}.`,
+      });
     },
   },
 

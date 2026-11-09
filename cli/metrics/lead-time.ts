@@ -1,4 +1,4 @@
-import { trendLine } from "../report/charts.ts";
+import { perTicketChart, spanText } from "../report/charts.ts";
 import type { Figure, Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
 import { formatHours, hoursBetween, percentile, plural, round } from "./stats.ts";
@@ -9,6 +9,8 @@ export interface LeadTime {
   /** Each ticket's lead time, in delivery order, so the percentiles can be traced. Absent once anonymized. */
   tickets?: { ticket: string; hours: number }[];
 }
+
+const LEAD_TIME_FIGURE: Figure<LeadTime> = { label: "p50", of: ({ p50Hours }) => p50Hours, format: formatHours };
 
 export const leadTime: Metric<LeadTime> = {
   id: "leadTime",
@@ -34,7 +36,7 @@ export const leadTime: Metric<LeadTime> = {
   // Per-ticket rows name tickets: an anonymized dataset keeps the percentiles only.
   anonymize: ({ p50Hours, p90Hours }) => ({ p50Hours, p90Hours }),
 
-  figure: { label: "p50", of: ({ p50Hours }) => p50Hours, format: formatHours },
+  figure: LEAD_TIME_FIGURE,
 
   sentence: ({ p50Hours, p90Hours }) =>
     `Median lead time of ${formatHours(p50Hours)} from a ticket being ready to its last PR merging (p90 ${formatHours(p90Hours)})`,
@@ -44,25 +46,30 @@ export const leadTime: Metric<LeadTime> = {
     title: "Lead time per ticket",
     draw(input) {
       const { p50Hours, p90Hours, tickets } = input.value;
-      if (!tickets?.length) return trendLine(input, leadTime.figure as Figure<unknown>, "Lead time");
-      const hours = tickets.map((t) => t.hours);
-      return {
-        kind: "distribution",
-        data: tickets.map((t) => ({ label: t.ticket, value: t.hours })),
+      return perTicketChart(input, LEAD_TIME_FIGURE, {
+        what: "Lead time",
+        rows: tickets?.map((t) => ({ ticket: t.ticket, value: t.hours })),
+        head: "Lead time",
         markers: [
           { label: "p50", value: p50Hours },
           { label: "p90", value: p90Hours },
         ],
         format: formatHours,
-        heads: ["Ticket", "Lead time"],
-        description: `Lead time of each of ${plural(tickets.length, "ticket")}, from ${formatHours(Math.min(...hours))} to ${formatHours(Math.max(...hours))}: p50 ${formatHours(p50Hours)}, p90 ${formatHours(p90Hours)}.`,
-      };
+        description: (rows) =>
+          `Lead time of each of ${plural(rows.length, "ticket")}, ${spanText(rows, formatHours)}: p50 ${formatHours(p50Hours)}, p90 ${formatHours(p90Hours)}.`,
+      });
     },
   },
 
   headline: {
     order: 1,
     card: ({ p50Hours, p90Hours }) => `${formatHours(p50Hours)} <small>p50</small> · ${formatHours(p90Hours)} <small>p90</small>`,
+    // Percentiles over every repo's tickets: an anonymized repo, with no rows, never pools.
+    pool(known) {
+      const hours = known.flatMap(({ value }) => (value.tickets ?? []).map((row) => row.hours));
+      if (hours.length === 0) return undefined;
+      return { p50Hours: round(percentile(hours, 50), 1), p90Hours: round(percentile(hours, 90), 1) };
+    },
   },
 
   section: ({ p50Hours, p90Hours }) =>

@@ -130,6 +130,33 @@ describe("unknown, not zero", () => {
     assert.match(textOf(html, "data-methodology", "orchestrationTime") ?? "", /unknown, not 0 h, when no session linked to no ticket has measured activity/);
   });
 
+  it("renders a value over 0 tickets, and orchestration with no measured activity, as unknown in a dataset written before they were", async () => {
+    await run(["collect"], join(GITHUB, "lifeline"));
+    // As this repo's own dataset was published before #33: zeros over no ticket, and 0 h of orchestration.
+    const file = join(cwd, "datasets", "grimfeld/lifeline.json");
+    const data = JSON.parse(readFileSync(file, "utf8")) as Dataset;
+    const of = data.metrics["leadTime"]?.coverage.of ?? 0;
+    data.metrics["netLinesRemoved"] = { value: { linesAdded: 0, linesDeleted: 0, netLinesRemoved: 0, ticketsNetRemoving: 0, tickets: [] }, coverage: { tickets: 0, of } };
+    data.metrics["orchestrationTime"] = { value: { hours: 0, sessions: 0, subAgents: 0, humanMessages: 0 }, coverage: { tickets: 2, of } };
+    data.trends.metrics["netLinesRemoved"] = (data.trends.metrics["netLinesRemoved"] ?? []).map(({ coverage }) => ({ value: 0, coverage: { ...coverage, tickets: 0 } }));
+    data.trends.metrics["orchestrationTime"] = (data.trends.metrics["orchestrationTime"] ?? []).map(({ coverage }) => ({ value: 0, coverage }));
+    const levels = data.byAutonomy["netLinesRemoved"] ?? {};
+    for (const level of Object.keys(levels)) levels[level] = { value: 0, coverage: { tickets: 0, of: 1 } };
+    writeFileSync(file, JSON.stringify(data));
+    await run(["report"], join(GITHUB, "lifeline"));
+    const html = report("grimfeld/lifeline");
+
+    assert.match(textOf(html, "data-metric", "netLinesRemoved") ?? "", /^Net lines changed unknown 0 of \d+ tickets$/);
+    assert.match(textOf(html, "data-metric", "orchestrationTime") ?? "", /^Orchestration time unknown /);
+    for (const key of ["netLinesRemoved", "netLinesRemoved:trend", "netLinesRemoved:autonomy", "orchestrationTime", "orchestrationTime:trend"]) {
+      assert.equal(textOf(html, "data-sentence", key), undefined, key);
+    }
+    const net = metricPage("netLinesRemoved", "grimfeld/lifeline");
+    assert.equal(textOf(net, "data-section", "netLinesRemoved"), "Summary unknown");
+    assert.match(textOf(net, "data-section", "trend") ?? "", /Tickets Oct 2026 unknown 0 of 4 Nov 2026 unknown 0 of 1$/);
+    assert.equal(textOf(metricPage("orchestrationTime", "grimfeld/lifeline"), "data-section", "orchestrationTime"), "Summary unknown");
+  });
+
   it("never publishes a known figure over 0 tickets, in any fixture", async () => {
     const root = cwd;
     const fixtures = [

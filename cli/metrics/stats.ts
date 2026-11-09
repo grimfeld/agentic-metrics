@@ -49,3 +49,7 @@ export function plural(count: number, word: string, many = `${word}s`): string {
 export function coverageText({ tickets, of }: { tickets: number; of: number }): string {
   return `${String(tickets)} of ${String(of)} tickets`;
 }
+
+export function sum(values: readonly number[]): number {
+  return values.reduce((total, value) => total + value, 0);
+}

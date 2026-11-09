@@ -2,11 +2,11 @@
 // override (series colours too: blue, orange, aqua, the first three slots of a
 // colour-blind-safe categorical order, each stepped for its mode; autonomy
 // levels wear them as full, assisted, manual), the sidebar listing every page,
-// the title bar, and the chart styles. Below phone
+// the title bar, number tiles, and the chart styles. Below phone
 // width the sidebar becomes a bar scrolling across the top. Everything is
 // inline: the report loads nothing from the network.
 import { escapeHtml } from "../metrics/html.ts";
-import { COPY_SCRIPT } from "../report-trends.ts";
+import { COPY_SCRIPT } from "./cv-sentences.ts";
 import { CHART_CSS, CHART_SCRIPT } from "./charts.ts";
 import { SORT_SCRIPT, TABLE_CSS } from "./ticket-table.ts";
 import { PATHS, type PageContext, type SiteRepo } from "./site.ts";
@@ -60,6 +60,14 @@ th { font-weight: 500; color: var(--ink-2); font-size: 13px; }
 .scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .card > table, .card section > table { display: block; max-width: 100%; overflow-x: auto; }
 main p, main li { overflow-wrap: anywhere; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.tile { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--ring); border-radius: 10px; padding: 10px 12px; min-width: 0; text-decoration: none; }
+a.tile:hover { border-color: var(--axis); }
+.tile h2, .tile h3 { margin: 0; font-size: 12px; font-weight: 500; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile .value { margin: 2px 0; font-size: 20px; font-weight: 650; line-height: 1.25; font-variant-numeric: tabular-nums; }
+.tile.lg .value { font-size: 24px; }
+.tile .foot { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-top: auto; }
+.tile .coverage { font-size: 12px; }
 .sentences ul { list-style: none; margin: 0; padding: 0; }
 .sentences li { display: flex; gap: 12px; align-items: flex-start; padding: 6px 0; border-top: 1px solid var(--grid); }
 .sentences li:first-child { border-top: 0; }
@@ -71,6 +79,7 @@ main p, main li { overflow-wrap: anywhere; }
   nav.side .grp, nav.side details { display: none; }
   nav.side .brand { padding: 4px 8px; }
   main { padding: 16px; }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 ${CHART_CSS}${TABLE_CSS}`;
 

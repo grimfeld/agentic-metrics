@@ -1,6 +1,6 @@
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
-import { percentile } from "./stats.ts";
+import { percentile, round, sum } from "./stats.ts";
 
 export interface HumanMessages {
   p50: number;
@@ -36,6 +36,12 @@ export const humanMessagesPerTicket: Metric<HumanMessages> = {
   headline: {
     order: 3,
     card: ({ p50, p90 }) => `${String(p50)} <small>p50</small> · ${String(p90)} <small>p90</small>`,
+    // Over every repo's tickets with transcripts: an anonymized repo, with no rows, never pools.
+    pool(known) {
+      const counts = known.flatMap(({ value }) => (value.perTicket ?? []).map((row) => row.messages));
+      if (counts.length === 0) return undefined;
+      return { p50: percentile(counts, 50), p90: percentile(counts, 90), mean: round(sum(counts) / counts.length, 1) };
+    },
   },
 
   section: ({ mean }) => `<p>Mean <strong>${String(mean)}</strong> human messages per ticket with transcripts.</p>`,

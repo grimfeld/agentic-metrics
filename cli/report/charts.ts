@@ -112,6 +112,44 @@ export function trendLine(input: ChartInput<unknown>, figure: Figure<unknown>, w
   };
 }
 
+/** A per-ticket distribution chart, as a metric's chart hook declares it. */
+export interface PerTicket {
+  /** The metric's name, naming its trend line when there are no rows. */
+  what: string;
+  /** Each ticket's number; undefined or empty when the value keeps none (an anonymized dataset). */
+  rows: readonly { ticket: string; value: number }[] | undefined;
+  /** The value column's heading. */
+  head: string;
+  markers: { label: string; value: number }[];
+  format: (value: number) => string;
+  /** Plain text for screen readers, given the rows: what the dots show, with the key numbers. */
+  description(rows: readonly { ticket: string; value: number }[]): string;
+}
+
+/**
+ * One dot per ticket with its markers (p50, p90…): lead time's, size's and
+ * estimate vs actual's chart. A value with no per-ticket rows (an anonymized
+ * dataset keeps none) draws its figure by month instead.
+ */
+export function perTicketChart(input: ChartInput<unknown>, figure: Figure<unknown>, chart: PerTicket): Chart {
+  const { rows } = chart;
+  if (!rows?.length) return trendLine(input, figure, chart.what);
+  return {
+    kind: "distribution",
+    data: rows.map((row) => ({ label: row.ticket, value: row.value })),
+    markers: chart.markers,
+    format: chart.format,
+    heads: ["Ticket", chart.head],
+    description: chart.description(rows),
+  };
+}
+
+/** The span of `rows`' values, as `from <min> to <max>`. */
+export function spanText(rows: readonly { value: number }[], format: (value: number) => string): string {
+  const values = rows.map((row) => row.value);
+  return `from ${format(Math.min(...values))} to ${format(Math.max(...values))}`;
+}
+
 /** A metric's figure at each autonomy level, as comparison bars: for metric pages. */
 export function autonomyComparison(input: ChartInput<unknown>, figure: Figure<unknown>, what: string): Chart | undefined {
   const levels = input.byAutonomy;

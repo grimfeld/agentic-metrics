@@ -9,23 +9,16 @@ import { escapeHtml } from "../metrics/html.ts";
 import type { Metric } from "../metrics/metric.ts";
 import { METRICS } from "../metrics/index.ts";
 import { coverageText } from "../metrics/stats.ts";
-import { sentenceSection } from "../report-trends.ts";
+import { sentenceSection } from "./cv-sentences.ts";
 import { drawnValue, sparkline } from "./charts.ts";
 import { HEADLINES, tileValue } from "./headline.ts";
+import { studyTitle } from "./case-study-page.ts";
 import { metricChart } from "./metric-chart.ts";
 import { chip, layout } from "./shell.ts";
-import { PATHS, type PageContext, type SiteRepo, type SiteStudy } from "./site.ts";
+import { PATHS, type PageContext, type SiteRepo } from "./site.ts";
 
-/** Number tiles and a grid of chart cards: the repo page's, and each metric page's. */
+/** A grid of chart cards: the repo page's, and each metric page's. Number tiles are the shell's. */
 export const DASHBOARD_CSS = `
-.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; margin-bottom: 12px; }
-.tile { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--ring); border-radius: 10px; padding: 10px 12px; min-width: 0; text-decoration: none; }
-a.tile:hover { border-color: var(--axis); }
-.tile h3 { margin: 0; font-size: 12px; font-weight: 500; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tile .value { margin: 2px 0; font-size: 20px; font-weight: 650; line-height: 1.25; font-variant-numeric: tabular-nums; }
-.tile.lg .value { font-size: 24px; }
-.tile .foot { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-top: auto; }
-.tile .coverage { font-size: 12px; }
 .chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
 .chart-grid > .card { margin: 0; }
 .chart-grid > .wide { grid-column: 1 / -1; }
@@ -33,10 +26,7 @@ a.tile:hover { border-color: var(--axis); }
 .chart-card h2 a { text-decoration: none; }
 .chart-card h2 a:hover { text-decoration: underline; }
 .chart-card > .coverage { margin-top: 4px; }
-@media (max-width: 760px) {
-  .chart-grid { grid-template-columns: minmax(0, 1fr); }
-  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
+@media (max-width: 760px) { .chart-grid { grid-template-columns: minmax(0, 1fr); } }
 `;
 
 const CSS = `${DASHBOARD_CSS}
@@ -81,17 +71,12 @@ function charts(ctx: PageContext, repo: SiteRepo): string {
   return `<div class="chart-grid" data-section="charts">\n${charted.map((metric) => chartCard(ctx, repo, metric)).join("\n")}\n</div>`;
 }
 
-/** A case study's title: its first heading, else its ticket. */
-function studyTitle({ study }: SiteStudy): string {
-  return /^#{1,6}\s+(.+?)\s*#*\s*$/m.exec(study.markdown)?.[1] ?? `Case study ${study.ticket}`;
-}
-
 function studyCards(ctx: PageContext, repo: SiteRepo): string {
   if (repo.studies.length === 0) return "";
   const cards = repo.studies
     .map(
       (s) =>
-        `<a class="study-card" href="${escapeHtml(ctx.link(PATHS.caseStudy(repo, s)))}"><b>${escapeHtml(studyTitle(s))}</b><span class="muted">Case study ${escapeHtml(s.study.ticket)}</span></a>`,
+        `<a class="study-card" href="${escapeHtml(ctx.link(PATHS.caseStudy(repo, s)))}"><b>${escapeHtml(studyTitle(s.study).title)}</b><span class="muted">Case study ${escapeHtml(s.study.ticket)}</span></a>`,
     )
     .join("");
   return `<section class="card wide" data-section="case-studies"><h2>Case studies</h2><div class="studies">${cards}</div></section>`;

@@ -161,11 +161,14 @@ describe("overview page", () => {
     const html = page("index.html");
     const tiles = [...html.matchAll(/<article class="tile" data-headline="(\w+)"/g)].map((match) => match[1]);
     assert.deepEqual(tiles, ["leadTime", "firstRunCiRate", "humanMessagesPerTicket", "regressionRate"]);
-    // Lifeline's 5 tickets pool with agentic-metrics' 0; client-a's are left out.
-    assert.equal(text(element(html, "data-headline", "leadTime")), "Lead time 12 h p50 · 7.5 d p90 5 of 5 tickets Covers grimfeld/lifeline");
+    // Lifeline's 5 tickets pool with agentic-metrics' 0, which the tile names as unknown; client-a's are left out.
+    assert.equal(
+      text(element(html, "data-headline", "leadTime")),
+      "Lead time 12 h p50 · 7.5 d p90 5 of 5 tickets Covers grimfeld/lifeline Unknown for grimfeld/agentic-metrics",
+    );
     assert.equal(
       text(element(html, "data-headline", "regressionRate")),
-      "Regression rate 60% 4 regressions 5 of 5 tickets Covers grimfeld/lifeline",
+      "Regression rate 60% 4 regressions 5 of 5 tickets Covers grimfeld/lifeline Unknown for grimfeld/agentic-metrics",
     );
     assert.equal(text(element(html, "data-headline", "firstRunCiRate")), "First-run CI rate unknown 0 of 5 tickets No full repo has data");
     assert.match(text(element(html, "data-headline", "leadTime")), /^(?!.*client-a)/);
