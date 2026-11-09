@@ -1,5 +1,5 @@
 import { batchDiffCommits, hasOwnDiff, type Ticket } from "../linker.ts";
-import { trendLine } from "../report/charts.ts";
+import { perTicketChart, spanText } from "../report/charts.ts";
 import type { Figure, Metric, TableCell } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
 import { percentile, plural } from "./stats.ts";
@@ -74,16 +74,14 @@ export const size: Metric<Size> = {
     title: "Diff lines per ticket",
     draw(input) {
       const { p50DiffLines, tickets } = input.value;
-      if (tickets.length === 0) return trendLine(input, SIZE_FIGURE, "Ticket size");
-      const lines = tickets.map((t) => t.diffLines);
-      return {
-        kind: "distribution",
-        data: tickets.map((t) => ({ label: t.ticket, value: t.diffLines })),
+      return perTicketChart(input, SIZE_FIGURE, {
+        what: "Ticket size",
+        rows: tickets.map((t) => ({ ticket: t.ticket, value: t.diffLines })),
+        head: "Diff lines",
         markers: [{ label: "p50", value: p50DiffLines }],
         format: String,
-        heads: ["Ticket", "Diff lines"],
-        description: `Diff lines of each of ${plural(tickets.length, "ticket")}, from ${String(Math.min(...lines))} to ${String(Math.max(...lines))}: p50 ${String(p50DiffLines)}.`,
-      };
+        description: (rows) => `Diff lines of each of ${plural(rows.length, "ticket")}, ${spanText(rows, String)}: p50 ${String(p50DiffLines)}.`,
+      });
     },
   },
 
