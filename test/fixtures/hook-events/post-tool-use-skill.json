@@ -1,0 +1,11 @@
+{
+  "session_id": "c99b81f0-41dc-44b4-a9a8-c038d6ad0bd9",
+  "transcript_path": "/Users/dev/.claude/projects/-Users-dev-repos-app/c99b81f0-41dc-44b4-a9a8-c038d6ad0bd9.jsonl",
+  "cwd": "/Users/dev/repos/app",
+  "permission_mode": "default",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Skill",
+  "tool_input": { "skill": "pr" },
+  "tool_response": { "success": true, "commandName": "pr" },
+  "tool_use_id": "toolu_01AbCdEfGhIjKlMnOpQrStUv"
+}
