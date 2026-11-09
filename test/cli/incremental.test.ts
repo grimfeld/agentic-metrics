@@ -89,6 +89,31 @@ describe("collect, incremental", () => {
     assert.deepEqual(dataset.metrics["leadTime"], { value: { p50Hours: 30, p90Hours: 36 }, coverage: { tickets: 3, of: 3 } });
   });
 
+  // Runs are read on their creation time. Before: nightly run 2 (created
+  // 2026-10-25T20:00) still running. After: it failed, and run 3 passed.
+  it("reads workflow runs created since the last run, and again a run that was still in progress", async () => {
+    await collect(dir, recording("before").source, BEFORE);
+    const fetched: number[] = [];
+    const inner = fixtureSource(join(HISTORY, "after"));
+    const source: GitHubSource = {
+      async read(request, options) {
+        const raw = await inner.read(request, options);
+        if (request === "workflow-runs") {
+          fetched.push(...(raw as { workflow_runs: { id: number }[] }[]).flatMap((page) => page.workflow_runs.map((run) => run.id)));
+        }
+        return raw;
+      },
+    };
+    const dataset = JSON.parse(await collect(dir, source, AFTER)) as { metrics: Record<string, { value: unknown }> };
+
+    assert.deepEqual(fetched.sort(), [41000000002, 41000000003]);
+    assert.deepEqual(dataset.metrics["scheduledFailures"]?.value, {
+      failed: 1,
+      runs: 3,
+      workflows: [{ workflow: ".github/workflows/e2e.yml", failed: 1, runs: 3 }],
+    });
+  });
+
   it("re-collects everything with --full", async () => {
     await collect(dir, recording("before").source, BEFORE);
     const { source, fetched } = recording("after");

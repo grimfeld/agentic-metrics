@@ -15,7 +15,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-export type GitHubRequest = "repo" | "pull-requests" | "issues" | "regressions";
+export type GitHubRequest = "repo" | "pull-requests" | "issues" | "regressions" | "workflow-runs";
 
 /** The label that marks a bug as a regression; `init` creates it. */
 export const REGRESSION_LABEL = "regression";
@@ -42,8 +42,17 @@ export interface IncrementalRequest {
   answer(items: unknown[]): unknown;
   /** Identifies an item across reads. */
   key(item: unknown): string;
-  /** ISO time of the item's last update, or undefined when the answer doesn't carry it. */
+  /**
+   * ISO time a `since` read filters the item on (its last update, for most
+   * requests), or undefined when the answer doesn't carry it.
+   */
   updatedAt(item: unknown): string | undefined;
+  /**
+   * For a cached item that may still change without its `updatedAt` reaching
+   * the next read's `since` (a workflow run still in progress), the earliest
+   * `since` that reads it again. The cache reads from the earliest of these.
+   */
+  pendingSince?(item: unknown): string | undefined;
 }
 
 const PULL_REQUESTS_QUERY = `
@@ -59,6 +68,8 @@ query($owner: String!, $name: String!, $endCursor: String) {
         commits(first: 100) { nodes { commit { authoredDate messageHeadline messageBody } } }
         labels(first: 20) { nodes { name } }
         files(first: 100) { totalCount nodes { path additions deletions } }
+        body
+        reviews(first: 100, states: [CHANGES_REQUESTED]) { nodes { submittedAt } }
       }
     }
   }
@@ -125,7 +136,50 @@ const GRAPHQL_REQUESTS = {
 };
 
 /** The requests collection reads incrementally. */
-export const INCREMENTAL: Partial<Record<GitHubRequest, IncrementalRequest>> = GRAPHQL_REQUESTS;
+export const INCREMENTAL: Partial<Record<GitHubRequest, IncrementalRequest>> = {
+  ...GRAPHQL_REQUESTS,
+  "workflow-runs": workflowRunsRequest(),
+};
+
+// Actions runs: REST pages of `actions/runs`, newest created first. A run
+// object shows only its latest attempt: a re-run keeps the run's id and
+// `created_at`, and bumps `run_attempt`, `conclusion` and `run_started_at`
+// (checked on a real re-run, nodejs/node run 42578563994). For a re-run PR or
+// scheduled run, `ghSource` adds its first attempt (`runs/{id}/attempts/1`,
+// a run object of the same shape) as `first_attempt`; fixtures record it so.
+//
+// Incremental on `created_at`, the only time the listing can be cut on: a run
+// still in progress when read is read again from its creation. A completed run
+// re-run later is not read again, which loses nothing the metrics use: they
+// judge a run on its first attempt.
+interface RawRunsPage {
+  total_count: number;
+  workflow_runs: RawRun[];
+}
+
+interface RawRun {
+  id: number;
+  event: string;
+  status: string;
+  run_attempt: number;
+  created_at: string;
+  first_attempt?: unknown;
+}
+
+/** Events whose runs the metrics judge on their first attempt. */
+const FIRST_ATTEMPT_EVENTS = new Set(["pull_request", "schedule"]);
+
+function workflowRunsRequest(): IncrementalRequest {
+  const run = (item: unknown) => item as RawRun;
+  return {
+    version: "1",
+    items: (raw) => (raw as RawRunsPage[]).flatMap((page) => page.workflow_runs),
+    answer: (items) => [{ total_count: items.length, workflow_runs: items }],
+    key: (item) => String(run(item).id),
+    updatedAt: (item) => run(item).created_at,
+    pendingSince: (item) => (run(item).status === "completed" ? undefined : run(item).created_at),
+  };
+}
 
 // Issues labelled as regressions, with the text a `caused-by: #N` line may sit
 // in. Text is read here only to find that line; it never reaches the dataset.
@@ -178,6 +232,28 @@ export function ghSource(options: { cwd: string; repo?: string | undefined }): G
   const graphqlAll = (query: string, variables: string[] = []) =>
     gh(["graphql", "--paginate", "--slurp", "-F", "owner={owner}", "-F", "name={repo}", ...variables, "-f", `query=${query}`]);
 
+  /**
+   * Pages through every run, newest created first, until a page reaches runs
+   * created before `since`. Unfiltered on purpose: a filtered listing returns
+   * at most 1,000 runs.
+   */
+  const workflowRuns = async (since: Date | undefined): Promise<RawRunsPage[]> => {
+    const pages: RawRunsPage[] = [];
+    for (let page = 1; ; page++) {
+      const found = (await gh([`repos/{owner}/{repo}/actions/runs?per_page=100&page=${String(page)}`])) as RawRunsPage;
+      for (const run of found.workflow_runs) {
+        if (run.run_attempt > 1 && FIRST_ATTEMPT_EVENTS.has(run.event)) {
+          run.first_attempt = await gh([`repos/{owner}/{repo}/actions/runs/${String(run.id)}/attempts/1`]);
+        }
+      }
+      pages.push(found);
+      const oldest = found.workflow_runs.at(-1)?.created_at;
+      if (found.workflow_runs.length < 100 || oldest === undefined || (since !== undefined && new Date(oldest) < since)) {
+        return pages;
+      }
+    }
+  };
+
   return {
     read(request, readOptions) {
       switch (request) {
@@ -188,6 +264,8 @@ export function ghSource(options: { cwd: string; repo?: string | undefined }): G
           return graphql(GRAPHQL_REQUESTS[request], readOptions?.since);
         case "regressions":
           return graphqlAll(REGRESSIONS_QUERY, ["-f", `label=${REGRESSION_LABEL}`]);
+        case "workflow-runs":
+          return workflowRuns(readOptions?.since);
       }
     },
   };
