@@ -5,10 +5,12 @@
 // `fixtureSource` reads the same JSON from `<dir>/<request>.json`, so a
 // fixture folder is a recording of `gh api` output, one file per request.
 //
-// To read something new from GitHub, add a request here and its file to the
-// fixture folders. A request that lists items carrying an update time should
-// also get an entry in `INCREMENTAL`: collection then caches its items and,
-// after the first run, asks only for those updated since (see `cache.ts`).
+// To read something new from GitHub, add a request here, its raw type and
+// mapping in `load.ts`, and its file to every fixture folder (the README's
+// "Adding a metric" lists each place). A request that lists items carrying an
+// update time should also get an entry in `INCREMENTAL`: collection then caches
+// its items and, after the first run, asks only for those updated since (see
+// `cache.ts`).
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";

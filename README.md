@@ -107,7 +107,13 @@ npx agentic-metrics collect --repo owner/name   # writes datasets/owner/name.jso
 
 Each repo's section shows trends (every metric per month of delivery), a comparison by autonomy level (`full`, `assisted`, `manual`), and CV-ready sentences with a Copy button. A sentence quotes only known values, each with its coverage. All three come from the dataset (`trends`, `byAutonomy`), so an anonymized repo gets them too, from aggregates only, with any figure covering fewer than 3 tickets withheld (shown as —; `"suppressed"` in the dataset).
 
-Adding a metric: write one file in `cli/metrics/` holding its computation (its dataset field), how the report shows it, and its Methodology entry. Give it a `figure` (one number read off its value, computed again over each month's and each autonomy level's tickets) so it has a trend and a comparison, and a `sentence` for the CV sentences. Then list it in `cli/metrics/index.ts`. Its tests go in `test/cli/`, fixtures in, dataset and HTML out. To read something new from GitHub, add a request to `cli/github/source.ts` and a recorded `gh api` answer to each folder in `test/fixtures/github/`. If the request lists items that carry an update time, give it an entry in `INCREMENTAL` in the same file and it is cached and read incrementally too (a list filtered on something that can change, like a label, can't be: an item leaving the filter would stay in the cache).
+Adding a metric: write one file in `cli/metrics/` holding its computation (its dataset field), how the report shows it, and its Methodology entry. Give it a `figure` (one number read off its value, computed again over each month's and each autonomy level's tickets) so it has a trend and a comparison, and a `sentence` for the CV sentences. Then list it in `cli/metrics/index.ts`. To give it a headline card, set its `headline` (`order` among the cards, and the card's HTML). Its tests go in `test/cli/`, fixtures in, dataset and HTML out. If it lists tickets, its `anonymize` must drop them.
+
+Reading something new from GitHub touches these places:
+
+1. `cli/github/source.ts`: add the request's name to `GitHubRequest`, its query (GraphQL text or REST path) and its case in `ghSource`'s `read`. If it lists items that carry an update time, give it an entry in `INCREMENTAL` and it is cached and read incrementally too (a list filtered on something that can change, like a label, can't be: an item leaving the filter would stay in the cache).
+2. `cli/github/load.ts`: the raw shape of its answer (`Raw…`), the model type the metrics read (added to `GitHubData`), and the mapping in `loadGitHub`.
+3. `test/fixtures/github/`: a recorded `gh api` answer, `<request>.json`, in every folder (`ci`, `empty`, `lifeline`, `private`, and `history/before` and `history/after`), and in the answers built inline by `test/cli/linking.test.ts`.
 
 ## GitHub Action
 
