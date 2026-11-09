@@ -62,6 +62,11 @@ export const fixCyclesMetric: Metric<FixCycles> = {
 
   anonymize: ({ perPullRequest, total, pullRequests }) => ({ perPullRequest, total, pullRequests }),
 
+  figure: { label: "per PR", of: ({ perPullRequest }) => perPullRequest, format: String },
+
+  sentence: ({ perPullRequest, pullRequests }) =>
+    `${String(perPullRequest)} CI fix cycles per pull request on average, over ${String(pullRequests)} pull requests`,
+
   section({ perPullRequest, total, pullRequests, withFixCycles }) {
     const summary = `<p><strong>${String(perPullRequest)}</strong> fix cycles per PR: ${String(total)} over ${String(pullRequests)} PRs with a CI run.</p>`;
     if (!withFixCycles?.length) return summary;

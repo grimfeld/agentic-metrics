@@ -1,6 +1,7 @@
 import { AUTONOMY_LEVELS, type AutonomyLevel } from "../autonomy.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
+import { formatPercent, percent } from "./stats.ts";
 
 export interface AutonomyCounts {
   /** Tickets at each level, overrides applied. */
@@ -39,6 +40,17 @@ export const autonomy: Metric<AutonomyCounts> = {
   },
 
   anonymize: ({ full, assisted, manual, overridden }) => ({ full, assisted, manual, overridden }),
+
+  // The share delivered at full autonomy. The comparison is by these levels, so it has none of its own.
+  figure: {
+    label: "full",
+    of: ({ full, assisted, manual }) => percent(full / (full + assisted + manual)),
+    format: formatPercent,
+    byAutonomy: false,
+  },
+
+  sentence: ({ full, assisted, manual }) =>
+    `${String(full)} of ${String(full + assisted + manual)} tickets delivered at full autonomy: at most one follow-up message, every commit co-authored by Claude`,
 
   section(value) {
     const total = value.full + value.assisted + value.manual;

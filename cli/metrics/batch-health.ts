@@ -2,6 +2,7 @@ import { firstResult } from "../ci.ts";
 import type { PullRequest } from "../github/load.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
+import { formatPercent, percent } from "./stats.ts";
 
 export interface BatchHealth {
   /** Integration PRs merged into the default branch. */
@@ -69,6 +70,14 @@ export const batchHealth: Metric<BatchHealth> = {
     ...(greenRate === undefined ? {} : { greenRate }),
     dropped,
   }),
+
+  // Batches are no ticket's: a trend over time, no comparison by autonomy level.
+  figure: { label: "green on first run", of: ({ greenRate }) => (greenRate === undefined ? Number.NaN : percent(greenRate)), format: formatPercent, byAutonomy: false },
+
+  sentence: ({ batches, withCi, greenOnFirstRun, greenRate }) =>
+    greenRate === undefined
+      ? undefined
+      : `${formatPercent(percent(greenRate))} of integration batches passed CI on their first run (${String(greenOnFirstRun)} of ${String(withCi)}, over ${String(batches)} batches)`,
 
   section({ batches, withCi, greenOnFirstRun, greenRate, dropped, perBatch }) {
     const green =

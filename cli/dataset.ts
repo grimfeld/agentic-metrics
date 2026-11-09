@@ -7,8 +7,9 @@ import type { PublishMode } from "./config.ts";
 import type { Repo } from "./github/load.ts";
 import type { LinkedWork } from "./linker.ts";
 import { METRICS } from "./metrics/index.ts";
-import type { MetricResult } from "./metrics/metric.ts";
+import type { Metric, MetricResult } from "./metrics/metric.ts";
 import { UNKNOWN } from "./metrics/metric.ts";
+import { byAutonomy, trends, type ByAutonomy, type Trends } from "./trends.ts";
 
 export const SCHEMA_VERSION = 2;
 
@@ -35,6 +36,10 @@ export interface Dataset {
   integrationPullRequests: number;
   /** Keyed by metric id. A metric this version doesn't compute is absent. */
   metrics: Record<string, MetricResult<unknown>>;
+  /** Each metric's figure per month of delivery. Absent from datasets written before trends. */
+  trends?: Trends;
+  /** Each metric's figure per autonomy level. Absent from datasets written before the comparison. */
+  byAutonomy?: ByAutonomy;
   /** The repo's GitHub page. Absent when anonymized. */
   url?: string;
   /** Every delivered ticket with its title and link, in delivery order. Absent when anonymized. */
@@ -51,11 +56,12 @@ export interface Dataset {
 export function buildDataset(repo: Repo, work: LinkedWork, now: Date, publish: PublishMode, alias?: string): Dataset {
   const anonymized = publish === "anonymized";
   if (anonymized && !alias) throw new Error("an anonymized dataset needs an alias");
+  const publishValue = <V>(metric: Metric<V>, value: V): V => (anonymized ? metric.anonymize(value) : value);
   const metrics = Object.fromEntries(
     METRICS.map((metric) => {
       const result = metric.compute(work);
-      if (!anonymized || result.value === UNKNOWN) return [metric.id, result];
-      return [metric.id, { ...result, value: metric.anonymize(result.value) }];
+      if (result.value === UNKNOWN) return [metric.id, result];
+      return [metric.id, { ...result, value: publishValue(metric, result.value) }];
     }),
   );
   const dataset: Dataset = {
@@ -67,6 +73,8 @@ export function buildDataset(repo: Repo, work: LinkedWork, now: Date, publish: P
     pullRequests: work.pullRequests.length,
     integrationPullRequests: work.integrationPullRequests.length,
     metrics,
+    trends: trends(work, METRICS, publishValue),
+    byAutonomy: byAutonomy(work, METRICS, publishValue),
   };
   if (anonymized) return dataset;
   return {

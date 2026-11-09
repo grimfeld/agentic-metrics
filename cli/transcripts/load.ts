@@ -39,6 +39,8 @@ export interface Session {
   humanMessages: string[];
   /** Active time: the gaps between its lines, each capped at IDLE_CAP_MS. */
   activeMs: number;
+  /** Its first line's time; undefined when no line carries one. Places orchestration in a trend's month. */
+  startedAt: Date | undefined;
   /**
    * Its API responses, each once (by `message.id`, which is unique across
    * sessions, so metrics dedupe a session counted on several tickets by it).
@@ -125,6 +127,7 @@ export function loadSessions(files: TranscriptFile[]): Session[] {
       prLinks,
       humanMessages: [...new Set(humanMessages)],
       activeMs,
+      startedAt: times[0] === undefined ? undefined : new Date(times[0]),
       responses: [...responses.values()],
       spawns: [...spawns.values()],
     };

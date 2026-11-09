@@ -29,6 +29,10 @@ export const humanMessagesPerTicket: Metric<HumanMessages> = {
 
   anonymize: ({ p50, p90, mean }) => ({ p50, p90, mean }),
 
+  figure: { label: "p50", of: ({ p50 }) => p50, format: String },
+
+  sentence: ({ p50, p90 }) => `A median of ${String(p50)} human messages per ticket (p90 ${String(p90)})`,
+
   headline({ p50, p90 }) {
     return `${String(p50)} <small>p50</small> · ${String(p90)} <small>p90</small>`;
   },

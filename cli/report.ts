@@ -1,7 +1,10 @@
 // The report: one static HTML page from the datasets. Per repo, four headline
-// cards and each metric's own section; then Methodology, which defines every
-// metric present, gives its coverage per repo and links the raw datasets.
+// cards, trends, the comparison by autonomy level, CV-ready sentences
+// (`report-trends.ts`) and each metric's own section; then Methodology, which
+// defines every metric present, gives its coverage per repo and links the raw
+// datasets.
 import type { CaseStudy } from "./case-studies.ts";
+import { autonomySection, COPY_SCRIPT, sentenceSection, trendSection } from "./report-trends.ts";
 import { renderMarkdown } from "./markdown.ts";
 import type { Dataset } from "./dataset.ts";
 import { datasetPath } from "./dataset.ts";
@@ -60,6 +63,9 @@ function repoSection(dataset: Dataset, studies?: readonly CaseStudy[]): string {
 <div class="cards">
 ${cards}
 </div>
+${trendSection(dataset)}
+${autonomySection(dataset)}
+${sentenceSection(dataset)}
 ${sections}
 ${caseStudySection(dataset, studies)}
 ${ticketList(dataset)}
@@ -118,6 +124,12 @@ body { margin: 0 auto; max-width: 960px; padding: 24px 16px; font: 16px/1.5 syst
 table { border-collapse: collapse; font-variant-numeric: tabular-nums; }
 th, td { padding: 2px 12px 2px 0; text-align: left; border-bottom: 1px solid var(--line); }
 a { color: inherit; }
+th small, td small { font-size: 12px; color: var(--muted); }
+.scroll { overflow-x: auto; }
+.sentences ul { list-style: none; padding: 0; }
+.sentences li { display: flex; gap: 12px; align-items: flex-start; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.sentence { margin: 0; flex: 1; user-select: all; }
+.sentences button { font: inherit; font-size: 13px; padding: 2px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--fg); cursor: pointer; }
 `;
 
 /** `caseStudies`: the approved case studies, by dataset repo; rendered for `full` datasets only. */
@@ -136,6 +148,7 @@ export function renderReport(datasets: Dataset[], caseStudies: ReadonlyMap<strin
 <nav id="repos">${sorted.map((dataset) => `<a href="#${escapeHtml(dataset.repo)}">${escapeHtml(dataset.repo)}</a>`).join(" ")}</nav>
 ${sorted.map((dataset) => repoSection(dataset, caseStudies.get(dataset.repo))).join("\n")}
 ${methodology(sorted)}
+<script>${COPY_SCRIPT}</script>
 </body>
 </html>
 `;

@@ -77,6 +77,10 @@ export const estimateVsActual: Metric<EstimateVsActual> = {
   // Per-ticket rows name tickets: an anonymized dataset keeps the medians only.
   anonymize: (value) => ({ ...value, tickets: [] }),
 
+  figure: { label: "p50 actual / estimate", of: ({ p50Ratio }) => p50Ratio, format: String },
+
+  sentence: ({ p50Ratio }) => `Tickets took a median ${String(p50Ratio)} times their up-front estimate`,
+
   section({ p50Ratio, excludedLate, tickets }) {
     const rows = tickets
       .map(
