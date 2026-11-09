@@ -225,6 +225,13 @@ describe("integration PRs", () => {
     assert.equal(data.tickets, 2);
     assert.equal(data.pullRequests, 0);
     assert.deepEqual(leadTimes(data), { p50Hours: 30, p90Hours: 30 });
+    // They have no diff of their own, so the diff metrics don't cover them.
+    const { size, testRatio, netLinesRemoved } = data.metrics;
+    assert.equal(size?.value, "unknown");
+    assert.deepEqual(
+      [size.coverage, testRatio?.coverage, netLinesRemoved?.coverage],
+      [{ tickets: 0, of: 2 }, { tickets: 0, of: 2 }, { tickets: 0, of: 2 }],
+    );
   });
 
   it("delivers ticket PRs merged into its branch when it merges into the default branch", async () => {

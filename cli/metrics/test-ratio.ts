@@ -43,7 +43,7 @@ export const testRatio: Metric<TestRatio> = {
   name: "Test lines per production line",
 
   compute({ tickets }) {
-    const covered = tickets.filter((ticket) => ticket.pullRequests.every((pr) => pr.filesComplete));
+    const covered = tickets.filter((ticket) => ticket.pullRequests.length > 0 && ticket.pullRequests.every((pr) => pr.filesComplete));
     const coverage = { tickets: covered.length, of: tickets.length };
     const pullRequests = new Set<PullRequest>(covered.flatMap((ticket) => ticket.pullRequests));
     let testLinesAdded = 0;

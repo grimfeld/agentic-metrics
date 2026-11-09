@@ -36,9 +36,11 @@ export const size: Metric<Size> = {
   name: "Ticket size",
 
   compute({ tickets }) {
-    const coverage = { tickets: tickets.length, of: tickets.length };
-    if (tickets.length === 0) return { value: UNKNOWN, coverage };
-    const sizes = tickets.map(sizeOf);
+    // A ticket an integration PR alone delivered has no diff of its own.
+    const sized = tickets.filter((ticket) => ticket.pullRequests.length > 0);
+    const coverage = { tickets: sized.length, of: tickets.length };
+    if (sized.length === 0) return { value: UNKNOWN, coverage };
+    const sizes = sized.map(sizeOf);
     return {
       value: {
         p50DiffLines: percentile(sizes.map((s) => s.diffLines), 50),
@@ -66,7 +68,7 @@ export const size: Metric<Size> = {
     definition:
       "Size proxies per ticket, for judging effort without an estimate: diff size (lines added plus lines deleted over its PRs merged into the default branch), files touched (distinct files those PRs changed) and sub-tickets (the issue's GitHub sub-issues). The headline is the median (nearest rank) over tickets.",
     limits:
-      "Diff size includes generated files and lockfiles. GitHub lists at most 100 files per PR; when a PR changes more, files touched adds up each PR's file count, so a file changed by two PRs counts twice. A PR that closes no issue has no sub-tickets.",
+      "Diff size includes generated files and lockfiles. GitHub lists at most 100 files per PR; when a PR changes more, files touched adds up each PR's file count, so a file changed by two PRs counts twice. A PR that closes no issue has no sub-tickets. A ticket delivered only through an integration PR has no diff of its own and is left out.",
   },
 };
 

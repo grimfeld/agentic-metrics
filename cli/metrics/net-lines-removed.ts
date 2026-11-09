@@ -15,7 +15,8 @@ export const netLinesRemoved: Metric<NetLinesRemoved> = {
   name: "Net lines removed",
 
   compute({ tickets, pullRequests }) {
-    const coverage = { tickets: tickets.length, of: tickets.length };
+    // A ticket an integration PR alone delivered has no diff of its own.
+    const coverage = { tickets: tickets.filter((ticket) => ticket.pullRequests.length > 0).length, of: tickets.length };
     if (tickets.length === 0) return { value: UNKNOWN, coverage };
     const linesAdded = sum(pullRequests.map((pr) => pr.additions));
     const linesDeleted = sum(pullRequests.map((pr) => pr.deletions));
