@@ -41,6 +41,7 @@
          { "createdAt": "2026-10-19T02:00:00Z", "author": { "__typename": "User" }, "body": "Estimate: 1.5d" }
         ]
        },
+       "labels": { "nodes": [{ "name": "autonomy:full" }] },
        "timelineItems": { "nodes": [] }
       }
      ]

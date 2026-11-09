@@ -65,6 +65,12 @@ Linking PRs to tickets. A merged PR is linked to an issue by the first of: its c
 
 Transcript metrics (human messages per ticket, orchestration time) come from the transcripts the plugin caches, for the clone `collect` runs in (with `--repo`, pass that repo's clone as `--checkout dir`, else they are unknown). A session belongs to a ticket through its branch (a ticket PR's head, or the issue number `branchRegex` finds), else its worktree's name, else the PRs it opened; a sub-agent with none of these inherits its parent's ticket. Sessions naming no work are orchestration time. Only counts reach the dataset: no transcript text, account or organisation identifier, session id or path.
 
+Each ticket gets an autonomy level. `full`: a transcript with at most one human message beyond the opening request, and every commit co-authored by Claude (a `Co-Authored-By: Claude …` trailer, or a `Claude-Session:` trailer from a cloud session). `manual`: no transcript and no such commit. `assisted`: anything between. The thresholds are set per repo, and an `autonomy:full`, `autonomy:assisted` or `autonomy:manual` label on the ticket's issue (or, else, its PR) wins; the report counts the tickets so overridden:
+
+```json
+{ "autonomy": { "fullMaxFollowUps": 1, "fullMinClaudeCommitShare": 1 } }
+```
+
 A regression is an issue labelled `regression` with a line starting `caused-by: #N` in its body or a comment; `#N` is the ticket or PR that caused it.
 
 ### Published report
