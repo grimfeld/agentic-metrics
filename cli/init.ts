@@ -17,6 +17,17 @@ export interface RepoAdmin {
   /** The names of the repo's labels. */
   labels(): Promise<string[]>;
   createLabel(label: Label): Promise<void>;
+  /** Which actions the repo's workflows may use (Settings > Actions > General). */
+  actionsPolicy(): Promise<ActionsPolicy>;
+  /** The full SHA of the commit `ref` (a branch or tag) names in `repo`; undefined when there is no such ref. */
+  commitSha(repo: string, ref: string): Promise<string | undefined>;
+}
+
+export interface ActionsPolicy {
+  allowedActions: "all" | "local_only" | "selected";
+  /** The `owner/repo/path@ref` patterns allowed, when `allowedActions` is `selected`. */
+  patternsAllowed: string[];
+  shaPinningRequired: boolean;
 }
 
 export interface Label {
@@ -31,9 +42,36 @@ export interface InitOptions {
   alias?: string | undefined;
   /** Overrides the default publish mode (`anonymized` for a private repo, else `full`). */
   publish?: PublishMode | undefined;
+  /** The CLI's version, whose release the Action is pinned to; package.json's when unset. */
+  version?: string | undefined;
 }
 
 export const WORKFLOW_FILE = ACTION_WORKFLOW;
+
+/** The repo the Action lives in, and its path there. */
+const TOOL_REPO = "grimfeld/agentic-metrics";
+const ACTION = `${TOOL_REPO}/action`;
+/** The allow-list pattern that admits every version of the Action. */
+export const ACTION_PATTERN = `${ACTION}@*`;
+
+function packageVersion(): string {
+  // ../package.json from both cli/init.ts and dist/init.js.
+  const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string };
+  return pkg.version;
+}
+
+/**
+ * The ref the workflow pins the Action to, and its commit: the release tag of
+ * this CLI's version (`v0.2.0`) when the tool repo has it, so the Action and
+ * the CLI that installed it match; else `main`.
+ */
+async function actionPin(admin: RepoAdmin, version: string): Promise<{ ref: string; sha: string }> {
+  for (const ref of [`v${version}`, "main"]) {
+    const sha = await admin.commitSha(TOOL_REPO, ref);
+    if (sha) return { ref, sha };
+  }
+  throw new Error(`can't pin the Action: neither v${version} nor main resolves to a commit in ${TOOL_REPO}`);
+}
 
 /** The bug label the Action watches; the config has no field for it. */
 const BUG_LABEL = "bug";
@@ -52,6 +90,9 @@ export async function init(cwd: string, admin: RepoAdmin, options: InitOptions):
   }
   const lines: string[] = [];
   const repo = await admin.repo();
+  const workflowPath = join(cwd, WORKFLOW_FILE);
+  // Resolved before anything is written: a workflow that can't be pinned is no reason to half-onboard.
+  const pin = existsSync(workflowPath) ? undefined : await actionPin(admin, options.version ?? packageVersion());
 
   const configPath = join(cwd, CONFIG_FILE);
   if (existsSync(configPath)) {
@@ -89,15 +130,53 @@ export async function init(cwd: string, admin: RepoAdmin, options: InitOptions):
     lines.push(`label ${label.name}: created`);
   }
 
-  const workflowPath = join(cwd, WORKFLOW_FILE);
-  if (existsSync(workflowPath)) {
+  if (!pin) {
     lines.push(`${WORKFLOW_FILE}: kept as it is`);
   } else {
     await mkdir(dirname(workflowPath), { recursive: true });
-    await writeFile(workflowPath, workflow({ readyLabel: config.readyLabel, branchRegex: config.branchRegex.source }));
-    lines.push(`${WORKFLOW_FILE}: written`);
+    await writeFile(workflowPath, workflow({ readyLabel: config.readyLabel, branchRegex: config.branchRegex.source, pin }));
+    lines.push(`${WORKFLOW_FILE}: written (${ACTION} pinned to ${pin.sha}, ${pin.ref})`);
+  }
+  lines.push(...(await allowListing(admin, repo.fullName, pin ? undefined : readFileSync(workflowPath, "utf8"))));
+  return lines;
+}
+
+const ALLOW_SETTING = "Settings > Actions > General > Actions permissions > Allow specified actions and reusable workflows";
+
+/**
+ * What the repo's Actions settings need for the Action to run, as lines to
+ * print. `init` reads the settings and never changes them: allowing an action
+ * is the repo admin's call. `keptWorkflow` is the workflow found in place, if any.
+ */
+async function allowListing(admin: RepoAdmin, repo: string, keptWorkflow: string | undefined): Promise<string[]> {
+  let policy: ActionsPolicy;
+  try {
+    policy = await admin.actionsPolicy();
+  } catch (error) {
+    const reason = error instanceof Error ? error.message.split("\n").find((line) => line.trim()) : String(error);
+    return [`actions permissions: not read (${reason ?? "unknown error"}); if ${repo} allows only selected actions, add ${ACTION_PATTERN} under ${ALLOW_SETTING}`];
+  }
+  const lines: string[] = [];
+  if (policy.allowedActions === "local_only") {
+    lines.push(`actions permissions: ${repo} allows only its own actions, so the Action can't run; to run it, choose "Allow specified actions" and add ${ACTION_PATTERN} under ${ALLOW_SETTING} (init changes no settings)`);
+  } else if (policy.allowedActions === "selected") {
+    const covering = policy.patternsAllowed.find((pattern) => covers(pattern, `${ACTION}@${"0".repeat(40)}`));
+    lines.push(
+      covering
+        ? `actions permissions: ${ACTION} is allowed (by ${covering})`
+        : `actions permissions: ${repo} allows only selected actions; add ${ACTION_PATTERN} under ${ALLOW_SETTING} (init changes no settings)`,
+    );
+  }
+  if (policy.shaPinningRequired && keptWorkflow !== undefined && !new RegExp(`${ACTION}@[0-9a-f]{40}\\b`).test(keptWorkflow)) {
+    lines.push(`${WORKFLOW_FILE}: ${repo} requires actions pinned to a full commit SHA, and this workflow's ${ACTION} isn't; pin it (see the README's GitHub Action section)`);
   }
   return lines;
+}
+
+/** Whether an allow-list pattern (`*` matches anything) admits `action` (`owner/repo/path@ref`). */
+function covers(pattern: string, action: string): boolean {
+  const regex = pattern.trim().split("*").map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join(".*");
+  return new RegExp(`^${regex}$`, "i").test(action);
 }
 
 /**
@@ -129,7 +208,7 @@ function quote(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
-function workflow(settings: { readyLabel: string; branchRegex: string }): string {
+function workflow(settings: { readyLabel: string; branchRegex: string; pin: { ref: string; sha: string } }): string {
   return `# Installed by \`agentic-metrics init\`. The inputs mirror ${CONFIG_FILE};
 # change both together.
 name: agentic-metrics
@@ -148,7 +227,7 @@ jobs:
   conventions:
     runs-on: ubuntu-latest
     steps:
-      - uses: grimfeld/agentic-metrics/action@main
+      - uses: ${ACTION}@${settings.pin.sha} # ${settings.pin.ref}
         with:
           branch-regex: ${quote(settings.branchRegex)}
           bug-label: ${quote(BUG_LABEL)}
@@ -173,5 +252,33 @@ export function ghAdmin(cwd: string): RepoAdmin {
     async createLabel(label) {
       await gh(["label", "create", label.name, "--color", label.color, "--description", label.description]);
     },
+    async actionsPolicy() {
+      const name = await repoName();
+      const permissions = JSON.parse(await gh(["api", `repos/${name}/actions/permissions`])) as {
+        enabled: boolean;
+        allowed_actions?: ActionsPolicy["allowedActions"];
+        sha_pinning_required?: boolean;
+      };
+      const allowedActions = permissions.allowed_actions ?? "all";
+      let patternsAllowed: string[] = [];
+      if (allowedActions === "selected") {
+        const selected = JSON.parse(await gh(["api", `repos/${name}/actions/permissions/selected-actions`])) as { patterns_allowed?: string[] };
+        patternsAllowed = selected.patterns_allowed ?? [];
+      }
+      return { allowedActions, patternsAllowed, shaPinningRequired: permissions.sha_pinning_required ?? false };
+    },
+    async commitSha(repo, ref) {
+      try {
+        const sha = (await gh(["api", `repos/${repo}/commits/${encodeURIComponent(ref)}`, "--jq", ".sha"])).trim();
+        return /^[0-9a-f]{40}$/.test(sha) ? sha : undefined;
+      } catch (error) {
+        // 404 / 422: no such ref. Anything else (no network, no login) is the caller's to see.
+        if (/HTTP 4(04|22)/.test(error instanceof Error ? error.message : String(error))) return undefined;
+        throw error;
+      }
+    },
   };
+  async function repoName(): Promise<string> {
+    return (await gh(["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"])).trim();
+  }
 }
