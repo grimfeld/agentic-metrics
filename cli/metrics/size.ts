@@ -51,11 +51,16 @@ export const size: Metric<Size> = {
     };
   },
 
+  // Per-ticket rows name tickets: an anonymized dataset keeps the medians only.
+  anonymize: (value) => ({ ...value, tickets: [] }),
+
   section({ p50DiffLines, p50FilesTouched, tickets }) {
     const rows = tickets
       .map((t) => `<tr><td>${t.ticket}</td>${sizeCells(t)}</tr>`)
       .join("");
-    return `<p>Median ticket: ${String(p50DiffLines)} lines changed in ${String(p50FilesTouched)} files.</p>
+    const median = `<p>Median ticket: ${String(p50DiffLines)} lines changed in ${String(p50FilesTouched)} files.</p>`;
+    if (tickets.length === 0) return median;
+    return `${median}
 <table><thead><tr><th>Ticket</th>${SIZE_HEADERS}</tr></thead><tbody>${rows}</tbody></table>`;
   },
 

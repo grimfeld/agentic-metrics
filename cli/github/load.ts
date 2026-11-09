@@ -5,10 +5,15 @@ export interface Repo {
   /** `owner/name` */
   fullName: string;
   defaultBranch: string;
+  /** Private, or of unknown visibility: either way it is anonymized unless the config says otherwise. */
+  private: boolean;
+  url: string;
 }
 
 export interface PullRequest {
   number: number;
+  title: string;
+  url: string;
   createdAt: Date;
   mergedAt: Date;
   baseRefName: string;
@@ -44,6 +49,8 @@ export interface LabelEvent {
 
 export interface Issue {
   number: number;
+  title: string;
+  url: string;
   createdAt: Date;
   /** Label additions, oldest first. */
   labelled: LabelEvent[];
@@ -78,10 +85,14 @@ export interface GitHubData {
 interface RawRepo {
   full_name: string;
   default_branch: string;
+  private?: boolean;
+  html_url: string;
 }
 
 interface RawPullRequest {
   number: number;
+  title: string;
+  url: string;
   createdAt: string;
   mergedAt: string | null;
   baseRefName: string;
@@ -97,6 +108,8 @@ interface RawPullRequest {
 
 interface RawIssue {
   number: number;
+  title: string;
+  url: string;
   createdAt: string;
   timelineItems: { nodes: { __typename: string; createdAt?: string; label?: { name: string } }[] };
   subIssues?: { totalCount: number };
@@ -113,7 +126,12 @@ type Pages<K extends string, N> = { data: { repository: Record<K, { nodes: N[] }
 
 export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
   const rawRepo = (await source.read("repo")) as RawRepo;
-  const repo: Repo = { fullName: rawRepo.full_name, defaultBranch: rawRepo.default_branch };
+  const repo: Repo = {
+    fullName: rawRepo.full_name,
+    defaultBranch: rawRepo.default_branch,
+    private: rawRepo.private !== false,
+    url: rawRepo.html_url,
+  };
 
   const prPages = (await source.read("pull-requests")) as Pages<"pullRequests", RawPullRequest>;
   const pullRequests = prPages
@@ -124,6 +142,8 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
         : [
             {
               number: pr.number,
+              title: pr.title,
+              url: pr.url,
               createdAt: new Date(pr.createdAt),
               mergedAt: new Date(pr.mergedAt),
               baseRefName: pr.baseRefName,
@@ -145,6 +165,8 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
     .flatMap((page) => page.data.repository.issues.nodes)
     .map((issue): Issue => ({
       number: issue.number,
+      title: issue.title,
+      url: issue.url,
       createdAt: new Date(issue.createdAt),
       labelled: issue.timelineItems.nodes
         .flatMap((event) =>

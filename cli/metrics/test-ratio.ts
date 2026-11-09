@@ -58,6 +58,8 @@ export const testRatio: Metric<TestRatio> = {
     return { value: { testLinesAdded, productionLinesAdded, ratio }, coverage };
   },
 
+  anonymize: (value) => value,
+
   section({ testLinesAdded, productionLinesAdded, ratio }) {
     return `<p><strong>${String(ratio)}</strong> test lines added per production line: ${String(testLinesAdded)} test lines for ${String(productionLinesAdded)} production lines.</p>`;
   },

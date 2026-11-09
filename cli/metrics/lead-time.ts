@@ -21,6 +21,8 @@ export const leadTime: Metric<LeadTime> = {
     return { value: { p50Hours: round(percentile(hours, 50)), p90Hours: round(percentile(hours, 90)) }, coverage };
   },
 
+  anonymize: (value) => value,
+
   headline({ p50Hours, p90Hours }) {
     return `${formatHours(p50Hours)} <small>p50</small> · ${formatHours(p90Hours)} <small>p90</small>`;
   },

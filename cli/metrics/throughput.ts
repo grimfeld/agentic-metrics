@@ -42,6 +42,8 @@ export const throughput: Metric<Throughput> = {
     return { value: { weeks: [...weeks.values()] }, coverage };
   },
 
+  anonymize: (value) => value,
+
   section({ weeks }) {
     const rows = weeks
       .map((w) => `<tr><td>${w.week}</td><td>${String(w.tickets)}</td><td>${String(w.pullRequests)}</td></tr>`)

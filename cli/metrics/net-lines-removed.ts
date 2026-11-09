@@ -24,6 +24,8 @@ export const netLinesRemoved: Metric<NetLinesRemoved> = {
     return { value: { linesAdded, linesDeleted, netLinesRemoved: linesDeleted - linesAdded, ticketsNetRemoving }, coverage };
   },
 
+  anonymize: (value) => value,
+
   section({ linesAdded, linesDeleted, netLinesRemoved, ticketsNetRemoving }) {
     return `<p><strong>${String(netLinesRemoved)}</strong> net lines removed: ${String(linesDeleted)} deleted, ${String(linesAdded)} added. Tickets removing more than they added: ${String(ticketsNetRemoving)}.</p>`;
   },

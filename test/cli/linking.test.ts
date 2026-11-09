@@ -30,7 +30,7 @@ function at(hours: number): string {
 
 function fakeGitHub(issues: number[], prs: FakePr[]): GitHubSource {
   const answers = {
-    repo: { full_name: "grimfeld/lifeline", default_branch: "master" },
+    repo: { full_name: "grimfeld/lifeline", default_branch: "master", private: false },
     regressions: [{ data: { repository: { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } } } }],
     issues: [
       {

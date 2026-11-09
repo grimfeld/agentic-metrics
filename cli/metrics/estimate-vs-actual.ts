@@ -74,6 +74,9 @@ export const estimateVsActual: Metric<EstimateVsActual> = {
     return { value: { p50Ratio: percentile(estimated.map((row) => row.ratio), 50), excludedLate, tickets: estimated }, coverage };
   },
 
+  // Per-ticket rows name tickets: an anonymized dataset keeps the medians only.
+  anonymize: (value) => ({ ...value, tickets: [] }),
+
   section({ p50Ratio, excludedLate, tickets }) {
     const rows = tickets
       .map(
@@ -81,7 +84,9 @@ export const estimateVsActual: Metric<EstimateVsActual> = {
           `<tr><td>${t.ticket}</td><td>${formatHours(t.estimateHours)}</td><td>${formatHours(t.actualHours)}</td><td>${String(t.ratio)}</td>${sizeCells(t)}</tr>`,
       )
       .join("");
-    return `<p>Median actual / estimate: <strong>${String(p50Ratio)}</strong>. Left out because the estimate came after the first commit: ${String(excludedLate)}.</p>
+    const median = `<p>Median actual / estimate: <strong>${String(p50Ratio)}</strong>. Left out because the estimate came after the first commit: ${String(excludedLate)}.</p>`;
+    if (tickets.length === 0) return median;
+    return `${median}
 <table><thead><tr><th>Ticket</th><th>Estimate</th><th>Actual</th><th>Actual / estimate</th>${SIZE_HEADERS}</tr></thead><tbody>${rows}</tbody></table>`;
   },
 
