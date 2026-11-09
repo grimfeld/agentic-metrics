@@ -7,7 +7,7 @@
 import { escapeHtml } from "../metrics/html.ts";
 import { UNKNOWN } from "../metrics/metric.ts";
 import { coverageText, plural } from "../metrics/stats.ts";
-import { cvSentences } from "../report-trends.ts";
+import { cvSentences } from "./cv-sentences.ts";
 import { HEADLINES, headlineValue } from "./headline.ts";
 import { pooled } from "./pool.ts";
 import { chip, layout } from "./shell.ts";

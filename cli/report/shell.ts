@@ -6,7 +6,7 @@
 // width the sidebar becomes a bar scrolling across the top. Everything is
 // inline: the report loads nothing from the network.
 import { escapeHtml } from "../metrics/html.ts";
-import { COPY_SCRIPT } from "../report-trends.ts";
+import { COPY_SCRIPT } from "./cv-sentences.ts";
 import { CHART_CSS, CHART_SCRIPT } from "./charts.ts";
 import { SORT_SCRIPT, TABLE_CSS } from "./ticket-table.ts";
 import { PATHS, type PageContext, type SiteRepo } from "./site.ts";

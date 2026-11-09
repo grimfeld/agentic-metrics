@@ -9,7 +9,7 @@ import { escapeHtml } from "../metrics/html.ts";
 import type { Metric } from "../metrics/metric.ts";
 import { METRICS } from "../metrics/index.ts";
 import { coverageText } from "../metrics/stats.ts";
-import { sentenceSection } from "../report-trends.ts";
+import { sentenceSection } from "./cv-sentences.ts";
 import { drawnValue, sparkline } from "./charts.ts";
 import { HEADLINES, tileValue } from "./headline.ts";
 import { studyTitle } from "./case-study-page.ts";

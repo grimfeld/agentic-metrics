@@ -1,14 +1,15 @@
-// The report's CV-ready sentences, built from the dataset and each metric's
-// `figure` and `sentence`, so a new metric appears in them by declaring those:
-// its value, its comparison by autonomy level and its trend over time. A
-// sentence only ever quotes a known value, with its coverage. Each metric's
-// trend and comparison as tables are on its own page (`report/metric-page.ts`).
-import type { Dataset } from "./dataset.ts";
-import { escapeHtml } from "./metrics/html.ts";
-import { METRICS } from "./metrics/index.ts";
-import type { Figure, Metric } from "./metrics/metric.ts";
-import { coverageText } from "./metrics/stats.ts";
-import { UNKNOWN } from "./metrics/metric.ts";
+// The report's CV-ready sentences, and the script behind their Copy buttons,
+// built from the dataset and each metric's `figure` and `sentence`, so a new
+// metric appears in them by declaring those: its value, its comparison by
+// autonomy level and its trend over time. A sentence only ever quotes a known
+// value, with its coverage. Each metric's trend and comparison as tables are
+// on its own page (`metric-page.ts`).
+import type { Dataset } from "../dataset.ts";
+import { escapeHtml } from "../metrics/html.ts";
+import { METRICS } from "../metrics/index.ts";
+import type { Figure, Metric } from "../metrics/metric.ts";
+import { coverageText } from "../metrics/stats.ts";
+import { UNKNOWN } from "../metrics/metric.ts";
 
 /** `2026-10` as `October 2026`. */
 function monthName(period: string): string {
