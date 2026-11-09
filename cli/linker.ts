@@ -19,6 +19,7 @@ import type { Config } from "./config.ts";
 import { mainWorkflow, type Ci } from "./ci.ts";
 import { issueNumberFromBranch } from "./branch.ts";
 import type { GitHubData, Issue, PullRequest, RegressionIssue } from "./github/load.ts";
+import type { Session } from "./transcripts/load.ts";
 
 export interface Ticket {
   /** `#104` for an issue, `PR #136` for a PR that is its own ticket. */
@@ -33,6 +34,8 @@ export interface Ticket {
   readyAt: Date | undefined;
   /** When its last PR reached the default branch. */
   doneAt: Date;
+  /** Its Claude Code sessions, sub-agents included (`transcripts/link.ts`). None: its transcript metrics are unknown. */
+  sessions: Session[];
 }
 
 export interface LinkedWork {
@@ -45,6 +48,13 @@ export interface LinkedWork {
   regressions: RegressionIssue[];
   /** CI runs, and the repo's main check workflow. */
   ci: Ci;
+  /** The repo's Claude Code transcripts (`transcripts/link.ts`). */
+  transcripts: {
+    /** Sessions read, sub-agents included. None: no transcript was read and transcript metrics are unknown. */
+    sessions: number;
+    /** Sessions naming no work: repo-level orchestration (grilling, planning, batching). */
+    orchestration: Session[];
+  };
 }
 
 export function link(data: GitHubData, config: Config): LinkedWork {
@@ -75,7 +85,7 @@ export function link(data: GitHubData, config: Config): LinkedWork {
     const linked = linkedIssues(pr, issues, config);
     if (linked.length === 0) {
       const doneAt = deliveredAt.get(pr) ?? pr.mergedAt;
-      tickets.push({ id: `PR #${String(pr.number)}`, issue: undefined, pullRequests: [pr], integrationPullRequests: [], readyAt: pr.createdAt, doneAt });
+      tickets.push({ id: `PR #${String(pr.number)}`, issue: undefined, pullRequests: [pr], integrationPullRequests: [], readyAt: pr.createdAt, doneAt, sessions: [] });
     }
     for (const number of linked) issuePrs.set(number, [...(issuePrs.get(number) ?? []), pr]);
   }
@@ -98,6 +108,7 @@ export function link(data: GitHubData, config: Config): LinkedWork {
       integrationPullRequests: batches,
       readyAt: issue && readyAt(issue, doneAt, config),
       doneAt,
+      sessions: [],
     });
   }
 
@@ -107,7 +118,14 @@ export function link(data: GitHubData, config: Config): LinkedWork {
     mainWorkflow: mainWorkflow(data.workflowRuns, [...pullRequests, ...integrationPullRequests], config.ciWorkflow),
     runs: data.workflowRuns,
   };
-  return { tickets, pullRequests, integrationPullRequests, regressions: data.regressions, ci };
+  return {
+    tickets,
+    pullRequests,
+    integrationPullRequests,
+    regressions: data.regressions,
+    ci,
+    transcripts: { sessions: 0, orchestration: [] },
+  };
 }
 
 /** By author login (case-insensitive, with or without a bot's `[bot]` suffix) or by branch prefix. */
