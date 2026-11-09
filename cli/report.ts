@@ -88,7 +88,7 @@ function methodology(datasets: Dataset[]): string {
     .join("");
   return `<section id="methodology">
 <h2>Methodology</h2>
-<p>Every number is derived from GitHub data. A metric whose source is missing is shown as <em>unknown</em>, never as zero. Coverage is the number of tickets a metric is computed over, out of the tickets delivered.</p>
+<p>Every number is derived from GitHub data and from the local cache of Claude Code transcripts, of which only counts reach the dataset. A metric whose source is missing is shown as <em>unknown</em>, never as zero. Coverage is the number of tickets a metric is computed over, out of the tickets delivered.</p>
 ${entries}
 <h3>Raw data</h3>
 <ul class="datasets">${links}</ul>
