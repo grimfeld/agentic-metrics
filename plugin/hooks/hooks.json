@@ -1,0 +1,16 @@
+{
+  "description": "agentic-metrics hooks",
+  "hooks": {
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/session-end.ts"]
+          }
+        ]
+      }
+    ]
+  }
+}
