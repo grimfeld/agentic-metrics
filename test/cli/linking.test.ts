@@ -67,6 +67,7 @@ function fakeGitHub(issues: number[], prs: FakePr[]): GitHubSource {
         },
       },
     ],
+    "workflow-runs": [{ total_count: 0, workflow_runs: [] }],
   };
   return {
     read(request) {

@@ -24,6 +24,12 @@ export interface Config {
   integrationBranchPrefixes: string[];
   /** PRs by these authors (GitHub logins) or from branches starting with these prefixes count nowhere. */
   exclude: { authors: string[]; branches: string[] };
+  /**
+   * The repo's main check workflow, by file path (`.github/workflows/check.yml`),
+   * file name (`check.yml`) or name (`Check`). Unset: the workflow that ran on
+   * the most PRs.
+   */
+  ciWorkflow?: string | undefined;
 }
 
 /**
@@ -57,6 +63,11 @@ export function readConfig(repoDir: string): Config {
   if ("readyLabel" in fields) {
     if (typeof fields["readyLabel"] !== "string") throw new Error(`${CONFIG_FILE}: readyLabel must be a string`);
     config.readyLabel = fields["readyLabel"];
+  }
+  if ("ciWorkflow" in fields) {
+    const workflow = fields["ciWorkflow"];
+    if (typeof workflow !== "string" || workflow === "") throw new Error(`${CONFIG_FILE}: ciWorkflow must be a non-empty string`);
+    config.ciWorkflow = workflow;
   }
   if ("publish" in fields) {
     const publish = fields["publish"];

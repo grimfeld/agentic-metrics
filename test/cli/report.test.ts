@@ -54,7 +54,7 @@ describe("report", () => {
   });
 
   it("shows the metrics not computed yet as unknown", () => {
-    assert.equal(textOf("data-metric", "firstRunCiRate", "grimfeld/lifeline"), "First-run CI rate unknown not measured yet");
+    assert.equal(textOf("data-metric", "firstRunCiRate", "grimfeld/lifeline"), "First-run CI rate unknown 0 of 5 tickets");
     assert.equal(textOf("data-metric", "humanMessagesPerTicket", "grimfeld/lifeline"), "Human messages per ticket unknown not measured yet");
   });
 
@@ -92,7 +92,7 @@ describe("report", () => {
     assert.match(leadTime, /^Lead time Time from a ticket becoming ready to its last PR merging into the default branch/);
     assert.match(leadTime, /Coverage: grimfeld\/agentic-metrics 0 of 0 tickets; grimfeld\/lifeline 5 of 5 tickets/);
     assert.match(textOf("data-methodology", "throughput"), /^Throughput Tickets and pull requests delivered per week/);
-    assert.doesNotMatch(html, /data-methodology="firstRunCiRate"/);
+    assert.doesNotMatch(html, /data-methodology="humanMessagesPerTicket"/);
   });
 
   it("shows the test ratio and net lines removed", () => {

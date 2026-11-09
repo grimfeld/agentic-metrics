@@ -34,6 +34,28 @@ export interface PullRequest {
   filesComplete: boolean;
   /** The earliest authored date among its commits; undefined when GitHub returned none. */
   firstCommitAt: Date | undefined;
+  /** Numbers written `#N` in its title or body, in order, without repeats. The text itself is not kept. */
+  references: number[];
+  /** When its reviews requesting changes were submitted (first 100). */
+  changesRequestedAt: Date[];
+}
+
+/** One GitHub Actions workflow run, as the runs listing shows it. */
+export interface WorkflowRun {
+  id: number;
+  /** The workflow's name when it ran; it can change over time, unlike `path`. */
+  name: string;
+  /** The workflow file, e.g. `.github/workflows/check.yml`; `dynamic/…` for GitHub's own (CodeQL, Dependabot). */
+  path: string;
+  /** `pull_request`, `push`, `schedule`, `dynamic`… */
+  event: string;
+  headBranch: string;
+  headSha: string;
+  createdAt: Date;
+  /** The conclusion of its latest attempt; undefined while it runs. */
+  conclusion: string | undefined;
+  /** The conclusion of its first attempt; undefined while it runs, or when a re-run's first attempt was not read. */
+  firstAttemptConclusion: string | undefined;
 }
 
 export interface ChangedFile {
@@ -80,6 +102,8 @@ export interface GitHubData {
   pullRequests: PullRequest[];
   issues: Issue[];
   regressions: RegressionIssue[];
+  /** Actions runs, newest first, GitHub's own `dynamic` runs left out. */
+  workflowRuns: WorkflowRun[];
 }
 
 interface RawRepo {
@@ -104,6 +128,22 @@ interface RawPullRequest {
   changedFiles?: number;
   commits?: { nodes: { commit: { authoredDate?: string; messageHeadline?: string } }[] };
   files?: { totalCount: number; nodes: ChangedFile[] } | null;
+  body?: string;
+  reviews?: { nodes: { submittedAt: string | null }[] };
+}
+
+interface RawRun {
+  id: number;
+  name: string;
+  path: string;
+  event: string;
+  head_branch: string | null;
+  head_sha: string;
+  created_at: string;
+  status: string;
+  conclusion: string | null;
+  run_attempt: number;
+  first_attempt?: { conclusion: string | null; status: string };
 }
 
 interface RawIssue {
@@ -156,6 +196,10 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
                 node.commit.messageHeadline === undefined ? [] : [node.commit.messageHeadline],
               ),
               ...diffOf(pr),
+              references: references(`${pr.title}\n${pr.body ?? ""}`),
+              changesRequestedAt: (pr.reviews?.nodes ?? []).flatMap((review) =>
+                review.submittedAt === null ? [] : [new Date(review.submittedAt)],
+              ),
             },
           ],
     );
@@ -189,7 +233,35 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
       return { number: issue.number, causedBy: causedBy([issue.body, ...comments.map((comment) => comment.body)]) };
     });
 
-  return { repo, pullRequests, issues, regressions };
+  const runPages = (await source.read("workflow-runs")) as { workflow_runs: RawRun[] }[];
+  const workflowRuns = runPages
+    .flatMap((page) => page.workflow_runs)
+    .filter((run) => run.event !== "dynamic")
+    .map((run): WorkflowRun => {
+      const conclusion = run.status === "completed" ? (run.conclusion ?? undefined) : undefined;
+      const first = run.run_attempt <= 1 ? { status: run.status, conclusion: run.conclusion } : run.first_attempt;
+      return {
+        id: run.id,
+        name: run.name,
+        path: run.path,
+        event: run.event,
+        headBranch: run.head_branch ?? "",
+        headSha: run.head_sha,
+        createdAt: new Date(run.created_at),
+        conclusion,
+        firstAttemptConclusion: first?.status === "completed" ? (first.conclusion ?? undefined) : undefined,
+      };
+    })
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.id - a.id);
+
+  return { repo, pullRequests, issues, regressions, workflowRuns };
+}
+
+/** `#N` not inside a word or a path (so `owner/repo#N` and `ADR#N`-like tokens are skipped). */
+const REFERENCE = /(?<![\w/])#(\d+)\b/g;
+
+function references(text: string): number[] {
+  return [...new Set([...text.matchAll(REFERENCE)].map((match) => Number(match[1])))];
 }
 
 /** A line starting with `caused-by: #N`, any case. A mention mid-line (such as the Action's question) is not one. */

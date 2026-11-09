@@ -65,6 +65,12 @@ Linking PRs to tickets. A merged PR is linked to an issue by the first of: its c
 
 A regression is an issue labelled `regression` with a line starting `caused-by: #N` in its body or a comment; `#N` is the ticket or PR that caused it.
 
+CI metrics (first-run CI rate, fix cycles, scheduled failures, batch health) read the repo's GitHub Actions runs. `ciWorkflow` names the main check workflow by path (`.github/workflows/check.yml`), file name or name; unset, it is the workflow that ran on the most PRs. A batch drops a PR it names (`#N` in its title or description) that merged only after it.
+
+```json
+{ "ciWorkflow": "check.yml" }
+```
+
 ### Published report
 
 This repo publishes the report for every tracked repo on its GitHub Pages. Datasets are committed under `datasets/<owner>/<repo>.json`, so every published number can be checked against its raw data, which each repo's section links. To track a repo, run `collect` from this repo and commit the dataset:
