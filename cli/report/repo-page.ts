@@ -12,9 +12,10 @@ import { coverageText } from "../metrics/stats.ts";
 import { sentenceSection } from "../report-trends.ts";
 import { drawnValue, sparkline } from "./charts.ts";
 import { HEADLINES, tileValue } from "./headline.ts";
+import { studyTitle } from "./case-study-page.ts";
 import { metricChart } from "./metric-chart.ts";
 import { chip, layout } from "./shell.ts";
-import { PATHS, type PageContext, type SiteRepo, type SiteStudy } from "./site.ts";
+import { PATHS, type PageContext, type SiteRepo } from "./site.ts";
 
 /** Number tiles and a grid of chart cards: the repo page's, and each metric page's. */
 export const DASHBOARD_CSS = `
@@ -81,17 +82,12 @@ function charts(ctx: PageContext, repo: SiteRepo): string {
   return `<div class="chart-grid" data-section="charts">\n${charted.map((metric) => chartCard(ctx, repo, metric)).join("\n")}\n</div>`;
 }
 
-/** A case study's title: its first heading, else its ticket. */
-function studyTitle({ study }: SiteStudy): string {
-  return /^#{1,6}\s+(.+?)\s*#*\s*$/m.exec(study.markdown)?.[1] ?? `Case study ${study.ticket}`;
-}
-
 function studyCards(ctx: PageContext, repo: SiteRepo): string {
   if (repo.studies.length === 0) return "";
   const cards = repo.studies
     .map(
       (s) =>
-        `<a class="study-card" href="${escapeHtml(ctx.link(PATHS.caseStudy(repo, s)))}"><b>${escapeHtml(studyTitle(s))}</b><span class="muted">Case study ${escapeHtml(s.study.ticket)}</span></a>`,
+        `<a class="study-card" href="${escapeHtml(ctx.link(PATHS.caseStudy(repo, s)))}"><b>${escapeHtml(studyTitle(s.study).title)}</b><span class="muted">Case study ${escapeHtml(s.study.ticket)}</span></a>`,
     )
     .join("");
   return `<section class="card wide" data-section="case-studies"><h2>Case studies</h2><div class="studies">${cards}</div></section>`;
