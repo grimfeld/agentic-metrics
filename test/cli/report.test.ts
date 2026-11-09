@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../../cli/main.ts";
 import { fixtureSource } from "../../cli/github/source.ts";
-import { readPages, repoPage } from "./report-pages.ts";
+import { metricPage, readPages, repoPage } from "./report-pages.ts";
 
 const FIXTURES = join(import.meta.dirname, "../fixtures/github");
 const NOW = new Date("2026-11-09T12:00:00Z");
@@ -39,6 +39,14 @@ function textOf(attribute: string, value: string, repo?: string): string {
   return (match[2] ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
+/** The visible text of a section of a metric's page. */
+function onMetricPage(repo: string, id: string, section: string): string {
+  const page = readPages(join(cwd, "report"), [metricPage(repo, id)]);
+  const match = new RegExp(`<section [^>]*data-section="${section}"[^>]*>([\\s\\S]*?)</section>`).exec(page);
+  assert.ok(match, `no ${section} section on ${id}'s page`);
+  return (match[1] ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
 function section(repo: string): string {
   const match = new RegExp(`<section class="repo"[^>]* data-repo="${repo}">([\\s\\S]*?)</section><!-- /repo -->`).exec(html);
   assert.ok(match, `no section for ${repo}`);
@@ -65,10 +73,15 @@ describe("report", () => {
     assert.equal(textOf("data-metric", "regressionRate", "grimfeld/agentic-metrics"), "Regression rate unknown 0 of 0 tickets");
   });
 
-  it("lists regressions per ticket, and the untraced ones", () => {
+  it("lists regressions per ticket on its page, and the untraced ones", () => {
     assert.equal(
-      textOf("data-section", "regressionRate", "grimfeld/lifeline"),
-      "Regression rate Ticket Regressions #104 #141 PR #136 #142 #106 #140, #145 Untraced: #143, #144",
+      onMetricPage("grimfeld/lifeline", "regressionRate", "tickets"),
+      "Per ticket 3 rows · select a column heading to sort Ticket Title Delivered Regressions Regression issues " +
+        "#104 Lifeline issue title 104 2026-10-19 1 #141 PR #136 Lifeline PR title 136 2026-10-27 1 #142 #106 Lifeline issue title 106 2026-10-28 2 #140, #145",
+    );
+    assert.equal(
+      onMetricPage("grimfeld/lifeline", "regressionRate", "regressionRate"),
+      "Summary 4 regressions traced to 3 delivered tickets. Untraced, and left out of the rate: #143, #144.",
     );
   });
 
@@ -83,10 +96,11 @@ describe("report", () => {
     assert.equal(textOf("data-metric", "humanMessagesPerTicket", "grimfeld/lifeline"), "Human messages per ticket unknown 0 of 5 tickets");
   });
 
-  it("shows throughput per week", () => {
+  it("shows throughput per week on its page", () => {
+    assert.match(onMetricPage("grimfeld/lifeline", "throughput", "chart"), / Week of Tickets PRs 2026-10-19 2 2 2026-10-26 2 2 2026-11-02 0 0 2026-11-09 1 1$/);
     assert.equal(
-      textOf("data-section", "throughput", "grimfeld/lifeline"),
-      "Throughput Week of Tickets PRs 2026-10-19 2 2 2026-10-26 2 2 2026-11-02 0 0 2026-11-09 1 1",
+      onMetricPage("grimfeld/lifeline", "throughput", "throughput"),
+      "Summary 5 tickets in 5 PRs over 4 weeks, 1 week with none. The busiest, the week of 2026-10-19, delivered 2.",
     );
   });
 
@@ -114,10 +128,14 @@ describe("report", () => {
     for (const id of ["throughput", "leadTime"]) assert.match(textOf("data-methodology", id), /closed with no (merged )?PR/, id);
   });
 
-  it("shows each ticket's lead time", () => {
+  it("shows each ticket's lead time on its page", () => {
+    assert.match(
+      onMetricPage("grimfeld/lifeline", "leadTime", "tickets"),
+      / Lead time #104 Lifeline issue title 104 2026-10-19 12 h #105 .* 20 h PR #136 .* 6 h #106 .* 7\.5 d PR #137 .* 10 h$/,
+    );
     assert.equal(
-      textOf("data-section", "leadTime", "grimfeld/lifeline"),
-      "Lead time p50 12 h , p90 7.5 d . Ticket Lead time #104 12 h #105 20 h PR #136 6 h #106 7.5 d PR #137 10 h",
+      onMetricPage("grimfeld/lifeline", "leadTime", "leadTime"),
+      "Summary Half the tickets took up to 12 h from ready to merged, and nine in ten up to 7.5 d .",
     );
   });
 

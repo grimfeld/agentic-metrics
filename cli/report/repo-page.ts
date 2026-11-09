@@ -2,10 +2,10 @@
 // metrics first), each with a sparkline of its monthly trend and linking to
 // the metric's page; a grid of chart cards, one per metric that declares a
 // chart; the CV-ready sentences and the case-study cards. Below them, the
-// detail tables: trends, the comparison by autonomy level, each metric's own
-// section and the delivered tickets (until each moves to its metric page).
+// detail of the metrics whose detail is not yet on their own page
+// (`ON_METRIC_PAGES`): trends, the comparison by autonomy level and each
+// metric's own section.
 // An anonymized repo's dataset holds aggregates only, so its page does too.
-import type { Dataset } from "../dataset.ts";
 import { escapeHtml } from "../metrics/html.ts";
 import type { Metric } from "../metrics/metric.ts";
 import { UNKNOWN } from "../metrics/metric.ts";
@@ -13,12 +13,20 @@ import { METRICS } from "../metrics/index.ts";
 import { coverageText } from "../metrics/stats.ts";
 import { autonomySection, sentenceSection, trendSection } from "../report-trends.ts";
 import { sparkline } from "./charts.ts";
-import { HEADLINES, headlineValue } from "./headline.ts";
+import { HEADLINES, tileValue } from "./headline.ts";
 import { metricChart } from "./metric-chart.ts";
 import { chip, layout } from "./shell.ts";
 import { PATHS, type PageContext, type SiteRepo, type SiteStudy } from "./site.ts";
 
-const CSS = `
+/**
+ * The metrics whose summary, monthly trend, comparison by autonomy level and
+ * per-ticket table are on their metric page, and no longer under Detail here.
+ * Once every metric's are, Detail goes.
+ */
+const ON_METRIC_PAGES = new Set(["leadTime", "throughput", "firstRunCiRate", "fixCycles", "scheduledFailures", "batchHealth", "regressionRate", "humanMessagesPerTicket"]);
+
+/** Number tiles and a grid of chart cards: the repo page's, and each metric page's. */
+export const DASHBOARD_CSS = `
 .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; margin-bottom: 12px; }
 .tile { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--ring); border-radius: 10px; padding: 10px 12px; min-width: 0; text-decoration: none; }
 a.tile:hover { border-color: var(--axis); }
@@ -34,26 +42,19 @@ a.tile:hover { border-color: var(--axis); }
 .chart-card h2 a { text-decoration: none; }
 .chart-card h2 a:hover { text-decoration: underline; }
 .chart-card > .coverage { margin-top: 4px; }
-.studies { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
-.study-card { display: block; text-decoration: none; background: var(--plane); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
-.study-card:hover { background: var(--wash); }
-.study-card b { display: block; font-weight: 600; margin-bottom: 2px; }
-.detail-heading { font-size: 16px; margin: 24px 0 8px; }
-.tickets ul { padding-left: 20px; }
 @media (max-width: 760px) {
   .chart-grid { grid-template-columns: minmax(0, 1fr); }
   .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 `;
 
-/** The metric's figure on a tile: its headline card when it has one, else its trend figure. HTML. */
-function tileValue(metric: Metric<unknown>, dataset: Dataset): string {
-  const result = dataset.metrics[metric.id];
-  if (metric.headline || !result || result.value === UNKNOWN || !metric.figure) return headlineValue(metric, result);
-  const figure = metric.figure.of(result.value);
-  if (!Number.isFinite(figure)) return headlineValue(metric, undefined);
-  return `${escapeHtml(metric.figure.format(figure))} <small>${escapeHtml(metric.figure.label)}</small>`;
-}
+const CSS = `${DASHBOARD_CSS}
+.studies { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+.study-card { display: block; text-decoration: none; background: var(--plane); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+.study-card:hover { background: var(--wash); }
+.study-card b { display: block; font-weight: 600; margin-bottom: 2px; }
+.detail-heading { font-size: 16px; margin: 24px 0 8px; }
+`;
 
 function tile(ctx: PageContext, repo: SiteRepo, metric: Metric<unknown>): string {
   const { dataset } = repo;
@@ -106,8 +107,8 @@ function studyCards(ctx: PageContext, repo: SiteRepo): string {
   return `<section class="card wide" data-section="case-studies"><h2>Case studies</h2><div class="studies">${cards}</div></section>`;
 }
 
-function metricSections(ctx: PageContext, repo: SiteRepo): string {
-  return repo.metrics
+function metricSections(ctx: PageContext, repo: SiteRepo, metrics: readonly Metric<unknown>[]): string {
+  return metrics
     .flatMap((metric) => {
       const result = repo.dataset.metrics[metric.id];
       if (!metric.section || !result) return [];
@@ -116,21 +117,6 @@ function metricSections(ctx: PageContext, repo: SiteRepo): string {
       return [`<section class="metric card" data-section="${metric.id}"><h3>${heading}</h3>${body}</section>`];
     })
     .join("\n");
-}
-
-/** The delivered tickets with their titles and links, latest first; only a `full` dataset has them. */
-function ticketList(repo: SiteRepo): string {
-  const tickets = repo.dataset.ticketList;
-  if (!tickets?.length) return "";
-  const items = [...tickets]
-    .reverse()
-    .map((ticket) => {
-      const label = `${escapeHtml(ticket.id)} ${escapeHtml(ticket.title)}`;
-      const linked = ticket.url ? `<a href="${escapeHtml(ticket.url)}">${label}</a>` : label;
-      return `<li>${linked} <small>${escapeHtml(ticket.doneAt.slice(0, 10))}</small></li>`;
-    })
-    .join("");
-  return `<details class="tickets card" data-section="tickets"><summary>Tickets delivered (${String(tickets.length)})</summary><ul>${items}</ul></details>`;
 }
 
 export function repoPage(ctx: PageContext, repo: SiteRepo): string {
@@ -145,15 +131,15 @@ export function repoPage(ctx: PageContext, repo: SiteRepo): string {
   ].join("");
   const sentences = sentenceSection(dataset).replace(/^<section class="([^"]*)"/, '<section class="$1 card wide"');
   const studies = studyCards(ctx, repo);
+  const detailed = METRICS.filter((metric) => !ON_METRIC_PAGES.has(metric.id));
   const body = `<section class="repo" id="${name}" data-repo="${name}">
 ${tiles(ctx, repo)}
 ${charts(ctx, repo)}
 ${sentences || studies ? `<div class="chart-grid">\n${sentences}\n${studies}\n</div>` : ""}
 <h2 class="detail-heading">Detail</h2>
-${wrap(trendSection(dataset))}
-${wrap(autonomySection(dataset))}
-${metricSections(ctx, repo)}
-${ticketList(repo)}
+${wrap(trendSection(dataset, detailed))}
+${wrap(autonomySection(dataset, detailed))}
+${metricSections(ctx, repo, detailed.filter((metric) => repo.metrics.includes(metric)))}
 </section><!-- /repo -->`;
   return layout(ctx, { title: dataset.repo, chips, body, css: CSS });
 }

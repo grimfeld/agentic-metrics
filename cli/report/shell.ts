@@ -8,6 +8,7 @@
 import { escapeHtml } from "../metrics/html.ts";
 import { COPY_SCRIPT } from "../report-trends.ts";
 import { CHART_CSS, CHART_SCRIPT } from "./charts.ts";
+import { SORT_SCRIPT, TABLE_CSS } from "./ticket-table.ts";
 import { PATHS, type PageContext, type SiteRepo } from "./site.ts";
 
 const LIGHT = `--plane: #f7f7f5; --surface: #ffffff; --ink: #111110; --ink-2: #4f4e4a; --muted: #77756f;
@@ -71,7 +72,7 @@ main p, main li { overflow-wrap: anywhere; }
   nav.side .brand { padding: 4px 8px; }
   main { padding: 16px; }
 }
-${CHART_CSS}`;
+${CHART_CSS}${TABLE_CSS}`;
 
 function navLink(ctx: PageContext, to: string, label: string, value = ""): string {
   const current = to === ctx.path ? ' aria-current="page"' : "";
@@ -134,7 +135,8 @@ ${parts.body}
 </main>
 </div>
 <script>${COPY_SCRIPT}
-${CHART_SCRIPT}</script>
+${CHART_SCRIPT}
+${SORT_SCRIPT}</script>
 </body>
 </html>
 `;

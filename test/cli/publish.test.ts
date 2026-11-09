@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../../cli/main.ts";
 import { fixtureSource } from "../../cli/github/source.ts";
-import { readAllPages, readPages, repoPage } from "./report-pages.ts";
+import { metricPage, readAllPages, readPages, repoPage } from "./report-pages.ts";
 
 const FIXTURES = join(import.meta.dirname, "../fixtures/github");
 const NOW = new Date("2026-11-09T12:00:00Z");
@@ -88,7 +88,8 @@ describe("publish: full", () => {
     });
 
     const html = await report();
-    assert.match(html, /<a href="https:\/\/github\.com\/grimfeld\/lifeline\/issues\/106">#106 Lifeline issue title 106<\/a>/);
+    // Throughput's table lists every delivered ticket.
+    assert.match(html, /<td><a href="https:\/\/github\.com\/grimfeld\/lifeline\/issues\/106">#106<\/a><\/td><td>Lifeline issue title 106<\/td>/);
     assert.match(html, /<h1>grimfeld\/lifeline<\/h1><div class="chips">.*<a class="chip" href="https:\/\/github\.com\/grimfeld\/lifeline">GitHub<\/a>/);
   });
 
@@ -165,7 +166,8 @@ describe("publish: none", () => {
 
     assert.deepEqual(files(join(cwd, "datasets")), []);
     const local = read(`.agentic-metrics-local/${repoPage("acme-corp/payroll-engine")}`);
-    assert.match(local, /<a href="https:\/\/github\.com\/acme-corp\/payroll-engine\/issues\/106">#106 Payroll issue title 106<\/a>/);
+    const throughput = read(`.agentic-metrics-local/${metricPage("acme-corp/payroll-engine", "throughput")}`);
+    assert.match(throughput, /<td><a href="https:\/\/github\.com\/acme-corp\/payroll-engine\/issues\/106">#106<\/a><\/td><td>Payroll issue title 106<\/td>/);
     assert.match(local, /data-metric="leadTime"/);
   });
 

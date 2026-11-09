@@ -20,10 +20,10 @@ function monthName(period: string): string {
   return new Date(`${period}-01T00:00:00Z`).toLocaleString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
 }
 
-/** The metrics this version defines with a figure, in report order, each with the figures `figures` holds for it. */
-function withFigures<T>(figures: Record<string, T> | undefined): { metric: Metric<unknown>; figure: Figure<unknown>; results: T }[] {
+/** The metrics this version defines with a figure (of `metrics`, in report order), each with the figures `figures` holds for it. */
+function withFigures<T>(figures: Record<string, T> | undefined, metrics: readonly Metric<unknown>[] = METRICS): { metric: Metric<unknown>; figure: Figure<unknown>; results: T }[] {
   if (!figures) return [];
-  return METRICS.flatMap((metric) => {
+  return metrics.flatMap((metric) => {
     const results = figures[metric.id];
     return metric.figure && results ? [{ metric, figure: metric.figure, results }] : [];
   });
@@ -43,9 +43,10 @@ function cell(figure: Figure<unknown>, result: FigureResult): string {
   return `<td>${value} <small>${String(result.coverage.tickets)} of ${String(result.coverage.of)}</small></td>`;
 }
 
-export function trendSection(dataset: Dataset): string {
+/** `metrics`: the rows to show, in report order; every metric by default. */
+export function trendSection(dataset: Dataset, metrics?: readonly Metric<unknown>[]): string {
   const trends = dataset.trends;
-  const rows = withFigures(trends?.metrics);
+  const rows = withFigures(trends?.metrics, metrics);
   if (!trends || rows.length === 0 || trends.periods.length === 0) return "";
   const head = trends.periods.map(({ period, tickets }) => `<th>${escapeHtml(period)} <small>${plural(tickets, "ticket")}</small></th>`).join("");
   const body = rows
@@ -58,8 +59,9 @@ ${body}
 </tbody></table></div></section>`;
 }
 
-export function autonomySection(dataset: Dataset): string {
-  const rows = withFigures(dataset.byAutonomy);
+/** `metrics`: the rows to show, in report order; every metric by default. */
+export function autonomySection(dataset: Dataset, metrics?: readonly Metric<unknown>[]): string {
+  const rows = withFigures(dataset.byAutonomy, metrics);
   if (rows.length === 0) return "";
   // Every metric covers the same tickets per level: the level's tickets are each result's `of`.
   const first = rows[0]?.results;

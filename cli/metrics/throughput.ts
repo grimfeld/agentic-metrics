@@ -76,10 +76,17 @@ export const throughput: Metric<Throughput> = {
   },
 
   section({ weeks }) {
-    const rows = weeks
-      .map((w) => `<tr><td>${w.week}</td><td>${String(w.tickets)}</td><td>${String(w.pullRequests)}</td></tr>`)
-      .join("");
-    return `<table><thead><tr><th>Week of</th><th>Tickets</th><th>PRs</th></tr></thead><tbody>${rows}</tbody></table>`;
+    const tickets = weeks.reduce((sum, week) => sum + week.tickets, 0);
+    const pullRequests = weeks.reduce((sum, week) => sum + week.pullRequests, 0);
+    const busiest = weeks.reduce((top, week) => (week.tickets > top.tickets ? week : top), weeks[0] ?? { week: "", tickets: 0, pullRequests: 0 });
+    const empty = weeks.filter((week) => week.tickets === 0).length;
+    return `<p><strong>${plural(tickets, "ticket")}</strong> in ${plural(pullRequests, "PR")} over ${plural(weeks.length, "week")}, ${plural(empty, "week")} with none. The busiest, the week of ${busiest.week}, delivered ${String(busiest.tickets)}.</p>`;
+  },
+
+  // Every delivered ticket, with the week it counts in.
+  ticketTable: {
+    columns: ["Week of"],
+    rows: (_value, delivered) => delivered.map((ticket) => ({ id: ticket.id, cells: [weekOf(new Date(ticket.doneAt))] })),
   },
 
   methodology: {

@@ -1,5 +1,4 @@
 import { trendLine } from "../report/charts.ts";
-import { escapeHtml } from "./html.ts";
 import type { Figure, Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
 import { formatHours, hoursBetween, percentile, plural, round } from "./stats.ts";
@@ -66,11 +65,12 @@ export const leadTime: Metric<LeadTime> = {
     card: ({ p50Hours, p90Hours }) => `${formatHours(p50Hours)} <small>p50</small> · ${formatHours(p90Hours)} <small>p90</small>`,
   },
 
-  section({ p50Hours, p90Hours, tickets }) {
-    const summary = `<p>p50 <strong>${formatHours(p50Hours)}</strong>, p90 <strong>${formatHours(p90Hours)}</strong>.</p>`;
-    if (!tickets?.length) return summary;
-    const rows = tickets.map((t) => `<tr><td>${escapeHtml(t.ticket)}</td><td>${formatHours(t.hours)}</td></tr>`).join("");
-    return `${summary}<table><thead><tr><th>Ticket</th><th>Lead time</th></tr></thead><tbody>${rows}</tbody></table>`;
+  section: ({ p50Hours, p90Hours }) =>
+    `<p>Half the tickets took up to <strong>${formatHours(p50Hours)}</strong> from ready to merged, and nine in ten up to <strong>${formatHours(p90Hours)}</strong>.</p>`,
+
+  ticketTable: {
+    columns: ["Lead time"],
+    rows: ({ tickets }) => tickets?.map((t) => ({ id: t.ticket, cells: [{ text: formatHours(t.hours), sort: t.hours }] })),
   },
 
   methodology: {
