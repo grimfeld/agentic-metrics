@@ -2,8 +2,7 @@
 // per repo, per metric of a repo and per approved case study, and
 // Methodology, all in one shell (`report/shell.ts`) whose sidebar lists every
 // page. `report/site.ts` holds the site map: each page kind's path, and the
-// relative links between pages. A new kind of page is a renderer in
-// `report/` plus its path in `PATHS` and its pages listed here.
+// relative links between pages. The README says how to add a kind of page.
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { CaseStudy } from "./case-studies.ts";
