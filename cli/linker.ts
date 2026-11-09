@@ -17,6 +17,7 @@
 // into it, or when the integration PR of the branch it merged into does.
 import type { Autonomy } from "./autonomy.ts";
 import type { Config } from "./config.ts";
+import { mainWorkflow, type Ci } from "./ci.ts";
 import { issueNumberFromBranch } from "./branch.ts";
 import type { GitHubData, Issue, PullRequest, RegressionIssue } from "./github/load.ts";
 import type { Session } from "./transcripts/load.ts";
@@ -48,6 +49,8 @@ export interface LinkedWork {
   integrationPullRequests: PullRequest[];
   /** Issues labelled as regressions, whether or not their cause is delivered work. */
   regressions: RegressionIssue[];
+  /** CI runs, and the repo's main check workflow. */
+  ci: Ci;
   /** The repo's Claude Code transcripts (`transcripts/link.ts`). */
   transcripts: {
     /** Sessions read, sub-agents included. None: no transcript was read and transcript metrics are unknown. */
@@ -113,7 +116,19 @@ export function link(data: GitHubData, config: Config): LinkedWork {
   }
 
   tickets.sort((a, b) => a.doneAt.getTime() - b.doneAt.getTime());
-  return { tickets, pullRequests, integrationPullRequests, regressions: data.regressions, transcripts: { sessions: 0, orchestration: [] } };
+  const ci: Ci = {
+    defaultBranch,
+    mainWorkflow: mainWorkflow(data.workflowRuns, [...pullRequests, ...integrationPullRequests], config.ciWorkflow),
+    runs: data.workflowRuns,
+  };
+  return {
+    tickets,
+    pullRequests,
+    integrationPullRequests,
+    regressions: data.regressions,
+    ci,
+    transcripts: { sessions: 0, orchestration: [] },
+  };
 }
 
 /** By author login (case-insensitive, with or without a bot's `[bot]` suffix) or by branch prefix. */

@@ -22,6 +22,8 @@ export interface PullRequest {
   closes: number[];
   /** The author's login, without a bot's `[bot]` suffix; undefined for a deleted account. */
   author: string | undefined;
+  /** Its description, for case-study drafts only; it never reaches the dataset. */
+  body: string;
   /** First line of each of its commits (first 100). */
   commitSubjects: string[];
   /** Lines added and deleted, and files changed, over the whole diff. */
@@ -38,6 +40,10 @@ export interface PullRequest {
   commits: CommitTrailers[];
   /** Its current labels (first 20). */
   labels: string[];
+  /** Numbers written `#N` in its title or body, in order, without repeats. */
+  references: number[];
+  /** When its reviews requesting changes were submitted (first 100). */
+  changesRequestedAt: Date[];
 }
 
 /** What a commit's trailers say about who wrote it. */
@@ -46,6 +52,24 @@ export interface CommitTrailers {
   claudeCoAuthor: boolean;
   /** A `Claude-Session:` trailer: made in a Claude Code cloud session, which leaves no local transcript. */
   cloudSession: boolean;
+}
+
+/** One GitHub Actions workflow run, as the runs listing shows it. */
+export interface WorkflowRun {
+  id: number;
+  /** The workflow's name when it ran; it can change over time, unlike `path`. */
+  name: string;
+  /** The workflow file, e.g. `.github/workflows/check.yml`; `dynamic/…` for GitHub's own (CodeQL, Dependabot). */
+  path: string;
+  /** `pull_request`, `push`, `schedule`, `dynamic`… */
+  event: string;
+  headBranch: string;
+  headSha: string;
+  createdAt: Date;
+  /** The conclusion of its latest attempt; undefined while it runs. */
+  conclusion: string | undefined;
+  /** The conclusion of its first attempt; undefined while it runs, or when a re-run's first attempt was not read. */
+  firstAttemptConclusion: string | undefined;
 }
 
 export interface ChangedFile {
@@ -66,6 +90,8 @@ export interface Issue {
   createdAt: Date;
   /** Label additions, oldest first. */
   labelled: LabelEvent[];
+  /** Its description, for case-study drafts only; it never reaches the dataset. */
+  body: string;
   /** Number of sub-issues. */
   subIssues: number;
   /** Its current labels (first 20). */
@@ -86,6 +112,8 @@ export interface RegressionIssue {
   number: number;
   /** Issue numbers named by `caused-by: #N` lines in its body or comments, in order, without repeats. */
   causedBy: number[];
+  /** Closed as completed (not as not planned or a duplicate): the regression was fixed. */
+  fixed: boolean;
 }
 
 export interface GitHubData {
@@ -94,6 +122,8 @@ export interface GitHubData {
   pullRequests: PullRequest[];
   issues: Issue[];
   regressions: RegressionIssue[];
+  /** Actions runs, newest first, GitHub's own `dynamic` runs left out. */
+  workflowRuns: WorkflowRun[];
 }
 
 interface RawRepo {
@@ -107,6 +137,7 @@ interface RawPullRequest {
   number: number;
   title: string;
   url: string;
+  body?: string | null;
   createdAt: string;
   mergedAt: string | null;
   baseRefName: string;
@@ -119,12 +150,28 @@ interface RawPullRequest {
   commits?: { nodes: { commit: { authoredDate?: string; messageHeadline?: string; messageBody?: string } }[] };
   labels?: RawLabels;
   files?: { totalCount: number; nodes: ChangedFile[] } | null;
+  reviews?: { nodes: { submittedAt: string | null }[] };
+}
+
+interface RawRun {
+  id: number;
+  name: string;
+  path: string;
+  event: string;
+  head_branch: string | null;
+  head_sha: string;
+  created_at: string;
+  status: string;
+  conclusion: string | null;
+  run_attempt: number;
+  first_attempt?: { conclusion: string | null; status: string };
 }
 
 interface RawIssue {
   number: number;
   title: string;
   url: string;
+  body?: string | null;
   createdAt: string;
   timelineItems: { nodes: { __typename: string; createdAt?: string; label?: { name: string } }[] };
   subIssues?: { totalCount: number };
@@ -135,6 +182,8 @@ interface RawIssue {
 interface RawRegressionIssue {
   number: number;
   body: string;
+  closedAt?: string | null;
+  stateReason?: string | null;
   comments: { nodes: { createdAt: string; body: string }[] };
 }
 
@@ -160,6 +209,7 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
               number: pr.number,
               title: pr.title,
               url: pr.url,
+              body: pr.body ?? "",
               createdAt: new Date(pr.createdAt),
               mergedAt: new Date(pr.mergedAt),
               baseRefName: pr.baseRefName,
@@ -174,6 +224,10 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
               ...diffOf(pr),
               commits: (pr.commits?.nodes ?? []).map((node) => trailersOf(node.commit.messageBody ?? "")),
               labels: labelNames(pr.labels),
+              references: references(`${pr.title}\n${pr.body ?? ""}`),
+              changesRequestedAt: (pr.reviews?.nodes ?? []).flatMap((review) =>
+                review.submittedAt === null ? [] : [new Date(review.submittedAt)],
+              ),
             },
           ],
     );
@@ -185,6 +239,7 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
       number: issue.number,
       title: issue.title,
       url: issue.url,
+      body: issue.body ?? "",
       createdAt: new Date(issue.createdAt),
       labelled: issue.timelineItems.nodes
         .flatMap((event) =>
@@ -205,10 +260,43 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
     .flatMap((page) => page.data.repository.issues.nodes)
     .map((issue): RegressionIssue => {
       const comments = [...issue.comments.nodes].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
-      return { number: issue.number, causedBy: causedBy([issue.body, ...comments.map((comment) => comment.body)]) };
+      return {
+        number: issue.number,
+        causedBy: causedBy([issue.body, ...comments.map((comment) => comment.body)]),
+        // Closed as not planned or as a duplicate is not a fix.
+        fixed: Boolean(issue.closedAt) && (issue.stateReason ?? "COMPLETED") === "COMPLETED",
+      };
     });
 
-  return { repo, pullRequests, issues, regressions };
+  const runPages = (await source.read("workflow-runs")) as { workflow_runs: RawRun[] }[];
+  const workflowRuns = runPages
+    .flatMap((page) => page.workflow_runs)
+    .filter((run) => run.event !== "dynamic")
+    .map((run): WorkflowRun => {
+      const conclusion = run.status === "completed" ? (run.conclusion ?? undefined) : undefined;
+      const first = run.run_attempt <= 1 ? { status: run.status, conclusion: run.conclusion } : run.first_attempt;
+      return {
+        id: run.id,
+        name: run.name,
+        path: run.path,
+        event: run.event,
+        headBranch: run.head_branch ?? "",
+        headSha: run.head_sha,
+        createdAt: new Date(run.created_at),
+        conclusion,
+        firstAttemptConclusion: first?.status === "completed" ? (first.conclusion ?? undefined) : undefined,
+      };
+    })
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.id - a.id);
+
+  return { repo, pullRequests, issues, regressions, workflowRuns };
+}
+
+/** `#N` not inside a word or a path (so `owner/repo#N` and `ADR#N`-like tokens are skipped). */
+const REFERENCE = /(?<![\w/])#(\d+)\b/g;
+
+function references(text: string): number[] {
+  return [...new Set([...text.matchAll(REFERENCE)].map((match) => Number(match[1])))];
 }
 
 /** A line starting with `caused-by: #N`, any case. A mention mid-line (such as the Action's question) is not one. */

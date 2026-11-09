@@ -1,8 +1,11 @@
 // The report: one static HTML page from the datasets. Per repo, four headline
 // cards and each metric's own section; then Methodology, which defines every
 // metric present, gives its coverage per repo and links the raw datasets.
+import type { CaseStudy } from "./case-studies.ts";
+import { renderMarkdown } from "./markdown.ts";
 import type { Dataset } from "./dataset.ts";
 import { datasetPath } from "./dataset.ts";
+import { escapeHtml } from "./metrics/html.ts";
 import { METRICS, findMetric } from "./metrics/index.ts";
 import type { MetricResult } from "./metrics/metric.ts";
 import { UNKNOWN } from "./metrics/metric.ts";
@@ -14,10 +17,6 @@ const HEADLINES = [
   { id: "humanMessagesPerTicket", name: "Human messages per ticket" },
   { id: "regressionRate", name: "Regression rate" },
 ] as const;
-
-export function escapeHtml(text: string): string {
-  return text.replace(/[&<>"']/g, (c) => `&#${String(c.charCodeAt(0))};`);
-}
 
 function coverageText(result: MetricResult<unknown>): string {
   return `${String(result.coverage.tickets)} of ${String(result.coverage.of)} tickets`;
@@ -35,7 +34,16 @@ function card(dataset: Dataset, id: string, fallbackName: string): string {
   return `<article class="card" data-metric="${id}"><h3>${name}</h3><p class="value${unknownClass}">${value}</p><p class="coverage">${coverageText(result)}</p></article>`;
 }
 
-function repoSection(dataset: Dataset): string {
+/** Approved case studies, for a `full` dataset only. */
+function caseStudySection(dataset: Dataset, studies: readonly CaseStudy[] | undefined): string {
+  if (dataset.publish !== "full" || !studies?.length) return "";
+  const articles = studies
+    .map((study) => `<article class="case-study" data-ticket="${escapeHtml(study.ticket)}">${renderMarkdown(study.markdown)}</article>`)
+    .join("\n");
+  return `<section class="case-studies" data-section="case-studies"><h3>Case studies</h3>\n${articles}\n</section>`;
+}
+
+function repoSection(dataset: Dataset, studies?: readonly CaseStudy[]): string {
   const repo = escapeHtml(dataset.repo);
   const cards = HEADLINES.map(({ id, name }) => card(dataset, id, name)).join("\n");
   const sections = METRICS.flatMap((metric) => {
@@ -53,6 +61,7 @@ function repoSection(dataset: Dataset): string {
 ${cards}
 </div>
 ${sections}
+${caseStudySection(dataset, studies)}
 ${ticketList(dataset)}
 </section><!-- /repo -->`;
 }
@@ -111,7 +120,8 @@ th, td { padding: 2px 12px 2px 0; text-align: left; border-bottom: 1px solid var
 a { color: inherit; }
 `;
 
-export function renderReport(datasets: Dataset[]): string {
+/** `caseStudies`: the approved case studies, by dataset repo; rendered for `full` datasets only. */
+export function renderReport(datasets: Dataset[], caseStudies: ReadonlyMap<string, readonly CaseStudy[]> = new Map()): string {
   const sorted = [...datasets].sort((a, b) => a.repo.localeCompare(b.repo));
   return `<!doctype html>
 <html lang="en">
@@ -124,7 +134,7 @@ export function renderReport(datasets: Dataset[]): string {
 <body>
 <h1>Agentic metrics</h1>
 <nav id="repos">${sorted.map((dataset) => `<a href="#${escapeHtml(dataset.repo)}">${escapeHtml(dataset.repo)}</a>`).join(" ")}</nav>
-${sorted.map(repoSection).join("\n")}
+${sorted.map((dataset) => repoSection(dataset, caseStudies.get(dataset.repo))).join("\n")}
 ${methodology(sorted)}
 </body>
 </html>

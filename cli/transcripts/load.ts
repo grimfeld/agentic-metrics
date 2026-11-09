@@ -8,10 +8,9 @@
 // The format is undocumented and changes between Claude Code versions, so
 // every field is read leniently and unknown line types are ignored.
 //
-// A later metric that needs more (tokens per model, Agent spawns) adds a
-// derived field here. Token usage must be deduplicated by `message.id`: one
-// API response is written as one line per content block, each repeating the
-// same `usage`.
+// A later metric that needs more adds a derived field here. Token usage is
+// deduplicated by `message.id` (`responses`): one API response is written as
+// one line per content block, each repeating the same `usage`.
 import type { TranscriptFile } from "./source.ts";
 
 export interface PrLink {
@@ -42,6 +41,37 @@ export interface Session {
   activeMs: number;
   /** Its first line's time; undefined when no line carries one. Places orchestration in a trend's month. */
   startedAt: Date | undefined;
+  /**
+   * Its API responses, each once (by `message.id`, which is unique across
+   * sessions, so metrics dedupe a session counted on several tickets by it).
+   * Local `<synthetic>` placeholders are left out. Ids are never published.
+   */
+  responses: ApiResponse[];
+  /** Sub-agents it spawned with the Agent tool. Agent ids are never published. */
+  spawns: AgentSpawn[];
+}
+
+export interface ApiResponse {
+  /** `message.id`. Never published. */
+  id: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  /** 5-minute cache writes; all cache writes when a usage has no 5m/1h split. */
+  cacheWrite5mTokens: number;
+  cacheWrite1hTokens: number;
+  cacheReadTokens: number;
+  webSearchRequests: number;
+  /** `usage.inference_geo`, e.g. `global` or `us`. */
+  inferenceGeo: string | undefined;
+  /** `usage.speed`, e.g. `standard` or `fast`. */
+  speed: string | undefined;
+}
+
+export interface AgentSpawn {
+  agentId: string;
+  /** The model Claude Code resolved for it (`toolUseResult.resolvedModel`), when written. */
+  model: string | undefined;
 }
 
 /** A gap between two lines longer than this counts as this much: the rest is idle. */
@@ -54,6 +84,9 @@ export function loadSessions(files: TranscriptFile[]): Session[] {
     const prLinks: PrLink[] = [];
     const humanMessages: string[] = [];
     const times: number[] = [];
+    const responses = new Map<string, ApiResponse>();
+    const agentToolUses = new Set<string>();
+    const spawns = new Map<string, AgentSpawn>();
     let sessionId: string | undefined;
 
     for (const raw of file.lines) {
@@ -72,6 +105,14 @@ export function loadSessions(files: TranscriptFile[]): Session[] {
       }
       const uuid = str(raw["uuid"]);
       if (uuid && isHumanMessage(raw)) humanMessages.push(uuid);
+      if (raw["type"] === "assistant") {
+        const response = apiResponse(raw);
+        // The last line of a response holds its final usage.
+        if (response) responses.set(response.id, response);
+        for (const id of agentToolUseIds(raw)) agentToolUses.add(id);
+      }
+      const spawn = agentSpawn(raw, agentToolUses);
+      if (spawn) spawns.set(spawn.agentId, spawn);
     }
 
     times.sort((a, b) => a - b);
@@ -87,8 +128,68 @@ export function loadSessions(files: TranscriptFile[]): Session[] {
       humanMessages: [...new Set(humanMessages)],
       activeMs,
       startedAt: times[0] === undefined ? undefined : new Date(times[0]),
+      responses: [...responses.values()],
+      spawns: [...spawns.values()],
     };
   });
+}
+
+/** A local placeholder (an error, an interrupted turn), not an API call. */
+const SYNTHETIC_MODEL = "<synthetic>";
+
+function apiResponse(line: Record<string, unknown>): ApiResponse | undefined {
+  const message = line["message"];
+  if (!isRecord(message)) return undefined;
+  const id = str(message["id"]);
+  const model = str(message["model"]);
+  const usage = message["usage"];
+  if (!id || !model || model === SYNTHETIC_MODEL || !isRecord(usage)) return undefined;
+  const split = usage["cache_creation"];
+  const cacheWrites = num(usage["cache_creation_input_tokens"]);
+  const write5m = isRecord(split) ? num(split["ephemeral_5m_input_tokens"]) : cacheWrites;
+  const write1h = isRecord(split) ? num(split["ephemeral_1h_input_tokens"]) : 0;
+  const serverTools = usage["server_tool_use"];
+  return {
+    id,
+    model,
+    inputTokens: num(usage["input_tokens"]),
+    outputTokens: num(usage["output_tokens"]),
+    // A split that misses part of the total (an older or partial usage): the rest counts as 5m writes.
+    cacheWrite5mTokens: Math.max(write5m, cacheWrites - write1h),
+    cacheWrite1hTokens: write1h,
+    cacheReadTokens: num(usage["cache_read_input_tokens"]),
+    webSearchRequests: isRecord(serverTools) ? num(serverTools["web_search_requests"]) : 0,
+    inferenceGeo: str(usage["inference_geo"]),
+    speed: str(usage["speed"]),
+  };
+}
+
+/** The tool names that spawn a sub-agent: `Agent`, and `Task` in older versions. */
+const AGENT_TOOLS = new Set(["Agent", "Task"]);
+
+function agentToolUseIds(line: Record<string, unknown>): string[] {
+  const message = line["message"];
+  const content = isRecord(message) ? message["content"] : undefined;
+  if (!Array.isArray(content)) return [];
+  return content.flatMap((block) => {
+    if (!isRecord(block) || block["type"] !== "tool_use" || !AGENT_TOOLS.has(str(block["name"]) ?? "")) return [];
+    const id = str(block["id"]);
+    return id ? [id] : [];
+  });
+}
+
+/** The sub-agent an Agent tool result launched, from its `toolUseResult`. */
+function agentSpawn(line: Record<string, unknown>, agentToolUses: Set<string>): AgentSpawn | undefined {
+  if (line["type"] !== "user") return undefined;
+  const result = line["toolUseResult"];
+  const agentId = isRecord(result) ? str(result["agentId"]) : undefined;
+  if (!isRecord(result) || !agentId) return undefined;
+  const message = line["message"];
+  const content = isRecord(message) ? message["content"] : undefined;
+  const answers = Array.isArray(content)
+    ? content.some((block) => isRecord(block) && block["type"] === "tool_result" && agentToolUses.has(str(block["tool_use_id"]) ?? ""))
+    : false;
+  return answers ? { agentId, model: str(result["resolvedModel"]) } : undefined;
 }
 
 /** Content a human typed but that is a command, a shell escape or an interrupt, not a message. */
@@ -121,4 +222,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function str(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
+}
+
+/** A token count; anything else counts as none. */
+function num(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0;
 }
