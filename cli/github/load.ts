@@ -15,6 +15,22 @@ export interface PullRequest {
   headRefName: string;
   /** Issue numbers in this repo the PR closes (GitHub's closing references). */
   closes: number[];
+  /** Lines added and deleted, and files changed, over the whole diff. */
+  additions: number;
+  deletions: number;
+  changedFiles: number;
+  /** Its changed files, possibly only the first 100. */
+  files: ChangedFile[];
+  /** Whether `files` lists every changed file. */
+  filesComplete: boolean;
+  /** The earliest authored date among its commits; undefined when GitHub returned none. */
+  firstCommitAt: Date | undefined;
+}
+
+export interface ChangedFile {
+  path: string;
+  additions: number;
+  deletions: number;
 }
 
 export interface LabelEvent {
@@ -27,6 +43,17 @@ export interface Issue {
   createdAt: Date;
   /** Label additions, oldest first. */
   labelled: LabelEvent[];
+  /** Number of sub-issues. */
+  subIssues: number;
+  /** Its comments (the first 100), oldest first. Bodies never reach the dataset. */
+  comments: Comment[];
+}
+
+export interface Comment {
+  at: Date;
+  body: string;
+  /** Posted by a bot (an Action or an app), not a person. */
+  byBot: boolean;
 }
 
 export interface GitHubData {
@@ -48,12 +75,19 @@ interface RawPullRequest {
   baseRefName: string;
   headRefName: string;
   closingIssuesReferences: { nodes: { number: number; repository: { nameWithOwner: string } }[] };
+  additions?: number;
+  deletions?: number;
+  changedFiles?: number;
+  commits?: { nodes: { commit: { authoredDate: string } }[] };
+  files?: { totalCount: number; nodes: ChangedFile[] } | null;
 }
 
 interface RawIssue {
   number: number;
   createdAt: string;
   timelineItems: { nodes: { __typename: string; createdAt?: string; label?: { name: string } }[] };
+  subIssues?: { totalCount: number };
+  comments?: { nodes: { createdAt: string; body: string; author: { __typename: string } | null }[] };
 }
 
 type Pages<K extends string, N> = { data: { repository: Record<K, { nodes: N[] }> } }[];
@@ -78,6 +112,7 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
               closes: pr.closingIssuesReferences.nodes
                 .filter((ref) => ref.repository.nameWithOwner.toLowerCase() === repo.fullName.toLowerCase())
                 .map((ref) => ref.number),
+              ...diffOf(pr),
             },
           ],
     );
@@ -95,7 +130,25 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
             : [],
         )
         .sort((a, b) => a.at.getTime() - b.at.getTime()),
+      subIssues: issue.subIssues?.totalCount ?? 0,
+      comments: (issue.comments?.nodes ?? [])
+        .map((comment) => ({ at: new Date(comment.createdAt), body: comment.body, byBot: comment.author?.__typename === "Bot" }))
+        .sort((a, b) => a.at.getTime() - b.at.getTime()),
     }));
 
   return { repo, pullRequests, issues };
+}
+
+/** A PR's diff stats and first commit. Missing fields read as an empty, incomplete diff. */
+function diffOf(pr: RawPullRequest) {
+  const files = pr.files?.nodes ?? [];
+  const commitTimes = (pr.commits?.nodes ?? []).map((node) => Date.parse(node.commit.authoredDate));
+  return {
+    additions: pr.additions ?? 0,
+    deletions: pr.deletions ?? 0,
+    changedFiles: pr.changedFiles ?? files.length,
+    files: files.map(({ path, additions, deletions }) => ({ path, additions, deletions })),
+    filesComplete: pr.files != null && files.length >= pr.files.totalCount,
+    firstCommitAt: commitTimes.length > 0 ? new Date(Math.min(...commitTimes)) : undefined,
+  };
 }

@@ -78,6 +78,42 @@ describe("report", () => {
     assert.doesNotMatch(html, /data-methodology="firstRunCiRate"/);
   });
 
+  it("shows the test ratio and net lines removed", () => {
+    assert.equal(
+      textOf("data-section", "testRatio", "grimfeld/lifeline"),
+      "Test lines per production line 0.59 test lines added per production line: 65 test lines for 110 production lines.",
+    );
+    assert.equal(
+      textOf("data-section", "netLinesRemoved", "grimfeld/lifeline"),
+      "Net lines removed -240 net lines removed: 145 deleted, 385 added. Tickets removing more than they added: 1.",
+    );
+  });
+
+  it("shows each ticket's size proxies", () => {
+    assert.match(
+      textOf("data-section", "size", "grimfeld/lifeline"),
+      /^Ticket size Median ticket: 150 lines changed in 3 files\. Ticket Diff lines Files Sub-tickets #104 150 3 2 #105 150 3 0 PR #136 205 101 0 #106 170 3 0 PR #137 5 1 0$/,
+    );
+  });
+
+  it("shows estimate vs actual beside each ticket's size proxies", () => {
+    assert.equal(
+      textOf("data-section", "estimateVsActual", "grimfeld/lifeline"),
+      "Estimate vs actual Median actual / estimate: 0.31 . Left out because the estimate came after the first commit: 1. " +
+        "Ticket Estimate Actual Actual / estimate Diff lines Files Sub-tickets #104 4 h 11 h 2.75 150 3 2 #105 36 h 11 h 0.31 150 3 0",
+    );
+    assert.equal(textOf("data-section", "estimateVsActual", "grimfeld/agentic-metrics"), "Estimate vs actual unknown");
+  });
+
+  it("defines the diff and estimate metrics in Methodology", () => {
+    assert.match(textOf("data-methodology", "testRatio"), /Lines added to test files divided by lines added to production files/);
+    assert.match(textOf("data-methodology", "netLinesRemoved"), /Lines deleted minus lines added/);
+    assert.match(textOf("data-methodology", "size"), /diff size .* files touched .* sub-tickets/);
+    const estimate = textOf("data-methodology", "estimateVsActual");
+    assert.match(estimate, /earliest comment on its issue/);
+    assert.match(estimate, /Coverage: grimfeld\/agentic-metrics 0 of 0 tickets; grimfeld\/lifeline 2 of 5 tickets/);
+  });
+
   it("links each raw dataset from Methodology, copied next to the report", () => {
     assert.match(html, /<a href="datasets\/grimfeld\/lifeline\.json">/);
     assert.equal(

@@ -27,6 +27,9 @@ query($owner: String!, $name: String!, $endCursor: String) {
         number createdAt mergedAt baseRefName headRefName
         author { login __typename }
         closingIssuesReferences(first: 50) { nodes { number repository { nameWithOwner } } }
+        additions deletions changedFiles
+        commits(first: 100) { nodes { commit { authoredDate } } }
+        files(first: 100) { totalCount nodes { path additions deletions } }
       }
     }
   }
@@ -39,6 +42,8 @@ query($owner: String!, $name: String!, $endCursor: String) {
       pageInfo { hasNextPage endCursor }
       nodes {
         number createdAt closedAt
+        subIssues { totalCount }
+        comments(first: 100) { nodes { createdAt body author { __typename } } }
         timelineItems(first: 100, itemTypes: [LABELED_EVENT]) {
           nodes { __typename ... on LabeledEvent { createdAt label { name } } }
         }
