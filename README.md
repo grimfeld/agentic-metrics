@@ -35,9 +35,12 @@ name: agentic-metrics
 on:
   pull_request:
     types: [opened, edited, reopened]
+  issues:
+    types: [labeled]
 permissions:
   contents: read
   pull-requests: write
+  issues: write
 jobs:
   conventions:
     runs-on: ubuntu-latest
@@ -45,9 +48,13 @@ jobs:
       - uses: grimfeld/agentic-metrics/action@main
         # with:
         #   branch-regex: '^spec[-/](\d+)'
+        #   bug-label: bug
+        #   ready-label: ready-for-agent
 ```
 
 When a PR's description references no issue and its branch name carries one (`spec-376-…`, `spec/363-…`, `ticket-16`, `16-title`), the Action appends `Closes #N`. A description that already mentions an issue (`#12`, `owner/repo#12`, an issue link) is left alone, and so are PRs from forks. It needs only the default workflow token. `branch-regex` overrides the built-in pattern; the number is its first capture group that matched.
+
+When an issue gets the bug label (`bug-label`, default `bug`), the Action asks "Regression? Reply `caused-by: #N`", unless the issue already carries a `caused-by: #N` line. When a ticket gets the ready label (`ready-label`, default `ready-for-agent`) and no comment starts with `estimate: <n><h|d|w>`, it posts a one-line estimate reminder. Each reminder carries a hidden marker and is posted at most once per issue, however often the label is removed and added again.
 
 ## Repository layout
 
