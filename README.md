@@ -41,6 +41,8 @@ npx agentic-metrics report    # renders datasets/ as report/index.html
 { "readyLabel": "ready-for-agent" }
 ```
 
+A regression is an issue labelled `regression` with a line starting `caused-by: #N` in its body or a comment; `#N` is the ticket or PR that caused it.
+
 Adding a metric: write one file in `cli/metrics/` holding its computation (its dataset field), how the report shows it, and its Methodology entry. Then list it in `cli/metrics/index.ts`. Its tests go in `test/cli/`, fixtures in, dataset and HTML out. To read something new from GitHub, add a request to `cli/github/source.ts` and a recorded `gh api` answer to each folder in `test/fixtures/github/`.
 
 ## GitHub Action

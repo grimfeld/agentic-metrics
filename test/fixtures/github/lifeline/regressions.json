@@ -1,0 +1,75 @@
+[
+ {
+  "data": {
+   "repository": {
+    "issues": {
+     "pageInfo": {
+      "hasNextPage": true,
+      "endCursor": "Y3Vyc29yOnYyOpK0MjAyNi0xMS0wMVQwOTowMDowMFrOAAAAjQ=="
+     },
+     "nodes": [
+      {
+       "number": 140,
+       "createdAt": "2026-10-29T09:00:00Z",
+       "body": "Type editor drops the field order on save.\n\ncaused-by: #116",
+       "comments": { "nodes": [] }
+      },
+      {
+       "number": 141,
+       "createdAt": "2026-10-30T09:00:00Z",
+       "body": "Demo data missing after reset.",
+       "comments": {
+        "nodes": [
+         { "createdAt": "2026-10-30T09:00:05Z", "body": "Regression? Reply `caused-by: #N` with the ticket or PR that introduced it." },
+         { "createdAt": "2026-10-30T10:00:00Z", "body": "caused-by: #104" }
+        ]
+       }
+      },
+      {
+       "number": 142,
+       "createdAt": "2026-11-01T09:00:00Z",
+       "body": "Handoff link 404s.",
+       "comments": {
+        "nodes": [
+         { "createdAt": "2026-11-01T09:30:00Z", "body": "Found it.\r\nCaused-by: #136" }
+        ]
+       }
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "data": {
+   "repository": {
+    "issues": {
+     "pageInfo": {
+      "hasNextPage": false,
+      "endCursor": "Y3Vyc29yOnYyOpK0MjAyNi0xMS0wNVQwOTowMDowMFrOAAAAkQ=="
+     },
+     "nodes": [
+      {
+       "number": 143,
+       "createdAt": "2026-11-03T09:00:00Z",
+       "body": "House module crashes.",
+       "comments": { "nodes": [{ "createdAt": "2026-11-03T10:00:00Z", "body": "caused-by: #42" }] }
+      },
+      {
+       "number": 144,
+       "createdAt": "2026-11-04T09:00:00Z",
+       "body": "Something broke, cause not found yet.",
+       "comments": { "nodes": [] }
+      },
+      {
+       "number": 145,
+       "createdAt": "2026-11-05T09:00:00Z",
+       "body": "Field labels truncated.",
+       "comments": { "nodes": [{ "createdAt": "2026-11-05T10:00:00Z", "body": "caused-by: #106" }] }
+      }
+     ]
+    }
+   }
+  }
+ }
+]
