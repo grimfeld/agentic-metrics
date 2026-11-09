@@ -111,6 +111,12 @@ describe("publish: anonymized", () => {
     assert.equal(dataset.tickets, 5);
     assert.deepEqual(dataset.metrics["leadTime"]?.value, { p50Hours: 12, p90Hours: 180 });
     assert.deepEqual(dataset.metrics["regressionRate"]?.value, { rate: 0.6, regressions: 4, regressedTickets: 3 });
+    // Per-ticket rows go; the medians stay.
+    for (const id of ["size", "estimateVsActual"]) {
+      const value = dataset.metrics[id]?.value as { tickets: unknown[] } & Record<string, unknown>;
+      assert.deepEqual(value.tickets, [], id);
+      assert.ok(Object.keys(value).some((key) => key.startsWith("p50")), id);
+    }
 
     const html = await report();
     assertNoLeak(html, "the report");

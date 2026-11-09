@@ -14,6 +14,13 @@
        "url": "https://github.com/acme-corp/payroll-engine/issues/104",
        "createdAt": "2026-10-18T20:00:00Z",
        "closedAt": "2026-10-19T20:00:01Z",
+       "subIssues": { "totalCount": 2 },
+       "comments": {
+        "nodes": [
+         { "createdAt": "2026-10-19T08:30:00Z", "author": { "__typename": "User" }, "body": "Small one.\nestimate: 4h" },
+         { "createdAt": "2026-10-19T10:00:00Z", "author": { "__typename": "User" }, "body": "estimate: 1d" }
+        ]
+       },
        "timelineItems": {
         "nodes": [
          { "__typename": "LabeledEvent", "createdAt": "2026-10-19T08:00:00Z", "label": { "name": "ready-for-agent" } }
@@ -26,6 +33,14 @@
        "url": "https://github.com/acme-corp/payroll-engine/issues/105",
        "createdAt": "2026-10-19T00:00:00Z",
        "closedAt": "2026-10-19T20:00:01Z",
+       "subIssues": { "totalCount": 0 },
+       "comments": {
+        "nodes": [
+         { "createdAt": "2026-10-19T00:10:00Z", "author": { "__typename": "Bot" }, "body": "estimate: 1w" },
+         { "createdAt": "2026-10-19T01:00:00Z", "author": { "__typename": "User" }, "body": "Last time the estimate: 3h was too low." },
+         { "createdAt": "2026-10-19T02:00:00Z", "author": { "__typename": "User" }, "body": "Estimate: 1.5d" }
+        ]
+       },
        "timelineItems": { "nodes": [] }
       }
      ]
@@ -48,6 +63,12 @@
        "url": "https://github.com/acme-corp/payroll-engine/issues/106",
        "createdAt": "2026-10-20T12:00:00Z",
        "closedAt": "2026-10-28T12:00:01Z",
+       "subIssues": { "totalCount": 0 },
+       "comments": {
+        "nodes": [
+         { "createdAt": "2026-10-28T10:00:00Z", "author": { "__typename": "User" }, "body": "estimate: 2d" }
+        ]
+       },
        "timelineItems": {
         "nodes": [
          { "__typename": "LabeledEvent", "createdAt": "2026-10-20T12:00:00Z", "label": { "name": "bug" } },
@@ -61,6 +82,8 @@
        "url": "https://github.com/acme-corp/payroll-engine/issues/107",
        "createdAt": "2026-10-20T08:00:00Z",
        "closedAt": null,
+       "subIssues": { "totalCount": 0 },
+       "comments": { "nodes": [] },
        "timelineItems": {
         "nodes": [
          { "__typename": "LabeledEvent", "createdAt": "2026-10-20T08:00:01Z", "label": { "name": "ready-for-agent" } }

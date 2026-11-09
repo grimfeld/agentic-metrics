@@ -17,6 +17,20 @@
        "baseRefName": "feat/module-plumbing",
        "headRefName": "feat/house-module",
        "author": { "login": "grimfeld", "__typename": "User" },
+       "additions": 999,
+       "deletions": 1,
+       "changedFiles": 1,
+       "commits": {
+        "nodes": [
+         { "commit": { "authoredDate": "2026-10-20T08:00:00Z" } }
+        ]
+       },
+       "files": {
+        "totalCount": 1,
+        "nodes": [
+         { "path": "src/house/module.ts", "additions": 999, "deletions": 1 }
+        ]
+       },
        "closingIssuesReferences": {
         "nodes": [
          { "number": 107, "repository": { "nameWithOwner": "acme-corp/payroll-engine" } }
@@ -32,6 +46,23 @@
        "baseRefName": "master",
        "headRefName": "demo",
        "author": { "login": "grimfeld", "__typename": "User" },
+       "additions": 120,
+       "deletions": 30,
+       "changedFiles": 3,
+       "commits": {
+        "nodes": [
+         { "commit": { "authoredDate": "2026-10-19T09:30:00Z" } },
+         { "commit": { "authoredDate": "2026-10-19T09:00:00Z" } }
+        ]
+       },
+       "files": {
+        "totalCount": 3,
+        "nodes": [
+         { "path": "src/house.ts", "additions": 80, "deletions": 20 },
+         { "path": "src/house.test.ts", "additions": 30, "deletions": 0 },
+         { "path": "package-lock.json", "additions": 10, "deletions": 10 }
+        ]
+       },
        "closingIssuesReferences": {
         "nodes": [
          { "number": 104, "repository": { "nameWithOwner": "acme-corp/payroll-engine" } },
@@ -48,6 +79,21 @@
        "baseRefName": "master",
        "headRefName": "type-editor-fields",
        "author": { "login": "grimfeld", "__typename": "User" },
+       "additions": 50,
+       "deletions": 70,
+       "changedFiles": 2,
+       "commits": {
+        "nodes": [
+         { "commit": { "authoredDate": "2026-10-21T09:00:00Z" } }
+        ]
+       },
+       "files": {
+        "totalCount": 2,
+        "nodes": [
+         { "path": "src/editor.ts", "additions": 20, "deletions": 70 },
+         { "path": "test/editor.spec.ts", "additions": 30, "deletions": 0 }
+        ]
+       },
        "closingIssuesReferences": {
         "nodes": [
          { "number": 106, "repository": { "nameWithOwner": "acme-corp/payroll-engine" } }
@@ -77,6 +123,21 @@
        "baseRefName": "master",
        "headRefName": "handoff-from-outside",
        "author": { "login": "grimfeld", "__typename": "User" },
+       "additions": 200,
+       "deletions": 5,
+       "changedFiles": 101,
+       "commits": {
+        "nodes": [
+         { "commit": { "authoredDate": "2026-10-27T01:00:00Z" } }
+        ]
+       },
+       "files": {
+        "totalCount": 101,
+        "nodes": [
+         { "path": "src/handoff/a.ts", "additions": 2, "deletions": 0 },
+         { "path": "src/handoff/b.ts", "additions": 2, "deletions": 0 }
+        ]
+       },
        "closingIssuesReferences": { "nodes": [] }
       },
       {
@@ -88,6 +149,21 @@
        "baseRefName": "master",
        "headRefName": "spec/106-type-editor-follow-up",
        "author": { "login": "grimfeld", "__typename": "User" },
+       "additions": 10,
+       "deletions": 40,
+       "changedFiles": 2,
+       "commits": {
+        "nodes": [
+         { "commit": { "authoredDate": "2026-10-28T09:00:00Z" } }
+        ]
+       },
+       "files": {
+        "totalCount": 2,
+        "nodes": [
+         { "path": "src/editor.ts", "additions": 10, "deletions": 30 },
+         { "path": "README.md", "additions": 0, "deletions": 10 }
+        ]
+       },
        "closingIssuesReferences": {
         "nodes": [
          { "number": 106, "repository": { "nameWithOwner": "acme-corp/payroll-engine" } }
@@ -103,6 +179,20 @@
        "baseRefName": "master",
        "headRefName": "ui-kit-pieces",
        "author": { "login": "grimfeld", "__typename": "User" },
+       "additions": 5,
+       "deletions": 0,
+       "changedFiles": 1,
+       "commits": {
+        "nodes": [
+         { "commit": { "authoredDate": "2026-11-09T01:00:00Z" } }
+        ]
+       },
+       "files": {
+        "totalCount": 1,
+        "nodes": [
+         { "path": "ui/__tests__/kit.test.tsx", "additions": 5, "deletions": 0 }
+        ]
+       },
        "closingIssuesReferences": {
         "nodes": [
          { "number": 999, "repository": { "nameWithOwner": "grimfeld/other" } }

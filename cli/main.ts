@@ -5,6 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { CONFIG_FILE, readConfig } from "./config.ts";
 import { buildDataset, datasetPath, SCHEMA_VERSION, type Dataset } from "./dataset.ts";
+import { cachedSource, defaultCacheDir } from "./github/cache.ts";
 import { loadGitHub } from "./github/load.ts";
 import { ghSource, type GitHubSource } from "./github/source.ts";
 import { link } from "./linker.ts";
@@ -14,6 +15,12 @@ export interface Dependencies {
   cwd: string;
   /** Defaults to the `gh` CLI. */
   github?: GitHubSource;
+  /**
+   * The local cache of raw GitHub items that makes collection incremental.
+   * Defaults to ~/.cache/agentic-metrics with the `gh` source; with an
+   * injected source, nothing is cached unless this is set.
+   */
+  cacheDir?: string;
   now?: () => Date;
   stdout?: (text: string) => void;
   stderr?: (text: string) => void;
@@ -23,12 +30,15 @@ export interface Dependencies {
 const LOCAL_DIR = ".agentic-metrics-local";
 
 const USAGE = `Usage:
-  agentic-metrics collect [--repo owner/name] [--datasets dir] [--local dir]
+  agentic-metrics collect [--repo owner/name] [--datasets dir] [--local dir] [--full]
       Read the repo (default: the current one) through \`gh\` and write
       <dir>/<owner>/<name>.json (default dir: datasets), or <dir>/<alias>.json
       when the repo is published anonymized (the default for a private repo).
       A repo published \`none\` gets a local report in <local>/index.html
       (default local: ${LOCAL_DIR}) and nothing in <dir>.
+      The first run reads the whole history; later runs read only what
+      changed since, from a cache in ~/.cache/agentic-metrics. --full
+      reads everything again (e.g. after a metric definition changes).
   agentic-metrics report [--datasets dir] [--out dir]
       Render every dataset in <dir> (default: datasets) as <out>/index.html
       (default out: report), with the datasets copied alongside.
@@ -63,10 +73,14 @@ async function collect(args: string[], deps: Dependencies, stdout: (text: string
       repo: { type: "string" },
       datasets: { type: "string", default: "datasets" },
       local: { type: "string", default: LOCAL_DIR },
+      full: { type: "boolean", default: false },
     },
   });
   const config = readConfig(deps.cwd);
-  const github = deps.github ?? ghSource({ cwd: deps.cwd, repo: values.repo });
+  const now = deps.now ?? (() => new Date());
+  const source = deps.github ?? ghSource({ cwd: deps.cwd, repo: values.repo });
+  const cacheDir = deps.cacheDir ?? (deps.github ? undefined : defaultCacheDir());
+  const github = cacheDir ? cachedSource(source, { dir: cacheDir, now, full: values.full }) : source;
   const data = await loadGitHub(github);
   const publish = config.publish ?? (data.repo.private ? "anonymized" : "full");
   if (publish === "anonymized" && !config.alias) {
@@ -74,7 +88,7 @@ async function collect(args: string[], deps: Dependencies, stdout: (text: string
       `${data.repo.fullName} is published anonymized${config.publish ? "" : " (it is private)"}: set "alias" in ${CONFIG_FILE}, or set "publish"`,
     );
   }
-  const dataset = buildDataset(data.repo, link(data, config), (deps.now ?? (() => new Date()))(), publish, config.alias);
+  const dataset = buildDataset(data.repo, link(data, config), now(), publish, config.alias);
 
   // Only this collect's dataset may stay in the datasets folder: a dataset left
   // by an earlier mode would publish what the current mode hides.
