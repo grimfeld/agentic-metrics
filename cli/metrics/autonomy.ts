@@ -1,4 +1,5 @@
 import { AUTONOMY_LEVELS, type AutonomyLevel } from "../autonomy.ts";
+import { levelCounts } from "../report/charts.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
 import { formatPercent, percent } from "./stats.ts";
@@ -47,6 +48,17 @@ export const autonomy: Metric<AutonomyCounts> = {
     of: ({ full, assisted, manual }) => percent(full / (full + assisted + manual)),
     format: formatPercent,
     byAutonomy: false,
+  },
+
+  chart: {
+    title: "Tickets by autonomy level",
+    draw: ({ value }) => ({
+      kind: "comparison",
+      data: levelCounts(value),
+      format: String,
+      heads: ["Autonomy level", "Tickets", "Share"],
+      description: `Tickets at each autonomy level: ${AUTONOMY_LEVELS.map((level) => `${String(value[level])} ${level}`).join(", ")}.`,
+    }),
   },
 
   sentence: ({ full, assisted, manual }) =>

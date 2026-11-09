@@ -1,3 +1,4 @@
+import { dayLabel } from "../report/charts.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
 import { plural } from "./stats.ts";
@@ -49,6 +50,21 @@ export const throughput: Metric<Throughput> = {
     label: "tickets",
     of: ({ weeks }) => weeks.reduce((sum, week) => sum + week.tickets, 0),
     format: String,
+  },
+
+  chart: {
+    title: "Tickets per week",
+    draw: ({ value: { weeks } }) => {
+      const tickets = weeks.reduce((sum, week) => sum + week.tickets, 0);
+      const busiest = weeks.reduce((top, week) => (week.tickets > top.tickets ? week : top), weeks[0] ?? { week: "", tickets: 0, pullRequests: 0 });
+      return {
+        kind: "columns",
+        data: weeks.map((week) => ({ label: week.week, short: dayLabel(week.week), value: week.tickets, note: String(week.pullRequests) })),
+        format: String,
+        heads: ["Week of", "Tickets", "PRs"],
+        description: `Tickets delivered in each of ${plural(weeks.length, "week")}, ${String(tickets)} in all; the busiest, the week of ${busiest.week}, delivered ${String(busiest.tickets)}.`,
+      };
+    },
   },
 
   sentence({ weeks }) {

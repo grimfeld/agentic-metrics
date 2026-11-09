@@ -1,15 +1,21 @@
 // The shell every report page shares: colour tokens with a dark-mode
-// override, the sidebar listing every page, and the title bar. Below phone
+// override (series colours too: blue, orange, aqua, the first three slots of a
+// colour-blind-safe categorical order, each stepped for its mode; autonomy
+// levels wear them as full, assisted, manual), the sidebar listing every page,
+// the title bar, and the chart styles. Below phone
 // width the sidebar becomes a bar scrolling across the top. Everything is
 // inline: the report loads nothing from the network.
 import { escapeHtml } from "../metrics/html.ts";
 import { COPY_SCRIPT } from "../report-trends.ts";
+import { CHART_CSS, CHART_SCRIPT } from "./charts.ts";
 import { PATHS, type PageContext, type SiteRepo } from "./site.ts";
 
 const LIGHT = `--plane: #f7f7f5; --surface: #ffffff; --ink: #111110; --ink-2: #4f4e4a; --muted: #77756f;
-  --grid: #e3e2dc; --axis: #c3c2b7; --ring: rgba(17,17,16,0.10); --wash: rgba(42,120,214,0.10); --accent: #1c5cab;`;
+  --grid: #e3e2dc; --axis: #c3c2b7; --ring: rgba(17,17,16,0.10); --wash: rgba(42,120,214,0.10); --accent: #1c5cab;
+  --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a;`;
 const DARK = `--plane: #0f0f0e; --surface: #1b1b1a; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #9a988f;
-  --grid: #2c2c2a; --axis: #45443f; --ring: rgba(255,255,255,0.10); --wash: rgba(57,135,229,0.16); --accent: #86b6ef;`;
+  --grid: #2c2c2a; --axis: #45443f; --ring: rgba(255,255,255,0.10); --wash: rgba(57,135,229,0.16); --accent: #86b6ef;
+  --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70;`;
 
 /** Shared by every page; a page kind adds its own rules through `layout`'s `css`. */
 const STYLE = `
@@ -65,7 +71,7 @@ main p, main li { overflow-wrap: anywhere; }
   nav.side .brand { padding: 4px 8px; }
   main { padding: 16px; }
 }
-`;
+${CHART_CSS}`;
 
 function navLink(ctx: PageContext, to: string, label: string, value = ""): string {
   const current = to === ctx.path ? ' aria-current="page"' : "";
@@ -127,7 +133,8 @@ ${sidebar(ctx)}
 ${parts.body}
 </main>
 </div>
-<script>${COPY_SCRIPT}</script>
+<script>${COPY_SCRIPT}
+${CHART_SCRIPT}</script>
 </body>
 </html>
 `;
