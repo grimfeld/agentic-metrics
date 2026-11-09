@@ -1,5 +1,6 @@
 // Pure decision function for the GitHub Action: an event payload in, a list of
 // operations out. It performs no I/O; `main.ts` carries the operations out.
+import { DEFAULT_BRANCH_REGEX, issueNumberFromBranch } from "../cli/branch.ts";
 
 export type GitHubEvent = {
   /** `GITHUB_EVENT_NAME`, e.g. `pull_request` or `issues`. */
@@ -28,20 +29,13 @@ export type Options = {
   readyLabel?: string;
 };
 
+export { DEFAULT_BRANCH_REGEX };
+
 export const DEFAULT_BUG_LABEL = "bug";
 export const DEFAULT_READY_LABEL = "ready-for-agent";
 
 export const REGRESSION_MARKER = "<!-- agentic-metrics:regression-question -->";
 export const ESTIMATE_MARKER = "<!-- agentic-metrics:estimate-reminder -->";
-
-/**
- * Matches `16-title` (GitHub's "create a branch" default) at the start, or a
- * ticket-like prefix followed by the number: `spec-376-…`, `spec/363-…`,
- * `ticket-16`, `fix/issue-12`. A bare number elsewhere (`integration/2026-11-09`)
- * does not match.
- */
-export const DEFAULT_BRANCH_REGEX =
-  /^(\d+)(?=[-_/]|$)|(?:^|[-_/])(?:issues?|tickets?|spec|gh|fix|bug|feat|feature)[-_/]?(\d+)(?=[-_/]|$)/i;
 
 export const CLOSES_MARKER = "<!-- agentic-metrics:closes -->";
 
@@ -144,15 +138,6 @@ function decidePullRequest(payload: PullRequestPayload, options: Options): Opera
       body: trimmed === "" ? line : `${trimmed}\n\n${line}`,
     },
   ];
-}
-
-function issueNumberFromBranch(branch: string, regex: RegExp): number | undefined {
-  const match = regex.exec(branch);
-  if (!match) return undefined;
-  // Unmatched groups are undefined at runtime, whatever the array type says.
-  const digits = (match.slice(1) as (string | undefined)[]).find((group) => group !== undefined) ?? match[0];
-  const issue = Number.parseInt(digits, 10);
-  return Number.isSafeInteger(issue) && issue > 0 ? issue : undefined;
 }
 
 type PullRequestPayload = {

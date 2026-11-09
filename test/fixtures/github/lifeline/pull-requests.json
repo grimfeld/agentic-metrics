@@ -22,7 +22,7 @@
        "changedFiles": 1,
        "commits": {
         "nodes": [
-         { "commit": { "authoredDate": "2026-10-20T08:00:00Z" } }
+         { "commit": { "authoredDate": "2026-10-20T08:00:00Z", "messageHeadline": "Implement the change" } }
         ]
        },
        "files": {
@@ -51,8 +51,8 @@
        "changedFiles": 3,
        "commits": {
         "nodes": [
-         { "commit": { "authoredDate": "2026-10-19T09:30:00Z" } },
-         { "commit": { "authoredDate": "2026-10-19T09:00:00Z" } }
+         { "commit": { "authoredDate": "2026-10-19T09:30:00Z", "messageHeadline": "Implement the change" } },
+         { "commit": { "authoredDate": "2026-10-19T09:00:00Z", "messageHeadline": "Implement the change" } }
         ]
        },
        "files": {
@@ -84,7 +84,7 @@
        "changedFiles": 2,
        "commits": {
         "nodes": [
-         { "commit": { "authoredDate": "2026-10-21T09:00:00Z" } }
+         { "commit": { "authoredDate": "2026-10-21T09:00:00Z", "messageHeadline": "Implement the change" } }
         ]
        },
        "files": {
@@ -128,7 +128,7 @@
        "changedFiles": 101,
        "commits": {
         "nodes": [
-         { "commit": { "authoredDate": "2026-10-27T01:00:00Z" } }
+         { "commit": { "authoredDate": "2026-10-27T01:00:00Z", "messageHeadline": "Implement the change" } }
         ]
        },
        "files": {
@@ -154,7 +154,7 @@
        "changedFiles": 2,
        "commits": {
         "nodes": [
-         { "commit": { "authoredDate": "2026-10-28T09:00:00Z" } }
+         { "commit": { "authoredDate": "2026-10-28T09:00:00Z", "messageHeadline": "Implement the change" } }
         ]
        },
        "files": {
@@ -184,7 +184,7 @@
        "changedFiles": 1,
        "commits": {
         "nodes": [
-         { "commit": { "authoredDate": "2026-11-09T01:00:00Z" } }
+         { "commit": { "authoredDate": "2026-11-09T01:00:00Z", "messageHeadline": "Implement the change" } }
         ]
        },
        "files": {

@@ -2,9 +2,9 @@
 // current PR body or issue comments, and performs the operations with the
 // workflow token. Not unit-tested (spec, Testing Decisions #3); keep logic out of here.
 import { readFileSync } from "node:fs";
+import { branchRegex as compileBranchRegex, DEFAULT_BRANCH_REGEX } from "../cli/branch.ts";
 import {
   decide,
-  DEFAULT_BRANCH_REGEX,
   DEFAULT_BUG_LABEL,
   DEFAULT_READY_LABEL,
   type IssueComment,
@@ -25,7 +25,7 @@ async function run(): Promise<void> {
   const name = requiredEnv("GITHUB_EVENT_NAME");
   const payload = JSON.parse(readFileSync(requiredEnv("GITHUB_EVENT_PATH"), "utf8")) as Record<string, unknown>;
   const pattern = input("branch-regex");
-  const branchRegex = pattern ? new RegExp(pattern, "i") : DEFAULT_BRANCH_REGEX;
+  const branchRegex = pattern ? compileBranchRegex(pattern) : DEFAULT_BRANCH_REGEX;
   const bugLabel = input("bug-label") || DEFAULT_BUG_LABEL;
   const readyLabel = input("ready-label") || DEFAULT_READY_LABEL;
 

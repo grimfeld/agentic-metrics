@@ -28,8 +28,10 @@ export interface Dataset {
   generatedAt: string;
   /** Tickets delivered: issues closed by, or PRs merged into, the default branch. */
   tickets: number;
-  /** PRs merged into the default branch. */
+  /** Ticket PRs delivered to the default branch (no integration PR, nothing excluded). */
   pullRequests: number;
+  /** Integration (batch) PRs merged into the default branch; in no ticket metric. */
+  integrationPullRequests: number;
   /** Keyed by metric id. A metric this version doesn't compute is absent. */
   metrics: Record<string, MetricResult<unknown>>;
   /** The repo's GitHub page. Absent when anonymized. */
@@ -60,6 +62,7 @@ export function buildDataset(repo: Repo, work: LinkedWork, now: Date, publish: P
     generatedAt: now.toISOString(),
     tickets: work.tickets.length,
     pullRequests: work.pullRequests.length,
+    integrationPullRequests: work.integrationPullRequests.length,
     metrics,
   };
   if (anonymized) return dataset;

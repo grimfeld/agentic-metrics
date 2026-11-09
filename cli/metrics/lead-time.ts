@@ -29,8 +29,8 @@ export const leadTime: Metric<LeadTime> = {
 
   methodology: {
     definition:
-      "Time from a ticket becoming ready to its last PR merging into the default branch, as the median (p50) and the 90th percentile (p90, nearest rank). A ticket becomes ready when the repo's ready label is first added; a ticket never labelled ready before it was done starts at its creation. A PR that closes no issue starts when it was opened.",
+      "Time from a ticket becoming ready to its last PR merging into the default branch, as the median (p50) and the 90th percentile (p90, nearest rank). A ticket becomes ready when the repo's ready label is first added; a ticket never labelled ready before it was done starts at its creation. A PR linked to no issue starts when it was opened. Integration PRs and excluded PRs are not tickets.",
     limits:
-      "Tickets whose issue GitHub did not return have no start and are left out. Time waiting in a batch or integration branch counts, since the ticket is not delivered until its PR reaches the default branch.",
+      "Tickets whose issue GitHub did not return have no start and are left out. Time waiting in a batch or integration branch counts, since the ticket is not delivered until its PR reaches the default branch: a PR merged into an integration branch is done when that branch's integration PR merges.",
   },
 };

@@ -3,6 +3,7 @@
 // versions can add their own.
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { branchRegex, DEFAULT_BRANCH_REGEX } from "./branch.ts";
 
 export const CONFIG_FILE = ".agentic-metrics.json";
 
@@ -13,6 +14,16 @@ export interface Config {
   publish?: PublishMode | undefined;
   /** The name an `anonymized` repo is published under, in place of `owner/name`. */
   alias?: string | undefined;
+  /**
+   * Finds the issue number in a PR's branch name (case-insensitive): the first
+   * capture group that matched, or the whole match. The file holds its source
+   * as a string; the default is the one the GitHub Action uses.
+   */
+  branchRegex: RegExp;
+  /** Branch-name prefixes of integration (batch) PRs. The file takes one string or a list. */
+  integrationBranchPrefixes: string[];
+  /** PRs by these authors (GitHub logins) or from branches starting with these prefixes count nowhere. */
+  exclude: { authors: string[]; branches: string[] };
 }
 
 /**
@@ -28,6 +39,9 @@ const ALIAS = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 const DEFAULTS: Config = {
   readyLabel: "ready-for-agent",
+  branchRegex: DEFAULT_BRANCH_REGEX,
+  integrationBranchPrefixes: ["integration/"],
+  exclude: { authors: [], branches: [] },
 };
 
 export function readConfig(repoDir: string): Config {
@@ -58,5 +72,38 @@ export function readConfig(repoDir: string): Config {
     }
     config.alias = alias;
   }
+  if ("branchRegex" in fields) {
+    const pattern = fields["branchRegex"];
+    if (typeof pattern !== "string") throw new Error(`${CONFIG_FILE}: branchRegex must be a string`);
+    try {
+      config.branchRegex = branchRegex(pattern);
+    } catch (error) {
+      throw new Error(`${CONFIG_FILE}: branchRegex is not a valid pattern: ${error instanceof Error ? error.message : String(error)}`, {
+        cause: error,
+      });
+    }
+  }
+  if ("integrationBranchPrefix" in fields) {
+    const prefix = fields["integrationBranchPrefix"];
+    config.integrationBranchPrefixes = typeof prefix === "string" ? [prefix] : stringList(prefix, "integrationBranchPrefix");
+  }
+  if ("exclude" in fields) {
+    const exclude = fields["exclude"];
+    if (typeof exclude !== "object" || exclude === null || Array.isArray(exclude)) {
+      throw new Error(`${CONFIG_FILE}: exclude must be an object with "authors" and/or "branches"`);
+    }
+    const lists = exclude as Record<string, unknown>;
+    config.exclude = {
+      authors: "authors" in lists ? stringList(lists["authors"], "exclude.authors") : [],
+      branches: "branches" in lists ? stringList(lists["branches"], "exclude.branches") : [],
+    };
+  }
   return config;
+}
+
+function stringList(value: unknown, field: string): string[] {
+  if (!Array.isArray(value) || !value.every((item) => typeof item === "string")) {
+    throw new Error(`${CONFIG_FILE}: ${field} must be a list of strings`);
+  }
+  return value;
 }
