@@ -96,7 +96,7 @@ describe("report", () => {
     assert.match(textOf("data-methodology", "throughput"), /^Throughput Tickets and pull requests delivered per week/);
   });
 
-  it("shows the test ratio and net lines removed, with each ticket's lines", () => {
+  it("shows the test ratio and net lines changed, with each ticket's lines", () => {
     assert.equal(
       textOf("data-section", "testRatio", "grimfeld/lifeline"),
       "Test lines per production line 0.59 test lines added per production line: 65 test lines for 110 production lines. " +
@@ -104,8 +104,8 @@ describe("report", () => {
     );
     assert.equal(
       textOf("data-section", "netLinesRemoved", "grimfeld/lifeline"),
-      "Net lines removed -240 net lines removed: 145 deleted, 385 added. Tickets removing more than they added: 1. " +
-        "Ticket Added Deleted Net removed #104 120 30 -90 #105 120 30 -90 PR #136 200 5 -195 #106 60 110 50 PR #137 5 0 -5",
+      "Net lines changed +240 net lines changed: 385 added, 145 deleted. Tickets removing more than they added: 1. " +
+        "Ticket Added Deleted Net change #104 120 30 +90 #105 120 30 +90 PR #136 200 5 +195 #106 60 110 −50 PR #137 5 0 +5",
     );
   });
 
@@ -138,7 +138,7 @@ describe("report", () => {
 
   it("defines the diff and estimate metrics in Methodology", () => {
     assert.match(textOf("data-methodology", "testRatio"), /Lines added to test files divided by lines added to production files/);
-    assert.match(textOf("data-methodology", "netLinesRemoved"), /Lines deleted minus lines added/);
+    assert.match(textOf("data-methodology", "netLinesRemoved"), /Lines added minus lines deleted/);
     assert.match(textOf("data-methodology", "size"), /diff size .* files touched .* sub-tickets/);
     const estimate = textOf("data-methodology", "estimateVsActual");
     assert.match(estimate, /earliest comment on its issue/);
