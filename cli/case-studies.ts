@@ -108,6 +108,9 @@ function ticketOfFile(file: string): string {
   return /^pr-\d+$/.test(name) ? `PR #${name.slice(3)}` : /^\d+$/.test(name) ? `#${name}` : name;
 }
 
+/** What a draft tells the human, as a comment in its front matter: never part of the story. */
+const DRAFT_INSTRUCTION = "Draft written by `agentic-metrics collect`. Edit it, then set `approved: true` to publish it in the report.";
+
 const NOTABLE_INTERVENTION = /^[ \t]*Notable intervention:.*$/gim;
 
 function hours(ticket: Ticket): string {
@@ -131,11 +134,10 @@ export function draftCaseStudy(candidate: CaseStudyCandidate, work: LinkedWork):
   const lines = [
     "---",
     "approved: false",
+    `# ${DRAFT_INSTRUCTION}`,
     "---",
     "",
     `# ${ticket.id} ${source?.title ?? ""}`.trimEnd(),
-    "",
-    `Draft written by \`agentic-metrics collect\`. Edit it, then set \`approved: true\` above to publish it in the report.`,
     "",
     `Candidate for: ${candidate.criteria.join(", ")}.`,
     "",

@@ -86,7 +86,9 @@ describe("case studies", () => {
     assert.deepEqual(readdirSync(join(cwd, DRAFTS)).sort(), ["104.md", "106.md", "pr-136.md"]);
 
     const draft = read(`${DRAFTS}/106.md`);
-    assert.match(draft, /^---\napproved: false\n/);
+    assert.match(draft, /^---\napproved: false\n# Draft written by `agentic-metrics collect`\. Edit it, then set `approved: true` to publish it in the report\.\n---\n\n# #106 /);
+    // The instruction lives in the front matter only, never in the story.
+    assert.equal(draft.match(/Draft written by/g)?.length, 1);
     assert.match(draft, /^# #106 Lifeline issue title 106$/m);
     assert.match(draft, /fewest human messages for its size, largest deletion/);
     assert.match(draft, /170 lines changed \(60 added, 110 deleted\)/);
