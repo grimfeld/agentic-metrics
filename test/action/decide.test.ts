@@ -136,6 +136,12 @@ describe("Action: regression question on the bug label", () => {
     assert.deepEqual(decide({ name: "issues", payload: fixture("issues-labeled-bug.json"), comments }), []);
   });
 
+  it("still asks when the only caused-by names another repo, which cannot be traced", () => {
+    const comments = [{ body: "caused-by: grimfeld/other#376" }];
+
+    assert.equal(decide({ name: "issues", payload: fixture("issues-labeled-bug.json"), comments }).length, 1);
+  });
+
   it("uses the repo's bug label when one is given", () => {
     const payload = withLabel(fixture("issues-labeled-bug.json"), "type: bug");
 

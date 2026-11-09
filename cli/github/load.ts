@@ -1,4 +1,5 @@
 // Turns the GitHub source's raw `gh api` answers into the CLI's GitHub model.
+import { causedBy } from "../conventions.ts";
 import type { GitHubSource } from "./source.ts";
 
 export interface Repo {
@@ -297,14 +298,6 @@ const REFERENCE = /(?<![\w/])#(\d+)\b/g;
 
 function references(text: string): number[] {
   return [...new Set([...text.matchAll(REFERENCE)].map((match) => Number(match[1])))];
-}
-
-/** A line starting with `caused-by: #N`, any case. A mention mid-line (such as the Action's question) is not one. */
-const CAUSED_BY = /^[ \t]*caused-by:[ \t]*#(\d+)\b/gim;
-
-function causedBy(texts: string[]): number[] {
-  const numbers = texts.flatMap((text) => [...text.matchAll(CAUSED_BY)].map((match) => Number(match[1])));
-  return [...new Set(numbers)];
 }
 
 type RawLabels = { nodes: { name: string }[] } | null;

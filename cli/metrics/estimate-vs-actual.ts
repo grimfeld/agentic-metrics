@@ -1,3 +1,4 @@
+import { estimateHours } from "../conventions.ts";
 import type { Comment } from "../github/load.ts";
 import type { Ticket } from "../linker.ts";
 import type { Metric } from "./metric.ts";
@@ -20,19 +21,13 @@ export interface EstimateVsActual {
   tickets: EstimatedTicket[];
 }
 
-/** `estimate: 2d` at the start of a line; decimals allowed. */
-const ESTIMATE = /^\s*estimate:\s*(\d+(?:\.\d+)?)\s*([hdw])\b/im;
-const UNIT_HOURS = { h: 1, d: 24, w: 168 } as const;
 
 /** The earliest estimate posted by a person, in hours. */
 function estimateOf(comments: readonly Comment[]): { at: Date; hours: number } | undefined {
   for (const comment of comments) {
     if (comment.byBot) continue;
-    const match = ESTIMATE.exec(comment.body);
-    if (match) {
-      const unit = (match[2] ?? "h").toLowerCase() as keyof typeof UNIT_HOURS;
-      return { at: comment.at, hours: Number(match[1]) * UNIT_HOURS[unit] };
-    }
+    const hours = estimateHours(comment.body);
+    if (hours !== undefined) return { at: comment.at, hours };
   }
   return undefined;
 }

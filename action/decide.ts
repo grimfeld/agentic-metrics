@@ -1,6 +1,7 @@
 // Pure decision function for the GitHub Action: an event payload in, a list of
 // operations out. It performs no I/O; `main.ts` carries the operations out.
 import { DEFAULT_BRANCH_REGEX, issueNumberFromBranch } from "../cli/branch.ts";
+import { causedBy, estimateHours } from "../cli/conventions.ts";
 
 export type GitHubEvent = {
   /** `GITHUB_EVENT_NAME`, e.g. `pull_request` or `issues`. */
@@ -45,12 +46,6 @@ const PR_ACTIONS = new Set(["opened", "edited", "reopened"]);
 // `&#38;` is an HTML entity, not a reference.
 const ISSUE_REFERENCE = /(?:^|[^&])#\d+\b|github\.com\/[\w.-]+\/[\w.-]+\/(?:issues|pull)\/\d+/i;
 
-// A `caused-by: #N` line (spec: "Regression"), in the issue body or a reply.
-const CAUSED_BY = /^\s*caused-by:\s*(?:[\w.-]+\/[\w.-]+)?#\d+/im;
-
-// An `estimate: <n><h|d|w>` comment (spec: "Estimate").
-const ESTIMATE = /^\s*estimate:\s*\d+(?:\.\d+)?\s*[hdw]\b/im;
-
 export function decide(event: GitHubEvent, options: Options = {}): Operation[] {
   if (event.name === "pull_request") return decidePullRequest(event.payload as PullRequestPayload, options);
   if (event.name === "issues") return decideIssue(event.payload as IssuesPayload, event.comments ?? [], options);
@@ -69,8 +64,7 @@ function decideIssue(payload: IssuesPayload, comments: IssueComment[], options: 
 
 function regressionQuestion(payload: IssuesPayload, comments: IssueComment[]): Operation[] {
   if (alreadyPosted(comments, REGRESSION_MARKER)) return [];
-  const texts = [payload.issue.body, ...comments.map((c) => c.body)];
-  if (texts.some((text) => CAUSED_BY.test(text ?? ""))) return [];
+  if (causedBy([payload.issue.body, ...comments.map((c) => c.body)]).length > 0) return [];
 
   return [
     comment(
@@ -82,7 +76,7 @@ function regressionQuestion(payload: IssuesPayload, comments: IssueComment[]): O
 
 function estimateReminder(payload: IssuesPayload, comments: IssueComment[]): Operation[] {
   if (alreadyPosted(comments, ESTIMATE_MARKER)) return [];
-  if (comments.some((c) => ESTIMATE.test(c.body ?? ""))) return [];
+  if (comments.some((c) => estimateHours(c.body) !== undefined)) return [];
 
   return [
     comment(
