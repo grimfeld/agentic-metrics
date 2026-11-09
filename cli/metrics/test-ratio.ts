@@ -1,4 +1,5 @@
 import type { PullRequest } from "../github/load.ts";
+import { escapeHtml } from "./html.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
 
@@ -7,6 +8,8 @@ export interface TestRatio {
   productionLinesAdded: number;
   /** Test lines added per production line added, to two decimals. */
   ratio: number;
+  /** Each covered ticket's lines over its own PRs, in delivery order. Absent once anonymized. */
+  tickets?: { ticket: string; testLinesAdded: number; productionLinesAdded: number }[];
 }
 
 type Kind = "test" | "production" | "other";
@@ -38,6 +41,18 @@ function classify(path: string): Kind {
   return "production";
 }
 
+/** Lines added to test and to production files over `pullRequests`, each PR counted once. */
+function linesAdded(pullRequests: ReadonlySet<PullRequest>): { testLinesAdded: number; productionLinesAdded: number } {
+  let testLinesAdded = 0;
+  let productionLinesAdded = 0;
+  for (const file of [...pullRequests].flatMap((pr) => pr.files)) {
+    const kind = classify(file.path);
+    if (kind === "test") testLinesAdded += file.additions;
+    if (kind === "production") productionLinesAdded += file.additions;
+  }
+  return { testLinesAdded, productionLinesAdded };
+}
+
 export const testRatio: Metric<TestRatio> = {
   id: "testRatio",
   name: "Test lines per production line",
@@ -45,28 +60,28 @@ export const testRatio: Metric<TestRatio> = {
   compute({ tickets }) {
     const covered = tickets.filter((ticket) => ticket.pullRequests.length > 0 && ticket.pullRequests.every((pr) => pr.filesComplete));
     const coverage = { tickets: covered.length, of: tickets.length };
-    const pullRequests = new Set<PullRequest>(covered.flatMap((ticket) => ticket.pullRequests));
-    let testLinesAdded = 0;
-    let productionLinesAdded = 0;
-    for (const file of [...pullRequests].flatMap((pr) => pr.files)) {
-      const kind = classify(file.path);
-      if (kind === "test") testLinesAdded += file.additions;
-      if (kind === "production") productionLinesAdded += file.additions;
-    }
+    const { testLinesAdded, productionLinesAdded } = linesAdded(new Set<PullRequest>(covered.flatMap((ticket) => ticket.pullRequests)));
     if (productionLinesAdded === 0) return { value: UNKNOWN, coverage };
     const ratio = Math.round((testLinesAdded / productionLinesAdded) * 100) / 100;
-    return { value: { testLinesAdded, productionLinesAdded, ratio }, coverage };
+    const perTicket = covered.map((ticket) => ({ ticket: ticket.id, ...linesAdded(new Set(ticket.pullRequests)) }));
+    return { value: { testLinesAdded, productionLinesAdded, ratio, tickets: perTicket }, coverage };
   },
 
-  anonymize: (value) => value,
+  // Per-ticket rows name tickets: an anonymized dataset keeps the totals only.
+  anonymize: ({ testLinesAdded, productionLinesAdded, ratio }) => ({ testLinesAdded, productionLinesAdded, ratio }),
 
   figure: { label: "ratio", of: ({ ratio }) => ratio, format: String },
 
   sentence: ({ testLinesAdded, productionLinesAdded, ratio }) =>
     `${String(ratio)} test lines written per production line (${String(testLinesAdded)} test lines for ${String(productionLinesAdded)} production lines)`,
 
-  section({ testLinesAdded, productionLinesAdded, ratio }) {
-    return `<p><strong>${String(ratio)}</strong> test lines added per production line: ${String(testLinesAdded)} test lines for ${String(productionLinesAdded)} production lines.</p>`;
+  section({ testLinesAdded, productionLinesAdded, ratio, tickets }) {
+    const summary = `<p><strong>${String(ratio)}</strong> test lines added per production line: ${String(testLinesAdded)} test lines for ${String(productionLinesAdded)} production lines.</p>`;
+    if (!tickets?.length) return summary;
+    const rows = tickets
+      .map((t) => `<tr><td>${escapeHtml(t.ticket)}</td><td>${String(t.testLinesAdded)}</td><td>${String(t.productionLinesAdded)}</td></tr>`)
+      .join("");
+    return `${summary}<table><thead><tr><th>Ticket</th><th>Test lines</th><th>Production lines</th></tr></thead><tbody>${rows}</tbody></table>`;
   },
 
   methodology: {

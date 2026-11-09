@@ -35,7 +35,20 @@ async function metric(id: string, fixture = "lifeline", repo = "grimfeld/lifelin
 describe("diff metrics", () => {
   it("reports net lines removed over the PRs delivered, each PR counted once", async () => {
     assert.deepEqual(await metric("netLinesRemoved"), {
-      value: { linesAdded: 385, linesDeleted: 145, netLinesRemoved: -240, ticketsNetRemoving: 1 },
+      value: {
+        linesAdded: 385,
+        linesDeleted: 145,
+        netLinesRemoved: -240,
+        ticketsNetRemoving: 1,
+        // Per ticket over its own PRs: #104 and #105 share #115.
+        tickets: [
+          { ticket: "#104", linesAdded: 120, linesDeleted: 30 },
+          { ticket: "#105", linesAdded: 120, linesDeleted: 30 },
+          { ticket: "PR #136", linesAdded: 200, linesDeleted: 5 },
+          { ticket: "#106", linesAdded: 60, linesDeleted: 110 },
+          { ticket: "PR #137", linesAdded: 5, linesDeleted: 0 },
+        ],
+      },
       coverage: { tickets: 5, of: 5 },
     });
   });
@@ -46,7 +59,17 @@ describe("diff metrics", () => {
   // #136 lists 2 of its 101 files, so its ticket is left out.
   it("classifies lines added as test or production and reports their ratio", async () => {
     assert.deepEqual(await metric("testRatio"), {
-      value: { testLinesAdded: 65, productionLinesAdded: 110, ratio: 0.59 },
+      value: {
+        testLinesAdded: 65,
+        productionLinesAdded: 110,
+        ratio: 0.59,
+        tickets: [
+          { ticket: "#104", testLinesAdded: 30, productionLinesAdded: 80 },
+          { ticket: "#105", testLinesAdded: 30, productionLinesAdded: 80 },
+          { ticket: "#106", testLinesAdded: 30, productionLinesAdded: 30 },
+          { ticket: "PR #137", testLinesAdded: 5, productionLinesAdded: 0 },
+        ],
+      },
       coverage: { tickets: 4, of: 5 },
     });
   });

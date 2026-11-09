@@ -1,3 +1,4 @@
+import { escapeHtml } from "./html.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
 import { formatHours, percentile } from "./stats.ts";
@@ -5,6 +6,8 @@ import { formatHours, percentile } from "./stats.ts";
 export interface LeadTime {
   p50Hours: number;
   p90Hours: number;
+  /** Each ticket's lead time, in delivery order, so the percentiles can be traced. Absent once anonymized. */
+  tickets?: { ticket: string; hours: number }[];
 }
 
 export const leadTime: Metric<LeadTime> = {
@@ -12,16 +15,25 @@ export const leadTime: Metric<LeadTime> = {
   name: "Lead time",
 
   compute({ tickets }) {
-    const hours = tickets.flatMap((ticket) =>
-      ticket.readyAt ? [(ticket.doneAt.getTime() - ticket.readyAt.getTime()) / 3_600_000] : [],
+    const rows = tickets.flatMap((ticket) =>
+      ticket.readyAt ? [{ ticket: ticket.id, hours: (ticket.doneAt.getTime() - ticket.readyAt.getTime()) / 3_600_000 }] : [],
     );
-    const coverage = { tickets: hours.length, of: tickets.length };
-    if (hours.length === 0) return { value: UNKNOWN, coverage };
+    const coverage = { tickets: rows.length, of: tickets.length };
+    if (rows.length === 0) return { value: UNKNOWN, coverage };
     const round = (value: number) => Math.round(value * 10) / 10;
-    return { value: { p50Hours: round(percentile(hours, 50)), p90Hours: round(percentile(hours, 90)) }, coverage };
+    const hours = rows.map((row) => row.hours);
+    return {
+      value: {
+        p50Hours: round(percentile(hours, 50)),
+        p90Hours: round(percentile(hours, 90)),
+        tickets: rows.map((row) => ({ ...row, hours: round(row.hours) })),
+      },
+      coverage,
+    };
   },
 
-  anonymize: (value) => value,
+  // Per-ticket rows name tickets: an anonymized dataset keeps the percentiles only.
+  anonymize: ({ p50Hours, p90Hours }) => ({ p50Hours, p90Hours }),
 
   figure: { label: "p50", of: ({ p50Hours }) => p50Hours, format: formatHours },
 
@@ -30,6 +42,13 @@ export const leadTime: Metric<LeadTime> = {
 
   headline({ p50Hours, p90Hours }) {
     return `${formatHours(p50Hours)} <small>p50</small> · ${formatHours(p90Hours)} <small>p90</small>`;
+  },
+
+  section({ p50Hours, p90Hours, tickets }) {
+    const summary = `<p>p50 <strong>${formatHours(p50Hours)}</strong>, p90 <strong>${formatHours(p90Hours)}</strong>.</p>`;
+    if (!tickets?.length) return summary;
+    const rows = tickets.map((t) => `<tr><td>${escapeHtml(t.ticket)}</td><td>${formatHours(t.hours)}</td></tr>`).join("");
+    return `${summary}<table><thead><tr><th>Ticket</th><th>Lead time</th></tr></thead><tbody>${rows}</tbody></table>`;
   },
 
   methodology: {
