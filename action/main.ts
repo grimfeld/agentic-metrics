@@ -2,7 +2,8 @@
 // PR body, and performs the operations with the workflow token. Not unit-tested
 // (spec, Testing Decisions #3); keep logic out of here.
 import { readFileSync } from "node:fs";
-import { decide, DEFAULT_BRANCH_REGEX, type Operation } from "./decide.ts";
+import { branchRegex as compileBranchRegex, DEFAULT_BRANCH_REGEX } from "../cli/branch.ts";
+import { decide, type Operation } from "./decide.ts";
 
 const api = process.env["GITHUB_API_URL"] ?? "https://api.github.com";
 const token = input("github-token");
@@ -18,7 +19,7 @@ async function run(): Promise<void> {
   const name = requiredEnv("GITHUB_EVENT_NAME");
   const payload = JSON.parse(readFileSync(requiredEnv("GITHUB_EVENT_PATH"), "utf8")) as Record<string, unknown>;
   const pattern = input("branch-regex");
-  const branchRegex = pattern ? new RegExp(pattern, "i") : DEFAULT_BRANCH_REGEX;
+  const branchRegex = pattern ? compileBranchRegex(pattern) : DEFAULT_BRANCH_REGEX;
 
   if (name === "pull_request") await refreshBody(payload);
 

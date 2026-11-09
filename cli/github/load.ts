@@ -15,6 +15,10 @@ export interface PullRequest {
   headRefName: string;
   /** Issue numbers in this repo the PR closes (GitHub's closing references). */
   closes: number[];
+  /** The author's login, without a bot's `[bot]` suffix; undefined for a deleted account. */
+  author: string | undefined;
+  /** First line of each of its commits (first 100). */
+  commitSubjects: string[];
 }
 
 export interface LabelEvent {
@@ -48,6 +52,8 @@ interface RawPullRequest {
   baseRefName: string;
   headRefName: string;
   closingIssuesReferences: { nodes: { number: number; repository: { nameWithOwner: string } }[] };
+  author: { login: string } | null;
+  commits: { nodes: { commit: { messageHeadline: string } }[] };
 }
 
 interface RawIssue {
@@ -78,6 +84,8 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
               closes: pr.closingIssuesReferences.nodes
                 .filter((ref) => ref.repository.nameWithOwner.toLowerCase() === repo.fullName.toLowerCase())
                 .map((ref) => ref.number),
+              author: pr.author?.login.replace(/\[bot\]$/, ""),
+              commitSubjects: pr.commits.nodes.map((node) => node.commit.messageHeadline),
             },
           ],
     );

@@ -1,5 +1,6 @@
 // Pure decision function for the GitHub Action: an event payload in, a list of
 // operations out. It performs no I/O; `main.ts` carries the operations out.
+import { DEFAULT_BRANCH_REGEX, issueNumberFromBranch } from "../cli/branch.ts";
 
 export type GitHubEvent = {
   /** `GITHUB_EVENT_NAME`, e.g. `pull_request`. */
@@ -24,14 +25,7 @@ export type Options = {
   branchRegex?: RegExp;
 };
 
-/**
- * Matches `16-title` (GitHub's "create a branch" default) at the start, or a
- * ticket-like prefix followed by the number: `spec-376-…`, `spec/363-…`,
- * `ticket-16`, `fix/issue-12`. A bare number elsewhere (`integration/2026-11-09`)
- * does not match.
- */
-export const DEFAULT_BRANCH_REGEX =
-  /^(\d+)(?=[-_/]|$)|(?:^|[-_/])(?:issues?|tickets?|spec|gh|fix|bug|feat|feature)[-_/]?(\d+)(?=[-_/]|$)/i;
+export { DEFAULT_BRANCH_REGEX };
 
 export const CLOSES_MARKER = "<!-- agentic-metrics:closes -->";
 
@@ -68,15 +62,6 @@ export function decide(event: GitHubEvent, options: Options = {}): Operation[] {
       body: trimmed === "" ? line : `${trimmed}\n\n${line}`,
     },
   ];
-}
-
-function issueNumberFromBranch(branch: string, regex: RegExp): number | undefined {
-  const match = regex.exec(branch);
-  if (!match) return undefined;
-  // Unmatched groups are undefined at runtime, whatever the array type says.
-  const digits = (match.slice(1) as (string | undefined)[]).find((group) => group !== undefined) ?? match[0];
-  const issue = Number.parseInt(digits, 10);
-  return Number.isSafeInteger(issue) && issue > 0 ? issue : undefined;
 }
 
 type PullRequestPayload = {

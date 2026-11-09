@@ -51,8 +51,8 @@ export const throughput: Metric<Throughput> = {
 
   methodology: {
     definition:
-      "Tickets and pull requests delivered per week. A ticket is a GitHub issue closed by at least one PR merged into the default branch; a merged PR that closes no issue counts as a ticket of its own. A ticket counts in the week its last PR merged; a PR in the week it merged. Weeks start on Monday (UTC).",
+      "Tickets and pull requests delivered per week. A ticket is a GitHub issue with at least one PR delivered to the default branch; a delivered PR linked to no issue counts as a ticket of its own. A PR is linked by the first of: its closing references (<code>Closes #N</code> and manual links), the issue number in its branch name (per-repo pattern), <code>(#N)</code> in its commit subjects. Integration (batch) PRs, recognised by a per-repo branch prefix, are neither tickets nor counted PRs; they deliver the PRs merged into their branch and the issues they close. PRs from excluded authors or branches count nowhere. A ticket counts in the week its last PR reached the default branch; a PR in the week it merged. Weeks start on Monday (UTC).",
     limits:
-      "PRs are linked to issues by GitHub's closing references only (<code>Closes #N</code> and manual links), which GitHub creates only for PRs targeting the default branch. PRs merged into other branches are not counted.",
+      "A branch name or commit subject can name the wrong issue, and only numbers GitHub returns as issues of this repo are linked. A PR merged into an integration branch counts in the week it merged there, not the week the batch landed. PRs merged into any other branch are not counted.",
   },
 };

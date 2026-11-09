@@ -15,6 +15,7 @@
        "baseRefName": "feat/module-plumbing",
        "headRefName": "feat/house-module",
        "author": { "login": "grimfeld", "__typename": "User" },
+       "commits": { "nodes": [ { "commit": { "messageHeadline": "Implement the change" } } ] },
        "closingIssuesReferences": {
         "nodes": [
          { "number": 107, "repository": { "nameWithOwner": "grimfeld/lifeline" } }
@@ -28,6 +29,7 @@
        "baseRefName": "master",
        "headRefName": "demo",
        "author": { "login": "grimfeld", "__typename": "User" },
+       "commits": { "nodes": [ { "commit": { "messageHeadline": "Implement the change" } } ] },
        "closingIssuesReferences": {
         "nodes": [
          { "number": 104, "repository": { "nameWithOwner": "grimfeld/lifeline" } },
@@ -42,6 +44,7 @@
        "baseRefName": "master",
        "headRefName": "type-editor-fields",
        "author": { "login": "grimfeld", "__typename": "User" },
+       "commits": { "nodes": [ { "commit": { "messageHeadline": "Implement the change" } } ] },
        "closingIssuesReferences": {
         "nodes": [
          { "number": 106, "repository": { "nameWithOwner": "grimfeld/lifeline" } }
@@ -69,6 +72,7 @@
        "baseRefName": "master",
        "headRefName": "handoff-from-outside",
        "author": { "login": "grimfeld", "__typename": "User" },
+       "commits": { "nodes": [ { "commit": { "messageHeadline": "Implement the change" } } ] },
        "closingIssuesReferences": { "nodes": [] }
       },
       {
@@ -78,6 +82,7 @@
        "baseRefName": "master",
        "headRefName": "spec/106-type-editor-follow-up",
        "author": { "login": "grimfeld", "__typename": "User" },
+       "commits": { "nodes": [ { "commit": { "messageHeadline": "Implement the change" } } ] },
        "closingIssuesReferences": {
         "nodes": [
          { "number": 106, "repository": { "nameWithOwner": "grimfeld/lifeline" } }
@@ -91,6 +96,7 @@
        "baseRefName": "master",
        "headRefName": "ui-kit-pieces",
        "author": { "login": "grimfeld", "__typename": "User" },
+       "commits": { "nodes": [ { "commit": { "messageHeadline": "Implement the change" } } ] },
        "closingIssuesReferences": {
         "nodes": [
          { "number": 999, "repository": { "nameWithOwner": "grimfeld/other" } }

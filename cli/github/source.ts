@@ -27,6 +27,7 @@ query($owner: String!, $name: String!, $endCursor: String) {
         number createdAt mergedAt baseRefName headRefName
         author { login __typename }
         closingIssuesReferences(first: 50) { nodes { number repository { nameWithOwner } } }
+        commits(first: 100) { nodes { commit { messageHeadline } } }
       }
     }
   }
