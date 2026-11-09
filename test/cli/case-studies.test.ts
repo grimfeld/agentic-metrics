@@ -157,7 +157,7 @@ describe("case studies", () => {
     const page = read("report/grimfeld--lifeline/case-studies/106.html");
     assert.match(
       page,
-      /<pre><code class="language-diff">-apps\/bible   \(old &#60;app&#62;\)\n\+migration    body → Thought\n\n- not a list item\n# not a heading<\/code><\/pre>\n<p>After\.<\/p>\n<pre><code>plain<\/code><\/pre>/,
+      /<pre><code class="language-diff">-apps\/bible {3}\(old &#60;app&#62;\)\n\+migration {4}body → Thought\n\n- not a list item\n# not a heading<\/code><\/pre>\n<p>After\.<\/p>\n<pre><code>plain<\/code><\/pre>/,
     );
   });
 
