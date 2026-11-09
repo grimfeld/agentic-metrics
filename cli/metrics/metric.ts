@@ -21,6 +21,12 @@ export interface MetricResult<V> {
   coverage: Coverage;
 }
 
+/** A repo's known value, with its coverage. */
+export interface Known<V> {
+  value: V;
+  coverage: Coverage;
+}
+
 export interface Figure<V> {
   /** What the number is, e.g. `p50`; shown beside the metric's name. */
   label: string;
@@ -75,11 +81,14 @@ export interface Metric<V> {
    */
   repoLevel?: { measured(value: V): boolean };
   /**
-   * A headline card at the top of the repo's section, for the few metrics
-   * that have one: `order` places it among the cards (lowest first), `card`
-   * renders its known value (HTML).
+   * A headline card at the top of the repo's page and of the overview, for
+   * the few metrics that have one: `order` places it among the cards (lowest
+   * first), `card` renders its known value (HTML). `pool` gives the overview's
+   * value, pooled over the known results of the repos published `full`; it
+   * returns undefined when they give nothing to pool, and the card is unknown.
+   * Two medians can't be pooled into one: pool from per-ticket rows or counts.
    */
-  headline?: { order: number; card(value: V): string };
+  headline?: { order: number; card(value: V): string; pool(known: readonly Known<V>[]): V | undefined };
   /**
    * A summary of its value in words (HTML), on its metric page: what its
    * tiles and per-ticket table don't say. Given anonymized values too.

@@ -2,7 +2,7 @@ import { firstResult } from "../ci.ts";
 import { escapeHtml } from "./html.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
-import { formatPercent, percent, share } from "./stats.ts";
+import { formatPercent, percent, share, sum } from "./stats.ts";
 
 export interface FirstRunCiRate {
   /** Share of PRs with a first CI result whose first result passed, 0 to 1. */
@@ -45,6 +45,11 @@ export const firstRunCiRate: Metric<FirstRunCiRate> = {
   headline: {
     order: 2,
     card: ({ rate, passed, pullRequests }) => `${formatPercent(percent(rate))} <small>${String(passed)} of ${String(pullRequests)} PRs</small>`,
+    pool(known) {
+      const passed = sum(known.map(({ value }) => value.passed));
+      const pullRequests = sum(known.map(({ value }) => value.pullRequests));
+      return pullRequests === 0 ? undefined : { rate: share(passed, pullRequests), passed, pullRequests };
+    },
   },
 
   section({ rate, passed, pullRequests, workflow }) {

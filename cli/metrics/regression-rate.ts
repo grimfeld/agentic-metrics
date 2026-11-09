@@ -1,7 +1,7 @@
 import type { Ticket } from "../linker.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
-import { formatPercent, percent, plural, share } from "./stats.ts";
+import { formatPercent, percent, plural, share, sum } from "./stats.ts";
 
 export interface RegressionRate {
   /** Share of delivered tickets with at least one regression traced to them, 0 to 1. */
@@ -68,6 +68,12 @@ export const regressionRate: Metric<RegressionRate> = {
   headline: {
     order: 4,
     card: ({ rate, regressions }) => `${formatPercent(percent(rate))} <small>${plural(regressions, "regression")}</small>`,
+    pool(known) {
+      const tickets = sum(known.map(({ coverage }) => coverage.tickets));
+      if (tickets === 0) return undefined;
+      const regressedTickets = sum(known.map(({ value }) => value.regressedTickets));
+      return { rate: share(regressedTickets, tickets), regressions: sum(known.map(({ value }) => value.regressions)), regressedTickets };
+    },
   },
 
   section({ untraced, regressions, regressedTickets }) {
