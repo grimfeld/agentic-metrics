@@ -55,7 +55,6 @@ describe("report", () => {
 
   it("shows the metrics not computed yet as unknown", () => {
     assert.equal(textOf("data-metric", "firstRunCiRate", "grimfeld/lifeline"), "First-run CI rate unknown not measured yet");
-    assert.equal(textOf("data-metric", "humanMessagesPerTicket", "grimfeld/lifeline"), "Human messages per ticket unknown not measured yet");
   });
 
   it("shows the regression rate on its card, with its coverage", () => {
@@ -78,6 +77,7 @@ describe("report", () => {
 
   it("shows a metric with no data as unknown, with its coverage", () => {
     assert.equal(textOf("data-metric", "leadTime", "grimfeld/agentic-metrics"), "Lead time unknown 0 of 0 tickets");
+    assert.equal(textOf("data-metric", "humanMessagesPerTicket", "grimfeld/lifeline"), "Human messages per ticket unknown 0 of 5 tickets");
   });
 
   it("shows throughput per week", () => {

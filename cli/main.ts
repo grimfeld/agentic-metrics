@@ -10,6 +10,9 @@ import { loadGitHub } from "./github/load.ts";
 import { ghSource, type GitHubSource } from "./github/source.ts";
 import { link } from "./linker.ts";
 import { renderReport } from "./report.ts";
+import { linkSessions } from "./transcripts/link.ts";
+import { loadSessions } from "./transcripts/load.ts";
+import { noTranscripts, transcriptCache, type TranscriptSource } from "./transcripts/source.ts";
 
 export interface Dependencies {
   cwd: string;
@@ -21,6 +24,11 @@ export interface Dependencies {
    * injected source, nothing is cached unless this is set.
    */
   cacheDir?: string;
+  /**
+   * Defaults to the transcript cache (see cacheDir) for the clone at `cwd`,
+   * or at `--checkout` with `--repo`; with an injected GitHub source, to none.
+   */
+  transcripts?: TranscriptSource;
   now?: () => Date;
   stdout?: (text: string) => void;
   stderr?: (text: string) => void;
@@ -30,7 +38,7 @@ export interface Dependencies {
 const LOCAL_DIR = ".agentic-metrics-local";
 
 const USAGE = `Usage:
-  agentic-metrics collect [--repo owner/name] [--datasets dir] [--local dir] [--full]
+  agentic-metrics collect [--repo owner/name [--checkout dir]] [--datasets dir] [--local dir] [--full]
       Read the repo (default: the current one) through \`gh\` and write
       <dir>/<owner>/<name>.json (default dir: datasets), or <dir>/<alias>.json
       when the repo is published anonymized (the default for a private repo).
@@ -39,6 +47,9 @@ const USAGE = `Usage:
       The first run reads the whole history; later runs read only what
       changed since, from a cache in ~/.cache/agentic-metrics. --full
       reads everything again (e.g. after a metric definition changes).
+      Claude Code transcripts are read from the same cache, for the clone in
+      the current folder, or in --checkout with --repo (without it, another
+      repo's transcript metrics are unknown).
   agentic-metrics report [--datasets dir] [--out dir]
       Render every dataset in <dir> (default: datasets) as <out>/index.html
       (default out: report), with the datasets copied alongside.
@@ -74,6 +85,7 @@ async function collect(args: string[], deps: Dependencies, stdout: (text: string
       datasets: { type: "string", default: "datasets" },
       local: { type: "string", default: LOCAL_DIR },
       full: { type: "boolean", default: false },
+      checkout: { type: "string" },
     },
   });
   const config = readConfig(deps.cwd);
@@ -88,7 +100,13 @@ async function collect(args: string[], deps: Dependencies, stdout: (text: string
       `${data.repo.fullName} is published anonymized${config.publish ? "" : " (it is private)"}: set "alias" in ${CONFIG_FILE}, or set "publish"`,
     );
   }
-  const dataset = buildDataset(data.repo, link(data, config), now(), publish, config.alias);
+  const checkout = values.checkout ?? (values.repo ? undefined : deps.cwd);
+  const transcripts =
+    deps.transcripts ??
+    (deps.github || checkout === undefined ? noTranscripts : transcriptCache({ dir: cacheDir ?? defaultCacheDir(), repoDir: resolve(deps.cwd, checkout) }));
+  const sessions = loadSessions(await transcripts.read());
+  const work = linkSessions(link(data, config), sessions, config, data.repo.fullName);
+  const dataset = buildDataset(data.repo, work, now(), publish, config.alias);
 
   // Only this collect's dataset may stay in the datasets folder: a dataset left
   // by an earlier mode would publish what the current mode hides.
