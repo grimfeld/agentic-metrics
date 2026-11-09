@@ -72,4 +72,33 @@ describe("a batch's commits credited to the tickets it delivers", () => {
       },
     );
   });
+
+  it("counts attributed commits in a ticket's diff only when it has no PR of its own; merges and unattributed commits count nowhere", async () => {
+    const dataset = await collect();
+    const size = dataset.metrics["size"] as { value: { tickets: { ticket: string; diffLines: number; filesTouched: number }[] }; coverage: unknown };
+    assert.deepEqual(size.coverage, { tickets: 5, of: 5 });
+    assert.deepEqual(perTicket(size.value.tickets), {
+      "#2": { diffLines: 67, filesTouched: 5, subTickets: 0 }, // c02, c03
+      "#18": { diffLines: 33, filesTouched: 3, subTickets: 0 }, // c05
+      "#16": { diffLines: 44, filesTouched: 2, subTickets: 0 }, // c06; the sync merge c07 is not its work
+      "#17": { diffLines: 32, filesTouched: 3, subTickets: 0 }, // c11, c12
+      "#19": { diffLines: 20, filesTouched: 2, subTickets: 0 }, // PR #30 only, not c09 again
+    });
+
+    const net = dataset.metrics["netLinesRemoved"] as { value: { linesAdded: number; linesDeleted: number }; coverage: unknown };
+    assert.deepEqual(net.coverage, { tickets: 5, of: 5 });
+    // c01 (100 lines) and c14 (7 + 7), attributed to nobody, are not in the totals.
+    assert.equal(net.value.linesAdded, 180);
+    assert.equal(net.value.linesDeleted, 16);
+  });
+
+  it("times a batch-delivered ticket from the first commit attributed to it", async () => {
+    // #18 is estimated at 1d; c05 was authored on Nov 3 09:00 and the batch merged on Nov 6 09:00.
+    const dataset = await collect();
+    const value = dataset.metrics["estimateVsActual"]?.value as { tickets: { ticket: string; actualHours: number; ratio: number }[] };
+    assert.deepEqual(
+      value.tickets.map(({ ticket, actualHours, ratio }) => ({ ticket, actualHours, ratio })),
+      [{ ticket: "#18", actualHours: 72, ratio: 3 }],
+    );
+  });
 });

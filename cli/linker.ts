@@ -151,6 +151,20 @@ export function ownCommits(ticket: Ticket): Commit[] {
   return ticket.pullRequests.length > 0 ? ticket.pullRequests.flatMap((pr) => pr.commits) : ticket.batchCommits;
 }
 
+/**
+ * The non-merge commits credited to a ticket only integration PRs delivered:
+ * its diff, since a merge's own diff repeats what it merged. Empty for a
+ * ticket with a PR of its own, whose diff is its PRs'.
+ */
+export function batchDiffCommits(ticket: Ticket): Commit[] {
+  return ticket.pullRequests.length > 0 ? [] : ticket.batchCommits.filter((commit) => commit.parents.length <= 1);
+}
+
+/** Whether a ticket has a diff of its own: a PR, or commits credited from a batch. */
+export function hasOwnDiff(ticket: Ticket): boolean {
+  return ticket.pullRequests.length > 0 || batchDiffCommits(ticket).length > 0;
+}
+
 /** By author login (case-insensitive, with or without a bot's `[bot]` suffix) or by branch prefix. */
 function excluded(pr: PullRequest, config: Config): boolean {
   const login = (name: string) => name.toLowerCase().replace(/\[bot\]$/, "");

@@ -86,7 +86,15 @@
         "nodes": []
        },
        "comments": {
-        "nodes": []
+        "nodes": [
+         {
+          "createdAt": "2026-11-01T10:00:00Z",
+          "author": {
+           "__typename": "User"
+          },
+          "body": "estimate: 1d"
+         }
+        ]
        },
        "timelineItems": {
         "nodes": []

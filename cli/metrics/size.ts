@@ -1,4 +1,4 @@
-import type { Ticket } from "../linker.ts";
+import { batchDiffCommits, hasOwnDiff, type Ticket } from "../linker.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
 import { percentile } from "./stats.ts";
@@ -22,10 +22,17 @@ export interface Size {
 /** A ticket's size proxies. */
 export function sizeOf(ticket: Ticket): TicketSize {
   const prs = ticket.pullRequests;
-  const diffLines = prs.reduce((total, pr) => total + pr.additions + pr.deletions, 0);
-  const filesTouched = prs.every((pr) => pr.filesComplete)
-    ? new Set(prs.flatMap((pr) => pr.files.map((file) => file.path))).size
-    : prs.reduce((total, pr) => total + pr.changedFiles, 0);
+  // A ticket only integration PRs delivered: the commits credited to it, each file count added up.
+  const commits = batchDiffCommits(ticket);
+  const diffLines =
+    prs.reduce((total, pr) => total + pr.additions + pr.deletions, 0) +
+    commits.reduce((total, commit) => total + commit.additions + commit.deletions, 0);
+  const filesTouched =
+    commits.length > 0
+      ? commits.reduce((total, commit) => total + (commit.changedFiles ?? 0), 0)
+      : prs.every((pr) => pr.filesComplete)
+        ? new Set(prs.flatMap((pr) => pr.files.map((file) => file.path))).size
+        : prs.reduce((total, pr) => total + pr.changedFiles, 0);
   // A PR that is its own ticket has no sub-tickets; an issue GitHub did not return has unknown ones.
   const subTickets = ticket.issue ? ticket.issue.subIssues : ticket.id.startsWith("PR ") ? 0 : null;
   return { ticket: ticket.id, diffLines, filesTouched, subTickets };
@@ -36,8 +43,8 @@ export const size: Metric<Size> = {
   name: "Ticket size",
 
   compute({ tickets }) {
-    // A ticket an integration PR alone delivered has no diff of its own.
-    const sized = tickets.filter((ticket) => ticket.pullRequests.length > 0);
+    // A ticket an integration PR alone delivered, with no commit of it credited, has no diff of its own.
+    const sized = tickets.filter(hasOwnDiff);
     const coverage = { tickets: sized.length, of: tickets.length };
     if (sized.length === 0) return { value: UNKNOWN, coverage };
     const sizes = sized.map(sizeOf);
@@ -71,9 +78,9 @@ export const size: Metric<Size> = {
 
   methodology: {
     definition:
-      "Size proxies per ticket, for judging effort without an estimate: diff size (lines added plus lines deleted over its PRs merged into the default branch), files touched (distinct files those PRs changed) and sub-tickets (the issue's GitHub sub-issues). The headline is the median (nearest rank) over tickets.",
+      "Size proxies per ticket, for judging effort without an estimate: diff size (lines added plus lines deleted over its PRs merged into the default branch, or, for a ticket with no PR of its own, over the integration PR commits credited to it), files touched (distinct files those PRs changed) and sub-tickets (the issue's GitHub sub-issues). The headline is the median (nearest rank) over tickets.",
     limits:
-      "Diff size includes generated files and lockfiles. GitHub lists at most 100 files per PR; when a PR changes more, files touched adds up each PR's file count, so a file changed by two PRs counts twice. A PR that closes no issue has no sub-tickets. A ticket delivered only through an integration PR has no diff of its own and is left out.",
+      "Diff size includes generated files and lockfiles. GitHub lists at most 100 files per PR; when a PR changes more, files touched adds up each PR's file count, so a file changed by two PRs counts twice. A PR that closes no issue has no sub-tickets. A ticket delivered only through an integration PR is sized on the commits of that PR credited to it (see Autonomy level), merges left out; its files touched add up each commit's file count, so a file changed by two commits counts twice. Such a ticket with no commit credited is left out.",
   },
 };
 
