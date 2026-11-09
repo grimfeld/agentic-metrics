@@ -6,7 +6,7 @@
 import { AUTONOMY_LEVELS, type AutonomyLevel } from "./autonomy.ts";
 import type { LinkedWork, Ticket } from "./linker.ts";
 import type { FigureResult, Metric, MetricResult } from "./metrics/metric.ts";
-import { UNKNOWN } from "./metrics/metric.ts";
+import { SUPPRESSED, UNKNOWN } from "./metrics/metric.ts";
 import type { PullRequest, WorkflowRun } from "./github/load.ts";
 import type { Session } from "./transcripts/load.ts";
 
@@ -19,6 +19,34 @@ export interface Trends {
 
 /** Keyed by metric id: its figure over the tickets at each autonomy level. */
 export type ByAutonomy = Record<string, Record<AutonomyLevel, FigureResult>>;
+
+/**
+ * The fewest tickets a figure may cover in an `anonymized` dataset. A month or
+ * level with one or two tickets would publish those tickets' own numbers.
+ */
+export const MIN_ANONYMIZED_TICKETS = 3;
+
+function suppress(result: FigureResult): FigureResult {
+  return typeof result.value === "number" && result.coverage.tickets < MIN_ANONYMIZED_TICKETS ? { ...result, value: SUPPRESSED } : result;
+}
+
+/** `trends` as an `anonymized` dataset publishes it: figures over too few tickets withheld. */
+export function anonymizeTrends(trends: Trends): Trends {
+  return {
+    periods: trends.periods,
+    metrics: Object.fromEntries(Object.entries(trends.metrics).map(([id, results]) => [id, results.map(suppress)])),
+  };
+}
+
+/** `byAutonomy` as an `anonymized` dataset publishes it: figures over too few tickets withheld. */
+export function anonymizeByAutonomy(byAutonomy: ByAutonomy): ByAutonomy {
+  return Object.fromEntries(
+    Object.entries(byAutonomy).map(([id, levels]) => [
+      id,
+      Object.fromEntries(AUTONOMY_LEVELS.map((level) => [level, suppress(levels[level])])) as Record<AutonomyLevel, FigureResult>,
+    ]),
+  );
+}
 
 /** The month a date falls in, as `YYYY-MM` (UTC). */
 export function monthOf(date: Date): string {

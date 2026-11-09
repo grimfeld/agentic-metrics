@@ -18,7 +18,7 @@ const REPO_DIR = "/Users/dev/repos/lifeline";
 //   delivered in November 2026: PR #137 (full).
 
 interface FigureResult {
-  value: number | "unknown";
+  value: number | "unknown" | "suppressed";
   coverage: { tickets: number; of: number };
 }
 interface Dataset {
@@ -94,8 +94,13 @@ describe("trends", () => {
     assert.deepEqual(Object.keys(dataset.trends.metrics).sort(), METRICS.map((metric) => metric.id).sort());
   });
 
-  it("keeps the same figures when anonymized", () => {
-    assert.deepEqual(anonymizedDataset.trends, dataset.trends);
+  it("keeps the same figures when anonymized, except those over fewer than 3 tickets", () => {
+    assert.deepEqual(anonymizedDataset.trends.periods, dataset.trends.periods);
+    assert.deepEqual(anonymizedDataset.trends.metrics, suppressed(dataset.trends.metrics, (cells) => cells.map(suppress)));
+    assert.deepEqual(anonymizedDataset.trends.metrics["humanMessagesPerTicket"], [
+      { value: 3, coverage: { tickets: 3, of: 4 } },
+      { value: "suppressed", coverage: { tickets: 1, of: 1 } },
+    ]);
   });
 });
 
@@ -117,10 +122,27 @@ describe("comparison by autonomy level", () => {
     for (const id of ["autonomy", "orchestrationTime", "scheduledFailures", "batchHealth"]) assert.equal(dataset.byAutonomy[id], undefined, id);
   });
 
-  it("keeps the same figures when anonymized", () => {
-    assert.deepEqual(anonymizedDataset.byAutonomy, dataset.byAutonomy);
+  it("keeps the same figures when anonymized, except those over fewer than 3 tickets", () => {
+    assert.deepEqual(
+      anonymizedDataset.byAutonomy,
+      suppressed(dataset.byAutonomy, ({ full, assisted, manual }) => ({ full: suppress(full), assisted: suppress(assisted), manual: suppress(manual) })),
+    );
+    assert.deepEqual(anonymizedDataset.byAutonomy["humanMessagesPerTicket"], {
+      full: { value: 2, coverage: { tickets: 3, of: 3 } },
+      assisted: { value: "suppressed", coverage: { tickets: 1, of: 1 } },
+      manual: { value: "unknown", coverage: { tickets: 0, of: 1 } },
+    });
   });
 });
+
+/** A known figure over 1 or 2 tickets, as an anonymized dataset publishes it. */
+function suppress(cell: FigureResult): FigureResult {
+  return typeof cell.value === "number" && cell.coverage.tickets < 3 ? { ...cell, value: "suppressed" } : cell;
+}
+
+function suppressed<T>(metrics: Record<string, T>, each: (cells: T) => T): Record<string, T> {
+  return Object.fromEntries(Object.entries(metrics).map(([id, cells]) => [id, each(cells)]));
+}
 
 /** The visible text of the first element carrying `attribute="value"` in `page`. */
 function textOf(page: string, attribute: string, value: string): string {
@@ -159,6 +181,15 @@ describe("report: comparison by autonomy level", () => {
   });
 });
 
+describe("report: anonymized trends and comparison", () => {
+  it("shows a figure over fewer than 3 tickets as a dash, and says why in Methodology", () => {
+    assert.equal(textOf(anonymizedHtml, "data-autonomy", "humanMessagesPerTicket"), "Human messages per ticket p50 2 3 of 3 — 1 of 1 unknown 0 of 1");
+    assert.equal(textOf(anonymizedHtml, "data-trend", "leadTime"), "Lead time p50 12 h 4 of 4 — 1 of 1");
+    assert.match(textOf(anonymizedHtml, "id", "methodology"), /fewer than 3 tickets/);
+    assert.doesNotMatch(html, /—/);
+  });
+});
+
 describe("report: CV-ready sentences", () => {
   it("quotes each known metric with its coverage", () => {
     const all = sentences(html);
@@ -193,7 +224,10 @@ describe("report: CV-ready sentences", () => {
     for (const text of all.values()) assert.doesNotMatch(text, /unknown/);
   });
 
-  it("are written for an anonymized repo too, from its aggregates", () => {
+  it("are written for an anonymized repo too, from its aggregates, never quoting a suppressed figure", () => {
+    const all = sentences(anonymizedHtml);
+    assert.equal(all.get("humanMessagesPerTicket:autonomy"), undefined, "the assisted figure covers 1 ticket");
+    assert.equal(all.get("leadTime:trend"), undefined, "November's figure covers 1 ticket");
     assert.equal(sentences(anonymizedHtml).get("humanMessagesPerTicket"), "A median of 2 human messages per ticket (p90 3), over 4 of 5 tickets.");
     assert.match(anonymizedHtml, /data-trend="leadTime"/);
     assert.match(anonymizedHtml, /data-autonomy="leadTime"/);

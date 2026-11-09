@@ -8,7 +8,8 @@ import type { Dataset } from "./dataset.ts";
 import { escapeHtml } from "./metrics/html.ts";
 import { METRICS } from "./metrics/index.ts";
 import type { Coverage, Figure, FigureResult, Metric } from "./metrics/metric.ts";
-import { UNKNOWN } from "./metrics/metric.ts";
+import { SUPPRESSED, UNKNOWN } from "./metrics/metric.ts";
+import { MIN_ANONYMIZED_TICKETS } from "./trends.ts";
 
 const LEVEL_NAMES: Record<AutonomyLevel, string> = { full: "Full", assisted: "Assisted", manual: "Manual" };
 
@@ -34,7 +35,12 @@ function rowHeader(metric: Metric<unknown>, figure: Figure<unknown>): string {
 }
 
 function cell(figure: Figure<unknown>, result: FigureResult): string {
-  const value = result.value === UNKNOWN ? `<span class="unknown">unknown</span>` : escapeHtml(figure.format(result.value));
+  const value =
+    result.value === UNKNOWN
+      ? `<span class="unknown">unknown</span>`
+      : result.value === SUPPRESSED
+        ? `<span class="unknown" title="Withheld: fewer than ${String(MIN_ANONYMIZED_TICKETS)} tickets">—</span>`
+        : escapeHtml(figure.format(result.value));
   return `<td>${value} <small>${String(result.coverage.tickets)} of ${String(result.coverage.of)}</small></td>`;
 }
 
@@ -81,10 +87,10 @@ export function cvSentences(dataset: Dataset): { key: string; text: string }[] {
 
   for (const { metric, figure, results } of withFigures(dataset.byAutonomy)) {
     const full = results.full;
-    if (full.value === UNKNOWN) continue;
+    if (typeof full.value !== "number") continue;
     const others = (["assisted", "manual"] as const).flatMap((level) => {
       const other = results[level];
-      return other.value === UNKNOWN ? [] : [`${figure.format(other.value)} on ${level} ones (${coverageOf(other.coverage)})`];
+      return typeof other.value !== "number" ? [] : [`${figure.format(other.value)} on ${level} ones (${coverageOf(other.coverage)})`];
     });
     if (others.length === 0) continue;
     sentences.push({
@@ -97,7 +103,7 @@ export function cvSentences(dataset: Dataset): { key: string; text: string }[] {
   for (const { metric, figure, results } of withFigures(dataset.trends?.metrics)) {
     const known = results.flatMap((result, index) => {
       const period = periods[index]?.period;
-      return result.value === UNKNOWN || period === undefined ? [] : [{ value: result.value, coverage: result.coverage, period }];
+      return typeof result.value !== "number" || period === undefined ? [] : [{ value: result.value, coverage: result.coverage, period }];
     });
     const from = known[0];
     const to = known.at(-1);

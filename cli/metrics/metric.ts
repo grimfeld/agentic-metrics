@@ -33,9 +33,15 @@ export interface Figure<V> {
   byAutonomy?: boolean;
 }
 
+/**
+ * A figure an `anonymized` dataset withholds because it covers too few tickets
+ * to stand for more than one ticket's own numbers.
+ */
+export const SUPPRESSED = "suppressed";
+
 /** A metric's figure over a subset of tickets: a month's, or an autonomy level's. */
 export interface FigureResult {
-  value: number | typeof UNKNOWN;
+  value: number | typeof UNKNOWN | typeof SUPPRESSED;
   coverage: Coverage;
 }
 

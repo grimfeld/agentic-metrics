@@ -12,6 +12,7 @@ import { escapeHtml } from "./metrics/html.ts";
 import { METRICS, findMetric } from "./metrics/index.ts";
 import type { MetricResult } from "./metrics/metric.ts";
 import { UNKNOWN } from "./metrics/metric.ts";
+import { MIN_ANONYMIZED_TICKETS } from "./trends.ts";
 
 /** The headline cards, in order. A metric not computed yet shows as unknown under this name. */
 const HEADLINES = [
@@ -101,9 +102,12 @@ function methodology(datasets: Dataset[]): string {
   const links = datasets
     .map((dataset) => `<li><a href="datasets/${escapeHtml(datasetPath(dataset.repo))}">${escapeHtml(dataset.repo)}</a></li>`)
     .join("");
+  const anonymized = datasets.some((dataset) => dataset.publish === "anonymized")
+    ? `\n<p>An anonymized repo's trends and comparison by autonomy level show a figure covering fewer than ${String(MIN_ANONYMIZED_TICKETS)} tickets as —: it would be those tickets' own numbers.</p>`
+    : "";
   return `<section id="methodology">
 <h2>Methodology</h2>
-<p>Every number is derived from GitHub data and from the local cache of Claude Code transcripts, of which only counts reach the dataset. A metric whose source is missing is shown as <em>unknown</em>, never as zero. Coverage is the number of tickets a metric is computed over, out of the tickets delivered.</p>
+<p>Every number is derived from GitHub data and from the local cache of Claude Code transcripts, of which only counts reach the dataset. A metric whose source is missing is shown as <em>unknown</em>, never as zero. Coverage is the number of tickets a metric is computed over, out of the tickets delivered.</p>${anonymized}
 ${entries}
 <h3>Raw data</h3>
 <ul class="datasets">${links}</ul>
