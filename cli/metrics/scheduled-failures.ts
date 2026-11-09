@@ -1,5 +1,5 @@
 import { verdict } from "../ci.ts";
-import { escapeHtml } from "../report.ts";
+import { escapeHtml } from "./html.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
 
