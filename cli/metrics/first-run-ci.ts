@@ -2,6 +2,7 @@ import { firstResult } from "../ci.ts";
 import { escapeHtml } from "./html.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
+import { formatPercent, percent } from "./stats.ts";
 
 export interface FirstRunCiRate {
   /** Share of PRs with a first CI result whose first result passed, 0 to 1. */
@@ -31,6 +32,11 @@ export const firstRunCiRate: Metric<FirstRunCiRate> = {
   },
 
   anonymize: (value) => value,
+
+  figure: { label: "of PRs", of: ({ rate }) => percent(rate), format: formatPercent },
+
+  sentence: ({ rate, passed, pullRequests }) =>
+    `${formatPercent(percent(rate))} of pull requests passed CI on their first run (${String(passed)} of ${String(pullRequests)})`,
 
   headline({ rate, passed, pullRequests }) {
     return `${String(Math.round(rate * 1000) / 10)}% <small>${String(passed)} of ${String(pullRequests)} PRs</small>`;

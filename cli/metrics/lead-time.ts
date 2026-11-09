@@ -23,6 +23,11 @@ export const leadTime: Metric<LeadTime> = {
 
   anonymize: (value) => value,
 
+  figure: { label: "p50", of: ({ p50Hours }) => p50Hours, format: formatHours },
+
+  sentence: ({ p50Hours, p90Hours }) =>
+    `Median lead time of ${formatHours(p50Hours)} from a ticket being ready to its last PR merging (p90 ${formatHours(p90Hours)})`,
+
   headline({ p50Hours, p90Hours }) {
     return `${formatHours(p50Hours)} <small>p50</small> · ${formatHours(p90Hours)} <small>p90</small>`;
   },

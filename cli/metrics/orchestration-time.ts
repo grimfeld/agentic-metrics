@@ -38,6 +38,12 @@ export const orchestrationTime: Metric<OrchestrationTime> = {
   // Repo-level only: nothing per ticket to drop.
   anonymize: (value) => value,
 
+  // Repo level: no ticket, so no autonomy level, owns it.
+  figure: { label: "active", of: ({ hours }) => hours, format: formatHours, byAutonomy: false },
+
+  sentence: ({ hours, sessions }) =>
+    `${formatHours(hours)} of active orchestration (planning, grilling, batching) in ${String(sessions)} session${sessions === 1 ? "" : "s"} on no ticket`,
+
   section({ hours, sessions, subAgents, humanMessages }) {
     const plural = (count: number, word: string) => `${String(count)} ${word}${count === 1 ? "" : "s"}`;
     return `<p>${formatHours(hours)} in ${plural(sessions, "session")} on no ticket, with ${plural(humanMessages, "human message")} and ${plural(subAgents, "sub-agent")}.</p>`;

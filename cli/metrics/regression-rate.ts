@@ -1,6 +1,7 @@
 import type { Ticket } from "../linker.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
+import { formatPercent, percent } from "./stats.ts";
 
 export interface RegressionRate {
   /** Share of delivered tickets with at least one regression traced to them, 0 to 1. */
@@ -58,6 +59,11 @@ export const regressionRate: Metric<RegressionRate> = {
   },
 
   anonymize: ({ rate, regressions, regressedTickets }) => ({ rate, regressions, regressedTickets }),
+
+  figure: { label: "of tickets", of: ({ rate }) => percent(rate), format: formatPercent },
+
+  sentence: ({ rate, regressions, regressedTickets }) =>
+    `Regression rate of ${formatPercent(percent(rate))}: ${String(regressions)} regression${regressions === 1 ? "" : "s"} traced to ${String(regressedTickets)} delivered ticket${regressedTickets === 1 ? "" : "s"}`,
 
   headline({ rate, regressions }) {
     return `${String(Math.round(rate * 1000) / 10)}% <small>${String(regressions)} regression${regressions === 1 ? "" : "s"}</small>`;

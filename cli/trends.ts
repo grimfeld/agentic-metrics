@@ -7,6 +7,7 @@ import { AUTONOMY_LEVELS, type AutonomyLevel } from "./autonomy.ts";
 import type { LinkedWork, Ticket } from "./linker.ts";
 import type { FigureResult, Metric, MetricResult } from "./metrics/metric.ts";
 import { UNKNOWN } from "./metrics/metric.ts";
+import type { PullRequest, WorkflowRun } from "./github/load.ts";
 import type { Session } from "./transcripts/load.ts";
 
 export interface Trends {
@@ -25,20 +26,27 @@ export function monthOf(date: Date): string {
 }
 
 /**
- * The work restricted to `tickets`: their PRs only, every regression (a
- * regression counts against the tickets it names, if they are kept), and the
- * orchestration sessions `orchestration` keeps (none by default: no ticket
- * owns them).
+ * The work restricted to `tickets`: their PRs, and the CI runs of those PRs
+ * (reached through the PRs). Every regression stays: one counts against the
+ * tickets it names, if they are kept. What no ticket owns (orchestration
+ * sessions, batches, CI runs other than a PR's, like scheduled ones) is kept
+ * when it happened `within` the slice's time window; without a window, only
+ * batches tied to the tickets are kept, and no orchestration session.
  */
-export function sliceWork(work: LinkedWork, tickets: Ticket[], orchestration: (session: Session) => boolean = () => false): LinkedWork {
+export function sliceWork(work: LinkedWork, tickets: Ticket[], within?: (date: Date) => boolean): LinkedWork {
   const pullRequests = new Set(tickets.flatMap((ticket) => ticket.pullRequests));
-  const batches = new Set(tickets.flatMap((ticket) => ticket.integrationPullRequests));
+  const branches = new Set([...pullRequests].map((pr) => pr.baseRefName));
+  const closing = new Set(tickets.flatMap((ticket) => ticket.integrationPullRequests));
+  const batch = within ? (pr: PullRequest) => within(pr.mergedAt) : (pr: PullRequest) => closing.has(pr) || branches.has(pr.headRefName);
+  const run = (run: WorkflowRun) => run.event === "pull_request" || (within?.(run.createdAt) ?? true);
+  const session = (session: Session) => within !== undefined && session.startedAt !== undefined && within(session.startedAt);
   return {
     ...work,
     tickets,
     pullRequests: work.pullRequests.filter((pr) => pullRequests.has(pr)),
-    integrationPullRequests: work.integrationPullRequests.filter((pr) => batches.has(pr)),
-    transcripts: { ...work.transcripts, orchestration: work.transcripts.orchestration.filter(orchestration) },
+    integrationPullRequests: work.integrationPullRequests.filter(batch),
+    ci: { ...work.ci, runs: work.ci.runs.filter(run) },
+    transcripts: { ...work.transcripts, orchestration: work.transcripts.orchestration.filter(session) },
   };
 }
 
@@ -59,7 +67,7 @@ export function trends(work: LinkedWork, metrics: readonly Metric<unknown>[], pu
   }
   const periods = [...months.keys()].sort();
   const slices = periods.map((period) =>
-    sliceWork(work, months.get(period) ?? [], (session) => session.startedAt !== undefined && monthOf(session.startedAt) === period),
+    sliceWork(work, months.get(period) ?? [], (date) => monthOf(date) === period),
   );
   return {
     periods: periods.map((period) => ({ period, tickets: months.get(period)?.length ?? 0 })),

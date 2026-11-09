@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { main } from "../../cli/main.ts";
 import { fixtureSource } from "../../cli/github/source.ts";
 import { transcriptCache } from "../../cli/transcripts/source.ts";
+import { METRICS } from "../../cli/metrics/index.ts";
 
 const GITHUB = join(import.meta.dirname, "../fixtures/github");
 const CACHE = join(import.meta.dirname, "../fixtures/transcript-cache/lifeline");
@@ -82,5 +83,41 @@ describe("trends", () => {
       { value: 4, coverage: { tickets: 4, of: 4 } },
       { value: 1, coverage: { tickets: 1, of: 1 } },
     ]);
+    // October: #104 and #105 (3 messages, one shared session), #106 (1); PR #136 has no transcript.
+    assert.deepEqual(dataset.trends.metrics["humanMessagesPerTicket"], [
+      { value: 3, coverage: { tickets: 3, of: 4 } },
+      { value: 2, coverage: { tickets: 1, of: 1 } },
+    ]);
+  });
+
+  it("gives every metric the CLI computes a trend", () => {
+    assert.deepEqual(Object.keys(dataset.trends.metrics).sort(), METRICS.map((metric) => metric.id).sort());
+  });
+
+  it("keeps the same figures when anonymized", () => {
+    assert.deepEqual(anonymizedDataset.trends, dataset.trends);
+  });
+});
+
+describe("comparison by autonomy level", () => {
+  it("gives each metric's figure over the tickets at each level, unknown where the level has no data", () => {
+    assert.deepEqual(dataset.byAutonomy["humanMessagesPerTicket"], {
+      full: { value: 2, coverage: { tickets: 3, of: 3 } },
+      assisted: { value: 3, coverage: { tickets: 1, of: 1 } },
+      manual: { value: "unknown", coverage: { tickets: 0, of: 1 } },
+    });
+    assert.deepEqual(dataset.byAutonomy["throughput"], {
+      full: { value: 3, coverage: { tickets: 3, of: 3 } },
+      assisted: { value: 1, coverage: { tickets: 1, of: 1 } },
+      manual: { value: 1, coverage: { tickets: 1, of: 1 } },
+    });
+  });
+
+  it("leaves out the metrics no ticket owns, and autonomy itself", () => {
+    for (const id of ["autonomy", "orchestrationTime", "scheduledFailures", "batchHealth"]) assert.equal(dataset.byAutonomy[id], undefined, id);
+  });
+
+  it("keeps the same figures when anonymized", () => {
+    assert.deepEqual(anonymizedDataset.byAutonomy, dataset.byAutonomy);
   });
 });

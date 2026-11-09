@@ -2,6 +2,7 @@ import { verdict } from "../ci.ts";
 import { escapeHtml } from "./html.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
+import { formatPercent, percent } from "./stats.ts";
 
 export interface ScheduledFailures {
   /** Scheduled runs on the default branch that failed on their first attempt. */
@@ -36,6 +37,11 @@ export const scheduledFailures: Metric<ScheduledFailures> = {
   },
 
   anonymize: (value) => value,
+
+  // Repo level: no ticket owns a scheduled run.
+  figure: { label: "of runs failed", of: ({ failed, runs }) => percent(failed / runs), format: formatPercent, byAutonomy: false },
+
+  sentence: ({ failed, runs }) => `${String(failed)} of ${String(runs)} scheduled CI runs on the default branch failed`,
 
   section({ failed, runs, workflows }) {
     const rows = workflows

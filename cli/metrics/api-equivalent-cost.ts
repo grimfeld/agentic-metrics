@@ -112,6 +112,13 @@ export const apiEquivalentCost: Metric<ApiEquivalentCost> = {
     orchestration,
   }),
 
+  figure: { label: "p50 per ticket", of: ({ perTicketUsd }) => perTicketUsd?.p50 ?? Number.NaN, format: usd },
+
+  sentence: ({ priceTable, perTicketUsd }) =>
+    perTicketUsd
+      ? `A median of ${usd(perTicketUsd.p50)} per ticket in API-equivalent cost (p90 ${usd(perTicketUsd.p90)}), at Anthropic API list prices of ${priceTable}`
+      : undefined,
+
   section({ priceTable, apiEquivalentUsd, unpricedModels, perTicketUsd, byModel, orchestration, perTicket }) {
     const spread = perTicketUsd ? ` (p50 ${usd(perTicketUsd.p50)}, p90 ${usd(perTicketUsd.p90)} per ticket)` : "";
     const unpriced = unpricedModels.length > 0 ? ` Not priced, so left out: ${unpricedModels.map(escapeHtml).join(", ")}.` : "";

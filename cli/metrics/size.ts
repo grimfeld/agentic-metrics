@@ -54,6 +54,11 @@ export const size: Metric<Size> = {
   // Per-ticket rows name tickets: an anonymized dataset keeps the medians only.
   anonymize: (value) => ({ ...value, tickets: [] }),
 
+  figure: { label: "p50 diff lines", of: ({ p50DiffLines }) => p50DiffLines, format: String },
+
+  sentence: ({ p50DiffLines, p50FilesTouched }) =>
+    `A median ticket of ${String(p50DiffLines)} changed lines across ${String(p50FilesTouched)} files`,
+
   section({ p50DiffLines, p50FilesTouched, tickets }) {
     const rows = tickets
       .map((t) => `<tr><td>${t.ticket}</td>${sizeCells(t)}</tr>`)

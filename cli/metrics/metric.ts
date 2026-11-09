@@ -63,10 +63,11 @@ export interface Metric<V> {
    */
   figure?: Figure<V>;
   /**
-   * A CV-ready sentence quoting a known value, plain text; the report adds the
-   * coverage. Never called on an unknown value.
+   * A CV-ready sentence quoting a known value, plain text with no final
+   * period; the report adds the coverage. Never called on an unknown value;
+   * undefined when the value has nothing worth quoting.
    */
-  sentence?(value: V): string;
+  sentence?(value: V): string | undefined;
   methodology: {
     /** HTML. */
     definition: string;
