@@ -3,6 +3,7 @@
 import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { CASE_STUDIES_DIR, readApproved, writeDrafts, type CaseStudy } from "./case-studies.ts";
 import { CONFIG_FILE, readConfig } from "./config.ts";
 import { buildDataset, datasetPath, SCHEMA_VERSION, type Dataset } from "./dataset.ts";
 import { cachedSource, defaultCacheDir } from "./github/cache.ts";
@@ -38,7 +39,7 @@ export interface Dependencies {
 const LOCAL_DIR = ".agentic-metrics-local";
 
 const USAGE = `Usage:
-  agentic-metrics collect [--repo owner/name [--checkout dir]] [--datasets dir] [--local dir] [--full]
+  agentic-metrics collect [--repo owner/name [--checkout dir]] [--datasets dir] [--local dir] [--case-studies dir] [--full]
       Read the repo (default: the current one) through \`gh\` and write
       <dir>/<owner>/<name>.json (default dir: datasets), or <dir>/<alias>.json
       when the repo is published anonymized (the default for a private repo).
@@ -50,9 +51,13 @@ const USAGE = `Usage:
       Claude Code transcripts are read from the same cache, for the clone in
       the current folder, or in --checkout with --repo (without it, another
       repo's transcript metrics are unknown).
-  agentic-metrics report [--datasets dir] [--out dir]
+      A repo published \`full\` gets a case-study draft per candidate in
+      <case-studies>/<owner>/<name>/ (default: case-studies); an existing
+      draft is never overwritten.
+  agentic-metrics report [--datasets dir] [--out dir] [--case-studies dir]
       Render every dataset in <dir> (default: datasets) as <out>/index.html
-      (default out: report), with the datasets copied alongside.
+      (default out: report), with the datasets copied alongside, and the
+      case studies marked \`approved: true\` of repos published \`full\`.
 `;
 
 export async function main(argv: string[], deps: Dependencies): Promise<number> {
@@ -86,6 +91,7 @@ async function collect(args: string[], deps: Dependencies, stdout: (text: string
       local: { type: "string", default: LOCAL_DIR },
       full: { type: "boolean", default: false },
       checkout: { type: "string" },
+      "case-studies": { type: "string", default: CASE_STUDIES_DIR },
     },
   });
   const config = readConfig(deps.cwd);
@@ -115,6 +121,12 @@ async function collect(args: string[], deps: Dependencies, stdout: (text: string
   const candidates = [data.repo.fullName, ...(config.alias ? [config.alias] : [])].map((repo) => join(datasetsDir, datasetPath(repo)));
   for (const stale of candidates) if (stale !== out) await rm(stale, { force: true });
 
+  // Only a `full` repo gets case-study drafts: they quote titles and descriptions.
+  if (publish === "full" && dataset.caseStudyCandidates) {
+    const drafts = await writeDrafts(join(resolve(deps.cwd, values["case-studies"]), dataset.repo), dataset.caseStudyCandidates, work);
+    for (const draft of drafts) stdout(`case-study draft -> ${draft}\n`);
+  }
+
   if (out) {
     await writeJson(out, dataset);
     stdout(`${dataset.repo}: ${String(dataset.tickets)} tickets, ${String(dataset.pullRequests)} PRs -> ${out}\n`);
@@ -134,7 +146,11 @@ async function writeJson(path: string, value: unknown): Promise<void> {
 async function report(args: string[], deps: Dependencies, stdout: (text: string) => void): Promise<void> {
   const { values } = parseArgs({
     args,
-    options: { datasets: { type: "string", default: "datasets" }, out: { type: "string", default: "report" } },
+    options: {
+      datasets: { type: "string", default: "datasets" },
+      out: { type: "string", default: "report" },
+      "case-studies": { type: "string", default: CASE_STUDIES_DIR },
+    },
   });
   const datasetsDir = resolve(deps.cwd, values.datasets);
   const files = (await readdir(datasetsDir, { recursive: true })).filter((file) => file.endsWith(".json"));
@@ -158,6 +174,12 @@ async function report(args: string[], deps: Dependencies, stdout: (text: string)
     await mkdir(dirname(join(out, "datasets", file)), { recursive: true });
     await cp(join(datasetsDir, file), join(out, "datasets", file));
   }
-  await writeFile(join(out, "index.html"), renderReport(datasets));
+  // Approved case studies of `full` repos only; drafts are never copied to the report.
+  const caseStudiesDir = resolve(deps.cwd, values["case-studies"]);
+  const caseStudies = new Map<string, CaseStudy[]>();
+  for (const dataset of datasets) {
+    if (dataset.publish === "full") caseStudies.set(dataset.repo, await readApproved(join(caseStudiesDir, dataset.repo)));
+  }
+  await writeFile(join(out, "index.html"), renderReport(datasets, caseStudies));
   stdout(`${String(datasets.length)} datasets -> ${join(out, "index.html")}\n`);
 }

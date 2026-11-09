@@ -8,6 +8,7 @@ on:
     branches: [main]
     paths:
       - "datasets/**"
+      - "case-studies/**"
       - "cli/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:

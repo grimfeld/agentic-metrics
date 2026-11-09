@@ -52,7 +52,7 @@ query($owner: String!, $name: String!, $endCursor: String) {
     pullRequests(first: 50, after: $endCursor, states: [MERGED], orderBy: {field: UPDATED_AT, direction: DESC}) {
       pageInfo { hasNextPage endCursor }
       nodes {
-        number title url createdAt updatedAt mergedAt baseRefName headRefName
+        number title url body createdAt updatedAt mergedAt baseRefName headRefName
         author { login __typename }
         closingIssuesReferences(first: 50) { nodes { number repository { nameWithOwner } } }
         additions deletions changedFiles
@@ -69,7 +69,7 @@ query($owner: String!, $name: String!, $endCursor: String) {
     issues(first: 50, after: $endCursor, orderBy: {field: UPDATED_AT, direction: DESC}) {
       pageInfo { hasNextPage endCursor }
       nodes {
-        number title url createdAt updatedAt closedAt
+        number title url body createdAt updatedAt closedAt
         subIssues { totalCount }
         comments(first: 100) { nodes { createdAt body author { __typename } } }
         timelineItems(first: 100, itemTypes: [LABELED_EVENT]) {
@@ -135,7 +135,7 @@ query($owner: String!, $name: String!, $label: String!, $endCursor: String) {
     issues(first: 50, after: $endCursor, labels: [$label], orderBy: {field: CREATED_AT, direction: ASC}) {
       pageInfo { hasNextPage endCursor }
       nodes {
-        number createdAt body
+        number createdAt closedAt stateReason body
         comments(first: 100) { nodes { createdAt body } }
       }
     }

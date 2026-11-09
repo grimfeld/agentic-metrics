@@ -2,6 +2,7 @@
 // `report` reads, and what the report links as raw data. A `full` dataset
 // also lists each delivered ticket's title and link; an `anonymized` one holds
 // aggregates only, under an alias.
+import { selectCandidates, type CaseStudyCandidate } from "./case-studies.ts";
 import type { PublishMode } from "./config.ts";
 import type { Repo } from "./github/load.ts";
 import type { LinkedWork } from "./linker.ts";
@@ -38,6 +39,8 @@ export interface Dataset {
   url?: string;
   /** Every delivered ticket with its title and link, in delivery order. Absent when anonymized. */
   ticketList?: DeliveredTicket[];
+  /** Tickets flagged as case-study candidates, with the criteria each meets. Absent when anonymized. */
+  caseStudyCandidates?: CaseStudyCandidate[];
 }
 
 /**
@@ -74,6 +77,7 @@ export function buildDataset(repo: Repo, work: LinkedWork, now: Date, publish: P
       const source = ticket.issue ?? ticket.pullRequests[0];
       return { id: ticket.id, title: source?.title ?? "", url: source?.url ?? "", doneAt: ticket.doneAt.toISOString() };
     }),
+    caseStudyCandidates: selectCandidates(work),
   };
 }
 

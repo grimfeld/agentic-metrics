@@ -60,6 +60,7 @@
       {
        "number": 106,
        "title": "Lifeline issue title 106",
+       "body": "Field order is lost when a type is edited.\n\nKeep the order the user set.",
        "url": "https://github.com/grimfeld/lifeline/issues/106",
        "createdAt": "2026-10-20T12:00:00Z",
        "closedAt": "2026-10-28T12:00:01Z",

@@ -73,6 +73,7 @@
       {
        "number": 116,
        "title": "Lifeline PR title 116",
+       "body": "Rewrites the type editor's field list.\n\nCloses #106\n\nNotable intervention: the human reverted the agent's schema change and kept the old field order.",
        "url": "https://github.com/grimfeld/lifeline/pull/116",
        "createdAt": "2026-10-21T08:00:00Z",
        "mergedAt": "2026-10-21T12:00:00Z",
@@ -117,6 +118,7 @@
       {
        "number": 136,
        "title": "Lifeline PR title 136",
+       "body": "Adds the handoff page.",
        "url": "https://github.com/grimfeld/lifeline/pull/136",
        "createdAt": "2026-10-27T00:00:00Z",
        "mergedAt": "2026-10-27T06:00:00Z",
