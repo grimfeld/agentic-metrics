@@ -14,10 +14,11 @@ import { chip, layout } from "./shell.ts";
 import { PATHS, type PageContext, type SiteRepo } from "./site.ts";
 
 const CSS = `
-.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; margin-bottom: 12px; }
-.tile { background: var(--surface); border: 1px solid var(--ring); border-radius: 10px; padding: 12px 14px; min-width: 0; }
-.tile h2 { margin: 0; font-size: 13px; font-weight: 500; color: var(--ink-2); }
-.tile .value { margin: 2px 0; font-size: 28px; font-weight: 650; line-height: 1.2; font-variant-numeric: tabular-nums; }
+[data-section="headlines"] { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+[data-section="headlines"] .tile { padding: 12px 14px; }
+[data-section="headlines"] .tile h2 { font-size: 13px; white-space: normal; }
+[data-section="headlines"] .tile .value { font-size: 28px; line-height: 1.2; }
+[data-section="headlines"] .tile .coverage { font-size: 13px; }
 .tile .covers { margin: 6px 0 0; font-size: 12px; color: var(--ink-2); }
 .repo-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
 .repo-card { display: block; text-decoration: none; background: var(--surface); border: 1px solid var(--ring); border-radius: 10px; padding: 12px 14px; }
@@ -26,7 +27,7 @@ const CSS = `
 .repo-card p { margin: 0; font-size: 13px; color: var(--ink-2); }
 [data-section="repos"] th, [data-section="repos"] td { white-space: nowrap; }
 .sentences h3 { font-size: 13px; margin: 12px 0 4px; color: var(--ink-2); }
-@media (max-width: 760px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .tile .value { font-size: 22px; } }
+@media (max-width: 760px) { [data-section="headlines"] { grid-template-columns: repeat(2, minmax(0, 1fr)); } [data-section="headlines"] .tile .value { font-size: 22px; } }
 `;
 
 function tiles(ctx: PageContext): string {

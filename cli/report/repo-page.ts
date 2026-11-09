@@ -17,16 +17,8 @@ import { metricChart } from "./metric-chart.ts";
 import { chip, layout } from "./shell.ts";
 import { PATHS, type PageContext, type SiteRepo } from "./site.ts";
 
-/** Number tiles and a grid of chart cards: the repo page's, and each metric page's. */
+/** A grid of chart cards: the repo page's, and each metric page's. Number tiles are the shell's. */
 export const DASHBOARD_CSS = `
-.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; margin-bottom: 12px; }
-.tile { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--ring); border-radius: 10px; padding: 10px 12px; min-width: 0; text-decoration: none; }
-a.tile:hover { border-color: var(--axis); }
-.tile h3 { margin: 0; font-size: 12px; font-weight: 500; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tile .value { margin: 2px 0; font-size: 20px; font-weight: 650; line-height: 1.25; font-variant-numeric: tabular-nums; }
-.tile.lg .value { font-size: 24px; }
-.tile .foot { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-top: auto; }
-.tile .coverage { font-size: 12px; }
 .chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
 .chart-grid > .card { margin: 0; }
 .chart-grid > .wide { grid-column: 1 / -1; }
@@ -34,10 +26,7 @@ a.tile:hover { border-color: var(--axis); }
 .chart-card h2 a { text-decoration: none; }
 .chart-card h2 a:hover { text-decoration: underline; }
 .chart-card > .coverage { margin-top: 4px; }
-@media (max-width: 760px) {
-  .chart-grid { grid-template-columns: minmax(0, 1fr); }
-  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
+@media (max-width: 760px) { .chart-grid { grid-template-columns: minmax(0, 1fr); } }
 `;
 
 const CSS = `${DASHBOARD_CSS}
