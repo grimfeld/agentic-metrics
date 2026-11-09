@@ -111,7 +111,7 @@ describe("case studies", () => {
     await run(["collect"]);
     approve(`${DRAFTS}/106.md`);
     const html = await report();
-    assert.match(read("report/grimfeld--lifeline/index.html"), /<section class="studies card" data-section="case-studies"><h3>Case studies<\/h3><ul><li><a href="case-studies\/106\.html">Case study #106<\/a>/);
+    assert.match(read("report/grimfeld--lifeline/index.html"), /<section class="card wide" data-section="case-studies"><h2>Case studies<\/h2><div class="studies"><a class="study-card" href="case-studies\/106\.html"><b>#106 Lifeline issue title 106<\/b><span class="muted">Case study #106<\/span><\/a><\/div>/);
     const page = read("report/grimfeld--lifeline/case-studies/106.html");
     assert.match(page, /<article class="case-study card" data-ticket="#106">/);
     assert.match(page, /<h4>#106 Lifeline issue title 106<\/h4>/);

@@ -114,6 +114,24 @@ export const apiEquivalentCost: Metric<ApiEquivalentCost> = {
 
   figure: { label: "p50 per ticket", of: ({ perTicketUsd }) => perTicketUsd?.p50 ?? Number.NaN, format: usd },
 
+  // Unpriced models are unknown, never zero: drawn as such, after the priced ones.
+  chart: {
+    title: "Cost by model",
+    draw: ({ value: { byModel, priceTable, unpricedModels } }) => {
+      const rows = [...byModel].sort((a, b) =>
+        a.apiEquivalentUsd === UNKNOWN ? 1 : b.apiEquivalentUsd === UNKNOWN ? -1 : b.apiEquivalentUsd - a.apiEquivalentUsd,
+      );
+      const unpriced = unpricedModels.length ? ` Unpriced, so unknown: ${unpricedModels.join(", ")}.` : "";
+      return {
+        kind: "comparison",
+        data: rows.map((row) => ({ label: row.model, value: row.apiEquivalentUsd })),
+        format: usd,
+        heads: ["Model", "API equivalent"],
+        description: `API-equivalent cost of the tickets' sessions by model, at Anthropic API list prices of ${priceTable}: ${rows.map((row) => `${row.model} ${usdOrUnknown(row.apiEquivalentUsd)}`).join(", ")}.${unpriced}`,
+      };
+    },
+  },
+
   sentence: ({ priceTable, perTicketUsd }) =>
     perTicketUsd
       ? `A median of ${usd(perTicketUsd.p50)} per ticket in API-equivalent cost (p90 ${usd(perTicketUsd.p90)}), at Anthropic API list prices of ${priceTable}`

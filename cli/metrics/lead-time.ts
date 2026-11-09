@@ -1,7 +1,8 @@
+import { trendLine } from "../report/charts.ts";
 import { escapeHtml } from "./html.ts";
-import type { Metric } from "./metric.ts";
+import type { Figure, Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
-import { formatHours, hoursBetween, percentile, round } from "./stats.ts";
+import { formatHours, hoursBetween, percentile, plural, round } from "./stats.ts";
 
 export interface LeadTime {
   p50Hours: number;
@@ -38,6 +39,27 @@ export const leadTime: Metric<LeadTime> = {
 
   sentence: ({ p50Hours, p90Hours }) =>
     `Median lead time of ${formatHours(p50Hours)} from a ticket being ready to its last PR merging (p90 ${formatHours(p90Hours)})`,
+
+  // Each ticket's lead time; an anonymized dataset has none, so its p50 by month instead.
+  chart: {
+    title: "Lead time per ticket",
+    draw(input) {
+      const { p50Hours, p90Hours, tickets } = input.value;
+      if (!tickets?.length) return trendLine(input, leadTime.figure as Figure<unknown>, "Lead time");
+      const hours = tickets.map((t) => t.hours);
+      return {
+        kind: "distribution",
+        data: tickets.map((t) => ({ label: t.ticket, value: t.hours })),
+        markers: [
+          { label: "p50", value: p50Hours },
+          { label: "p90", value: p90Hours },
+        ],
+        format: formatHours,
+        heads: ["Ticket", "Lead time"],
+        description: `Lead time of each of ${plural(tickets.length, "ticket")}, from ${formatHours(Math.min(...hours))} to ${formatHours(Math.max(...hours))}: p50 ${formatHours(p50Hours)}, p90 ${formatHours(p90Hours)}.`,
+      };
+    },
+  },
 
   headline: {
     order: 1,

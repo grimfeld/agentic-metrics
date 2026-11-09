@@ -46,9 +46,10 @@ function section(repo: string): string {
 }
 
 describe("report", () => {
-  it("shows the four headline cards for each repo, in order", () => {
-    const cards = [...section("grimfeld/lifeline").matchAll(/class="card" data-metric="(\w+)"/g)].map((m) => m[1]);
-    assert.deepEqual(cards, ["leadTime", "firstRunCiRate", "humanMessagesPerTicket", "regressionRate"]);
+  it("shows the four headline tiles first for each repo, in order", () => {
+    const tiles = [...section("grimfeld/lifeline").matchAll(/<a class="tile lg" [^>]*data-metric="(\w+)"/g)].map((m) => m[1]);
+    assert.deepEqual(tiles, ["leadTime", "firstRunCiRate", "humanMessagesPerTicket", "regressionRate"]);
+    assert.match(section("grimfeld/lifeline"), /^\s*<section class="tiles"[^>]*>\s*<a class="tile lg" [^>]*data-metric="leadTime"/);
   });
 
   it("shows lead time p50 and p90 with its coverage", () => {

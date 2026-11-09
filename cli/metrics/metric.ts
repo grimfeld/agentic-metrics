@@ -3,6 +3,7 @@
 // dataset field), how the report shows it, and its Methodology entry. Adding a
 // metric means adding a file and listing it in `index.ts`.
 import type { LinkedWork } from "../linker.ts";
+import type { Chart, ChartInput } from "../report/charts.ts";
 
 /** A metric whose source is missing is unknown, never zero. */
 export const UNKNOWN = "unknown";
@@ -72,6 +73,14 @@ export interface Metric<V> {
    * one has no trend and no comparison.
    */
   figure?: Figure<V>;
+  /**
+   * A chart of its own (see `report/charts.ts`): the repo page's grid has a
+   * card for each metric that declares one, and its metric page draws it too.
+   * `draw` is only called on a known value, given as published (anonymized
+   * when the dataset is), with the metric's monthly trend and its figures by
+   * autonomy level; a card whose value is unknown says so instead.
+   */
+  chart?: { title: string; draw(input: ChartInput<V>): Chart };
   /**
    * A CV-ready sentence quoting a known value, plain text with no final
    * period; the report adds the coverage. Never called on an unknown value;

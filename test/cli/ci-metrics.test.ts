@@ -203,9 +203,9 @@ describe("CI metrics in the report", () => {
     return readRepo(join(cwd, "report"), "grimfeld/ci");
   }
 
-  it("fills the first-run CI rate headline card", async () => {
+  it("fills the first-run CI rate headline tile", async () => {
     const html = await report();
-    const card = /<article class="card" data-metric="firstRunCiRate">.*?<\/article>/s.exec(html)?.[0] ?? "";
+    const card = /<a class="tile[^"]*" href="[^"]*" data-metric="firstRunCiRate">.*?<\/a>/s.exec(html)?.[0] ?? "";
     assert.match(card, /50%/);
     assert.match(card, /4 of 8 tickets/);
   });
