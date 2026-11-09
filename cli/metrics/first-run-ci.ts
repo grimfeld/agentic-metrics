@@ -10,8 +10,8 @@ export interface FirstRunCiRate {
   passed: number;
   /** PRs with a first CI result. */
   pullRequests: number;
-  /** The main check workflow's path. */
-  workflow: string;
+  /** The main check workflow's path. Absent once anonymized: a workflow's name can name the repo or client. */
+  workflow?: string;
 }
 
 export const firstRunCiRate: Metric<FirstRunCiRate> = {
@@ -31,7 +31,7 @@ export const firstRunCiRate: Metric<FirstRunCiRate> = {
     };
   },
 
-  anonymize: (value) => value,
+  anonymize: ({ rate, passed, pullRequests }) => ({ rate, passed, pullRequests }),
 
   figure: { label: "of PRs", of: ({ rate }) => percent(rate), format: formatPercent },
 
@@ -43,7 +43,7 @@ export const firstRunCiRate: Metric<FirstRunCiRate> = {
   },
 
   section({ rate, passed, pullRequests, workflow }) {
-    return `<p><strong>${String(Math.round(rate * 1000) / 10)}%</strong> of PRs passed CI on the first try: ${String(passed)} of ${String(pullRequests)}, judged on <code>${escapeHtml(workflow)}</code>.</p>`;
+    return `<p><strong>${String(Math.round(rate * 1000) / 10)}%</strong> of PRs passed CI on the first try: ${String(passed)} of ${String(pullRequests)}${workflow === undefined ? "" : `, judged on <code>${escapeHtml(workflow)}</code>`}.</p>`;
   },
 
   methodology: {

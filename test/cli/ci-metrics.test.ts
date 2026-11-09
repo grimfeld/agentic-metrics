@@ -158,6 +158,7 @@ describe("CI metrics, anonymized", () => {
     for (const id of CI_METRICS) {
       const text = JSON.stringify(metrics[id]);
       assert.doesNotMatch(text, /pullRequest"|perBatch|withFixCycles|\b20\d\b/, `${id} leaks a PR: ${text}`);
+      assert.doesNotMatch(text, /workflows?"|\.ya?ml|\.github/i, `${id} leaks a workflow: ${text}`);
     }
     assert.equal((metrics["firstRunCiRate"]?.value as { rate: number }).rate, 0.5);
     assert.deepEqual(metrics["fixCycles"]?.value, { perPullRequest: 0.5, total: 2, pullRequests: 4 });
