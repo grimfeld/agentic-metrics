@@ -150,3 +150,25 @@ describe("report", () => {
     );
   });
 });
+
+describe("report with no dataset", () => {
+  it("renders an empty-state page, not a crash, when the datasets folder is missing or empty", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "am-report-empty-"));
+    try {
+      for (const datasets of ["missing", "."]) {
+        let stdout = "";
+        let stderr = "";
+        const status = await main(["report", "--datasets", datasets, "--out", "site"], {
+          cwd: dir,
+          stdout: (text) => (stdout += text),
+          stderr: (text) => (stderr += text),
+        });
+        assert.equal(status, 0, stderr);
+        assert.match(stdout, /no dataset/i);
+        assert.match(readFileSync(join(dir, "site/index.html"), "utf8"), /No repo tracked yet/);
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

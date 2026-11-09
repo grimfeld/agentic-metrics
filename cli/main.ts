@@ -1,5 +1,6 @@
 // The `agentic-metrics` CLI: `collect` writes the current repo's dataset,
 // `report` renders the datasets as a static HTML report, `init` onboards a repo.
+import { existsSync } from "node:fs";
 import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
@@ -176,7 +177,8 @@ async function report(args: string[], deps: Dependencies, stdout: (text: string)
     },
   });
   const datasetsDir = resolve(deps.cwd, values.datasets);
-  const files = (await readdir(datasetsDir, { recursive: true })).filter((file) => file.endsWith(".json"));
+  // No datasets folder yet (nothing collected): an empty report, not a crash.
+  const files = existsSync(datasetsDir) ? (await readdir(datasetsDir, { recursive: true })).filter((file) => file.endsWith(".json")) : [];
   const read = await Promise.all(
     files.map(async (file) => {
       const dataset = JSON.parse(await readFile(join(datasetsDir, file), "utf8")) as Dataset;
@@ -189,7 +191,6 @@ async function report(args: string[], deps: Dependencies, stdout: (text: string)
   // A `none` dataset never belongs in the datasets folder; if one is there, it stays out of the report.
   const published = read.filter(({ dataset }) => dataset.publish !== "none");
   const datasets = published.map(({ dataset }) => dataset);
-  if (datasets.length === 0) throw new Error(`no dataset in ${datasetsDir}; run collect first`);
 
   const out = resolve(deps.cwd, values.out);
   await mkdir(out, { recursive: true });
@@ -204,5 +205,6 @@ async function report(args: string[], deps: Dependencies, stdout: (text: string)
     if (dataset.publish === "full") caseStudies.set(dataset.repo, await readApproved(join(caseStudiesDir, dataset.repo)));
   }
   await writeFile(join(out, "index.html"), renderReport(datasets, caseStudies));
-  stdout(`${String(datasets.length)} datasets -> ${join(out, "index.html")}\n`);
+  const summary = datasets.length === 0 ? `no dataset in ${datasetsDir} (run collect first); empty report` : `${String(datasets.length)} datasets`;
+  stdout(`${summary} -> ${join(out, "index.html")}\n`);
 }

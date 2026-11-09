@@ -150,7 +150,7 @@ export function renderReport(datasets: Dataset[], caseStudies: ReadonlyMap<strin
 <body>
 <h1>Agentic metrics</h1>
 <nav id="repos">${sorted.map((dataset) => `<a href="#${escapeHtml(dataset.repo)}">${escapeHtml(dataset.repo)}</a>`).join(" ")}</nav>
-${sorted.map((dataset) => repoSection(dataset, caseStudies.get(dataset.repo))).join("\n")}
+${sorted.length === 0 ? `<p class="empty">No repo tracked yet: run <code>agentic-metrics collect</code> and commit its dataset.</p>` : sorted.map((dataset) => repoSection(dataset, caseStudies.get(dataset.repo))).join("\n")}
 ${methodology(sorted)}
 <script>${COPY_SCRIPT}</script>
 </body>

@@ -103,7 +103,7 @@ This repo publishes the report for every tracked repo on its GitHub Pages. Datas
 npx agentic-metrics collect --repo owner/name   # writes datasets/owner/name.json
 ```
 
-`.github/workflows/pages.yml` renders `datasets/` and deploys it on every push to `main` that touches `datasets/` or `cli/`, or by hand from the Actions tab. One-time setting: Settings > Pages > Build and deployment > Source: **GitHub Actions**.
+`.github/workflows/pages.yml` renders `datasets/` (an empty-state page while there is none) and deploys it on every push to `main` that touches `datasets/` or `cli/`, or by hand from the Actions tab. One-time setting: Settings > Pages > Build and deployment > Source: **GitHub Actions**.
 
 Each repo's section shows trends (every metric per month of delivery), a comparison by autonomy level (`full`, `assisted`, `manual`), and CV-ready sentences with a Copy button. A sentence quotes only known values, each with its coverage. All three come from the dataset (`trends`, `byAutonomy`), so an anonymized repo gets them too, from aggregates only, with any figure covering fewer than 3 tickets withheld (shown as —; `"suppressed"` in the dataset).
 
