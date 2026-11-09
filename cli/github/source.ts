@@ -61,14 +61,13 @@ query($owner: String!, $name: String!, $endCursor: String) {
     pullRequests(first: 50, after: $endCursor, states: [MERGED], orderBy: {field: UPDATED_AT, direction: DESC}) {
       pageInfo { hasNextPage endCursor }
       nodes {
-        number title url createdAt updatedAt mergedAt baseRefName headRefName
+        number title url body createdAt updatedAt mergedAt baseRefName headRefName
         author { login __typename }
         closingIssuesReferences(first: 50) { nodes { number repository { nameWithOwner } } }
         additions deletions changedFiles
         commits(first: 100) { nodes { commit { authoredDate messageHeadline messageBody } } }
         labels(first: 20) { nodes { name } }
         files(first: 100) { totalCount nodes { path additions deletions } }
-        body
         reviews(first: 100, states: [CHANGES_REQUESTED]) { nodes { submittedAt } }
       }
     }
@@ -81,7 +80,7 @@ query($owner: String!, $name: String!, $endCursor: String) {
     issues(first: 50, after: $endCursor, orderBy: {field: UPDATED_AT, direction: DESC}) {
       pageInfo { hasNextPage endCursor }
       nodes {
-        number title url createdAt updatedAt closedAt
+        number title url body createdAt updatedAt closedAt
         subIssues { totalCount }
         labels(first: 20) { nodes { name } }
         comments(first: 100) { nodes { createdAt body author { __typename } } }
@@ -191,7 +190,7 @@ query($owner: String!, $name: String!, $label: String!, $endCursor: String) {
     issues(first: 50, after: $endCursor, labels: [$label], orderBy: {field: CREATED_AT, direction: ASC}) {
       pageInfo { hasNextPage endCursor }
       nodes {
-        number createdAt body
+        number createdAt closedAt stateReason body
         comments(first: 100) { nodes { createdAt body } }
       }
     }

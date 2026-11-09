@@ -79,6 +79,12 @@ CI metrics (first-run CI rate, fix cycles, scheduled failures, batch health) rea
 { "ciWorkflow": "check.yml" }
 ```
 
+### Case studies
+
+For a repo published `full`, `collect` flags case-study candidates: the largest ticket (lines changed), the fewest human messages for its size (per line changed), the largest deletion (most lines removed net of lines added) and a regression caught and fixed (a traced regression whose issue was closed as completed). The dataset lists them under `caseStudyCandidates`, and `collect` writes a Markdown draft for each to `case-studies/<owner>/<repo>/<N>.md` (`pr-<N>.md` for a PR that is its own ticket; `--case-studies dir` to change the folder), from the ticket's numbers and its issue and PR descriptions, quoting any PR's "Notable intervention" line. A draft that exists is never overwritten.
+
+A draft starts with `approved: false` in its front matter. Edit it, set `approved: true` and commit it: `report` renders approved case studies only, and never for a repo published `anonymized` or `none` (those get no candidates or drafts either). Drafts themselves are not copied into the report.
+
 ### Published report
 
 This repo publishes the report for every tracked repo on its GitHub Pages. Datasets are committed under `datasets/<owner>/<repo>.json`, so every published number can be checked against its raw data, which each repo's section links. To track a repo, run `collect` from this repo and commit the dataset:

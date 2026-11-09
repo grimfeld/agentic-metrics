@@ -22,6 +22,8 @@ export interface PullRequest {
   closes: number[];
   /** The author's login, without a bot's `[bot]` suffix; undefined for a deleted account. */
   author: string | undefined;
+  /** Its description, for case-study drafts only; it never reaches the dataset. */
+  body: string;
   /** First line of each of its commits (first 100). */
   commitSubjects: string[];
   /** Lines added and deleted, and files changed, over the whole diff. */
@@ -38,7 +40,7 @@ export interface PullRequest {
   commits: CommitTrailers[];
   /** Its current labels (first 20). */
   labels: string[];
-  /** Numbers written `#N` in its title or body, in order, without repeats. The text itself is not kept. */
+  /** Numbers written `#N` in its title or body, in order, without repeats. */
   references: number[];
   /** When its reviews requesting changes were submitted (first 100). */
   changesRequestedAt: Date[];
@@ -88,6 +90,8 @@ export interface Issue {
   createdAt: Date;
   /** Label additions, oldest first. */
   labelled: LabelEvent[];
+  /** Its description, for case-study drafts only; it never reaches the dataset. */
+  body: string;
   /** Number of sub-issues. */
   subIssues: number;
   /** Its current labels (first 20). */
@@ -108,6 +112,8 @@ export interface RegressionIssue {
   number: number;
   /** Issue numbers named by `caused-by: #N` lines in its body or comments, in order, without repeats. */
   causedBy: number[];
+  /** Closed as completed (not as not planned or a duplicate): the regression was fixed. */
+  fixed: boolean;
 }
 
 export interface GitHubData {
@@ -131,6 +137,7 @@ interface RawPullRequest {
   number: number;
   title: string;
   url: string;
+  body?: string | null;
   createdAt: string;
   mergedAt: string | null;
   baseRefName: string;
@@ -143,7 +150,6 @@ interface RawPullRequest {
   commits?: { nodes: { commit: { authoredDate?: string; messageHeadline?: string; messageBody?: string } }[] };
   labels?: RawLabels;
   files?: { totalCount: number; nodes: ChangedFile[] } | null;
-  body?: string;
   reviews?: { nodes: { submittedAt: string | null }[] };
 }
 
@@ -165,6 +171,7 @@ interface RawIssue {
   number: number;
   title: string;
   url: string;
+  body?: string | null;
   createdAt: string;
   timelineItems: { nodes: { __typename: string; createdAt?: string; label?: { name: string } }[] };
   subIssues?: { totalCount: number };
@@ -175,6 +182,8 @@ interface RawIssue {
 interface RawRegressionIssue {
   number: number;
   body: string;
+  closedAt?: string | null;
+  stateReason?: string | null;
   comments: { nodes: { createdAt: string; body: string }[] };
 }
 
@@ -200,6 +209,7 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
               number: pr.number,
               title: pr.title,
               url: pr.url,
+              body: pr.body ?? "",
               createdAt: new Date(pr.createdAt),
               mergedAt: new Date(pr.mergedAt),
               baseRefName: pr.baseRefName,
@@ -229,6 +239,7 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
       number: issue.number,
       title: issue.title,
       url: issue.url,
+      body: issue.body ?? "",
       createdAt: new Date(issue.createdAt),
       labelled: issue.timelineItems.nodes
         .flatMap((event) =>
@@ -249,7 +260,12 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
     .flatMap((page) => page.data.repository.issues.nodes)
     .map((issue): RegressionIssue => {
       const comments = [...issue.comments.nodes].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
-      return { number: issue.number, causedBy: causedBy([issue.body, ...comments.map((comment) => comment.body)]) };
+      return {
+        number: issue.number,
+        causedBy: causedBy([issue.body, ...comments.map((comment) => comment.body)]),
+        // Closed as not planned or as a duplicate is not a fix.
+        fixed: Boolean(issue.closedAt) && (issue.stateReason ?? "COMPLETED") === "COMPLETED",
+      };
     });
 
   const runPages = (await source.read("workflow-runs")) as { workflow_runs: RawRun[] }[];

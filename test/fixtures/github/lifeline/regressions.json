@@ -17,6 +17,8 @@
       {
        "number": 141,
        "createdAt": "2026-10-30T09:00:00Z",
+       "closedAt": "2026-10-31T09:00:00Z",
+       "stateReason": "COMPLETED",
        "body": "Demo data missing after reset.",
        "comments": {
         "nodes": [
@@ -28,6 +30,8 @@
       {
        "number": 142,
        "createdAt": "2026-11-01T09:00:00Z",
+       "closedAt": "2026-11-02T09:00:00Z",
+       "stateReason": "NOT_PLANNED",
        "body": "Handoff link 404s.",
        "comments": {
         "nodes": [
