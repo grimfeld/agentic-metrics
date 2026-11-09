@@ -33,8 +33,9 @@ export const humanMessagesPerTicket: Metric<HumanMessages> = {
 
   sentence: ({ p50, p90 }) => `A median of ${String(p50)} human messages per ticket (p90 ${String(p90)})`,
 
-  headline({ p50, p90 }) {
-    return `${String(p50)} <small>p50</small> · ${String(p90)} <small>p90</small>`;
+  headline: {
+    order: 3,
+    card: ({ p50, p90 }) => `${String(p50)} <small>p50</small> · ${String(p90)} <small>p90</small>`,
   },
 
   section({ perTicket, mean }) {

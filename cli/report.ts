@@ -9,27 +9,24 @@ import { renderMarkdown } from "./markdown.ts";
 import type { Dataset } from "./dataset.ts";
 import { datasetPath } from "./dataset.ts";
 import { escapeHtml } from "./metrics/html.ts";
-import { METRICS, findMetric } from "./metrics/index.ts";
+import { METRICS } from "./metrics/index.ts";
+import type { Metric } from "./metrics/metric.ts";
 import { UNKNOWN } from "./metrics/metric.ts";
 import { coverageText } from "./metrics/stats.ts";
 import { MIN_ANONYMIZED_TICKETS } from "./trends.ts";
 
-/** The headline cards, in order. A metric not computed yet shows as unknown under this name. */
-const HEADLINES = [
-  { id: "leadTime", name: "Lead time" },
-  { id: "firstRunCiRate", name: "First-run CI rate" },
-  { id: "humanMessagesPerTicket", name: "Human messages per ticket" },
-  { id: "regressionRate", name: "Regression rate" },
-] as const;
+/** The metrics with a headline card, in card order. */
+const HEADLINES = METRICS.filter((metric) => metric.headline).sort((a, b) => (a.headline?.order ?? 0) - (b.headline?.order ?? 0));
 
-function card(dataset: Dataset, id: string, fallbackName: string): string {
-  const metric = findMetric(id);
+/** A metric's headline card; a dataset written before the metric existed shows it as not measured yet. */
+function card(dataset: Dataset, metric: Metric<unknown>): string {
+  const id = metric.id;
   const result = dataset.metrics[id];
-  const name = escapeHtml(metric?.name ?? fallbackName);
-  if (!metric || !result) {
+  const name = escapeHtml(metric.name);
+  if (!result) {
     return `<article class="card" data-metric="${id}"><h3>${name}</h3><p class="value unknown">unknown</p><p class="coverage">not measured yet</p></article>`;
   }
-  const value = result.value === UNKNOWN || !metric.headline ? UNKNOWN : metric.headline(result.value);
+  const value = result.value === UNKNOWN || !metric.headline ? UNKNOWN : metric.headline.card(result.value);
   const unknownClass = value === UNKNOWN ? " unknown" : "";
   return `<article class="card" data-metric="${id}"><h3>${name}</h3><p class="value${unknownClass}">${value}</p><p class="coverage">${coverageText(result.coverage)}</p></article>`;
 }
@@ -45,7 +42,7 @@ function caseStudySection(dataset: Dataset, studies: readonly CaseStudy[] | unde
 
 function repoSection(dataset: Dataset, studies?: readonly CaseStudy[]): string {
   const repo = escapeHtml(dataset.repo);
-  const cards = HEADLINES.map(({ id, name }) => card(dataset, id, name)).join("\n");
+  const cards = HEADLINES.map((metric) => card(dataset, metric)).join("\n");
   const sections = METRICS.flatMap((metric) => {
     const result = dataset.metrics[metric.id];
     if (!metric.section || !result) return [];

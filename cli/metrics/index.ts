@@ -35,7 +35,3 @@ export const METRICS: readonly Metric<unknown>[] = [
   size,
   estimateVsActual,
 ];
-
-export function findMetric(id: string): Metric<unknown> | undefined {
-  return METRICS.find((metric) => metric.id === id);
-}

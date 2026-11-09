@@ -38,8 +38,9 @@ export const firstRunCiRate: Metric<FirstRunCiRate> = {
   sentence: ({ rate, passed, pullRequests }) =>
     `${formatPercent(percent(rate))} of pull requests passed CI on their first run (${String(passed)} of ${String(pullRequests)})`,
 
-  headline({ rate, passed, pullRequests }) {
-    return `${formatPercent(percent(rate))} <small>${String(passed)} of ${String(pullRequests)} PRs</small>`;
+  headline: {
+    order: 2,
+    card: ({ rate, passed, pullRequests }) => `${formatPercent(percent(rate))} <small>${String(passed)} of ${String(pullRequests)} PRs</small>`,
   },
 
   section({ rate, passed, pullRequests, workflow }) {

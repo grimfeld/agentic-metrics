@@ -65,8 +65,9 @@ export const regressionRate: Metric<RegressionRate> = {
   sentence: ({ rate, regressions, regressedTickets }) =>
     `Regression rate of ${formatPercent(percent(rate))}: ${plural(regressions, "regression")} traced to ${plural(regressedTickets, "delivered ticket")}`,
 
-  headline({ rate, regressions }) {
-    return `${formatPercent(percent(rate))} <small>${plural(regressions, "regression")}</small>`;
+  headline: {
+    order: 4,
+    card: ({ rate, regressions }) => `${formatPercent(percent(rate))} <small>${plural(regressions, "regression")}</small>`,
   },
 
   section({ perTicket, untraced, regressions, regressedTickets }) {
