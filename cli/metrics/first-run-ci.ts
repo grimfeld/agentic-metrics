@@ -2,7 +2,7 @@ import { firstResult } from "../ci.ts";
 import { escapeHtml } from "./html.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
-import { formatPercent, percent } from "./stats.ts";
+import { formatPercent, percent, share } from "./stats.ts";
 
 export interface FirstRunCiRate {
   /** Share of PRs with a first CI result whose first result passed, 0 to 1. */
@@ -26,7 +26,7 @@ export const firstRunCiRate: Metric<FirstRunCiRate> = {
     if (judged.length === 0 || ci.mainWorkflow === undefined) return { value: UNKNOWN, coverage };
     const passed = judged.filter((result) => result === "passed").length;
     return {
-      value: { rate: Math.round((passed / judged.length) * 1000) / 1000, passed, pullRequests: judged.length, workflow: ci.mainWorkflow },
+      value: { rate: share(passed, judged.length), passed, pullRequests: judged.length, workflow: ci.mainWorkflow },
       coverage,
     };
   },
@@ -39,11 +39,11 @@ export const firstRunCiRate: Metric<FirstRunCiRate> = {
     `${formatPercent(percent(rate))} of pull requests passed CI on their first run (${String(passed)} of ${String(pullRequests)})`,
 
   headline({ rate, passed, pullRequests }) {
-    return `${String(Math.round(rate * 1000) / 10)}% <small>${String(passed)} of ${String(pullRequests)} PRs</small>`;
+    return `${formatPercent(percent(rate))} <small>${String(passed)} of ${String(pullRequests)} PRs</small>`;
   },
 
   section({ rate, passed, pullRequests, workflow }) {
-    return `<p><strong>${String(Math.round(rate * 1000) / 10)}%</strong> of PRs passed CI on the first try: ${String(passed)} of ${String(pullRequests)}${workflow === undefined ? "" : `, judged on <code>${escapeHtml(workflow)}</code>`}.</p>`;
+    return `<p><strong>${formatPercent(percent(rate))}</strong> of PRs passed CI on the first try: ${String(passed)} of ${String(pullRequests)}${workflow === undefined ? "" : `, judged on <code>${escapeHtml(workflow)}</code>`}.</p>`;
   },
 
   methodology: {

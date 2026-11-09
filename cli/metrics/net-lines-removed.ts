@@ -1,6 +1,7 @@
 import { escapeHtml } from "./html.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
+import { plural } from "./stats.ts";
 
 export interface NetLinesRemoved {
   linesAdded: number;
@@ -40,7 +41,7 @@ export const netLinesRemoved: Metric<NetLinesRemoved> = {
   figure: { label: "net removed", of: ({ netLinesRemoved }) => netLinesRemoved, format: String },
 
   sentence: ({ linesAdded, linesDeleted, ticketsNetRemoving }) =>
-    `${String(linesDeleted)} lines deleted for ${String(linesAdded)} added; ${String(ticketsNetRemoving)} ticket${ticketsNetRemoving === 1 ? "" : "s"} removed more code than ${ticketsNetRemoving === 1 ? "it" : "they"} added`,
+    `${String(linesDeleted)} lines deleted for ${String(linesAdded)} added; ${plural(ticketsNetRemoving, "ticket")} removed more code than ${ticketsNetRemoving === 1 ? "it" : "they"} added`,
 
   section({ linesAdded, linesDeleted, netLinesRemoved, ticketsNetRemoving, tickets }) {
     const summary = `<p><strong>${String(netLinesRemoved)}</strong> net lines removed: ${String(linesDeleted)} deleted, ${String(linesAdded)} added. Tickets removing more than they added: ${String(ticketsNetRemoving)}.</p>`;

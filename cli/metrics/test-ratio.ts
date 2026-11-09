@@ -2,6 +2,7 @@ import type { PullRequest } from "../github/load.ts";
 import { escapeHtml } from "./html.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
+import { round } from "./stats.ts";
 
 export interface TestRatio {
   testLinesAdded: number;
@@ -62,7 +63,7 @@ export const testRatio: Metric<TestRatio> = {
     const coverage = { tickets: covered.length, of: tickets.length };
     const { testLinesAdded, productionLinesAdded } = linesAdded(new Set<PullRequest>(covered.flatMap((ticket) => ticket.pullRequests)));
     if (productionLinesAdded === 0) return { value: UNKNOWN, coverage };
-    const ratio = Math.round((testLinesAdded / productionLinesAdded) * 100) / 100;
+    const ratio = round(testLinesAdded / productionLinesAdded, 2);
     const perTicket = covered.map((ticket) => ({ ticket: ticket.id, ...linesAdded(new Set(ticket.pullRequests)) }));
     return { value: { testLinesAdded, productionLinesAdded, ratio, tickets: perTicket }, coverage };
   },

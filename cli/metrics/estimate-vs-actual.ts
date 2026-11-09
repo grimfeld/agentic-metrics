@@ -4,7 +4,7 @@ import type { Ticket } from "../linker.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
 import { SIZE_HEADERS, sizeCells, sizeOf, type TicketSize } from "./size.ts";
-import { formatHours, percentile } from "./stats.ts";
+import { formatHours, hoursBetween, percentile, round } from "./stats.ts";
 
 export interface EstimatedTicket extends TicketSize {
   estimateHours: number;
@@ -37,8 +37,6 @@ function firstCommitAt(ticket: Ticket): Date | undefined {
   return times.length > 0 ? new Date(Math.min(...times)) : undefined;
 }
 
-const round = (value: number, places: number) => Math.round(value * 10 ** places) / 10 ** places;
-
 export const estimateVsActual: Metric<EstimateVsActual> = {
   id: "estimateVsActual",
   name: "Estimate vs actual",
@@ -54,7 +52,7 @@ export const estimateVsActual: Metric<EstimateVsActual> = {
         excludedLate++;
         continue;
       }
-      const actualHours = (ticket.doneAt.getTime() - start.getTime()) / 3_600_000;
+      const actualHours = hoursBetween(start, ticket.doneAt);
       const { ticket: id, ...size } = sizeOf(ticket);
       estimated.push({
         ticket: id,

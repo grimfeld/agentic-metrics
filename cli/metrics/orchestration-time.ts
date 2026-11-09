@@ -1,6 +1,6 @@
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
-import { formatHours } from "./stats.ts";
+import { formatHours, msToHours, plural, round } from "./stats.ts";
 import { IDLE_CAP_MS } from "../transcripts/load.ts";
 
 export interface OrchestrationTime {
@@ -26,7 +26,7 @@ export const orchestrationTime: Metric<OrchestrationTime> = {
     const activeMs = main.reduce((sum, session) => sum + session.activeMs, 0);
     return {
       value: {
-        hours: Math.round((activeMs / 3_600_000) * 10) / 10,
+        hours: round(msToHours(activeMs), 1),
         sessions: main.length,
         subAgents: transcripts.orchestration.length - main.length,
         humanMessages: new Set(main.flatMap((session) => session.humanMessages)).size,
@@ -42,10 +42,9 @@ export const orchestrationTime: Metric<OrchestrationTime> = {
   figure: { label: "active", of: ({ hours }) => hours, format: formatHours, byAutonomy: false },
 
   sentence: ({ hours, sessions }) =>
-    `${formatHours(hours)} of active orchestration (planning, grilling, batching) in ${String(sessions)} session${sessions === 1 ? "" : "s"} on no ticket`,
+    `${formatHours(hours)} of active orchestration (planning, grilling, batching) in ${plural(sessions, "session")} on no ticket`,
 
   section({ hours, sessions, subAgents, humanMessages }) {
-    const plural = (count: number, word: string) => `${String(count)} ${word}${count === 1 ? "" : "s"}`;
     return `<p>${formatHours(hours)} in ${plural(sessions, "session")} on no ticket, with ${plural(humanMessages, "human message")} and ${plural(subAgents, "sub-agent")}.</p>`;
   },
 

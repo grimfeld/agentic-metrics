@@ -20,3 +20,32 @@ export function percent(rate: number): number {
 export function formatPercent(figure: number): string {
   return `${String(figure)}%`;
 }
+
+/** `value` rounded to `places` decimals. */
+export function round(value: number, places: number): number {
+  return Math.round(value * 10 ** places) / 10 ** places;
+}
+
+/** A share from 0 to 1, as datasets store a rate: to three decimals. */
+export function share(part: number, whole: number): number {
+  return round(part / whole, 3);
+}
+
+/** Hours from `from` to `to`, unrounded. */
+export function hoursBetween(from: Date, to: Date): number {
+  return msToHours(to.getTime() - from.getTime());
+}
+
+export function msToHours(ms: number): number {
+  return ms / 3_600_000;
+}
+
+/** `1 ticket`, `2 tickets`; `many` for an irregular plural (`batches`). */
+export function plural(count: number, word: string, many = `${word}s`): string {
+  return `${String(count)} ${count === 1 ? word : many}`;
+}
+
+/** A metric's coverage as the report words it: `3 of 5 tickets`. */
+export function coverageText({ tickets, of }: { tickets: number; of: number }): string {
+  return `${String(tickets)} of ${String(of)} tickets`;
+}

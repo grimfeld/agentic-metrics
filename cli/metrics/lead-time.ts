@@ -1,7 +1,7 @@
 import { escapeHtml } from "./html.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
-import { formatHours, percentile } from "./stats.ts";
+import { formatHours, hoursBetween, percentile, round } from "./stats.ts";
 
 export interface LeadTime {
   p50Hours: number;
@@ -16,17 +16,16 @@ export const leadTime: Metric<LeadTime> = {
 
   compute({ tickets }) {
     const rows = tickets.flatMap((ticket) =>
-      ticket.readyAt ? [{ ticket: ticket.id, hours: (ticket.doneAt.getTime() - ticket.readyAt.getTime()) / 3_600_000 }] : [],
+      ticket.readyAt ? [{ ticket: ticket.id, hours: hoursBetween(ticket.readyAt, ticket.doneAt) }] : [],
     );
     const coverage = { tickets: rows.length, of: tickets.length };
     if (rows.length === 0) return { value: UNKNOWN, coverage };
-    const round = (value: number) => Math.round(value * 10) / 10;
     const hours = rows.map((row) => row.hours);
     return {
       value: {
-        p50Hours: round(percentile(hours, 50)),
-        p90Hours: round(percentile(hours, 90)),
-        tickets: rows.map((row) => ({ ...row, hours: round(row.hours) })),
+        p50Hours: round(percentile(hours, 50), 1),
+        p90Hours: round(percentile(hours, 90), 1),
+        tickets: rows.map((row) => ({ ...row, hours: round(row.hours, 1) })),
       },
       coverage,
     };

@@ -2,7 +2,7 @@ import { firstResult } from "../ci.ts";
 import type { PullRequest } from "../github/load.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
-import { formatPercent, percent } from "./stats.ts";
+import { formatPercent, percent, plural, share } from "./stats.ts";
 
 export interface BatchHealth {
   /** Integration PRs merged into the default branch. */
@@ -55,7 +55,7 @@ export const batchHealth: Metric<BatchHealth> = {
         batches: perBatch.length,
         withCi,
         greenOnFirstRun,
-        ...(withCi > 0 ? { greenRate: Math.round((greenOnFirstRun / withCi) * 1000) / 1000 } : {}),
+        ...(withCi > 0 ? { greenRate: share(greenOnFirstRun, withCi) } : {}),
         dropped: perBatch.reduce((sum, batch) => sum + batch.dropped.length, 0),
         perBatch,
       },
@@ -83,8 +83,8 @@ export const batchHealth: Metric<BatchHealth> = {
     const green =
       greenRate === undefined
         ? `No batch has a CI result`
-        : `<strong>${String(Math.round(greenRate * 1000) / 10)}%</strong> of batches were green on their first CI run (${String(greenOnFirstRun)} of ${String(withCi)})`;
-    const summary = `<p>${green}; ${String(dropped)} PR${dropped === 1 ? "" : "s"} dropped from ${String(batches)} batch${batches === 1 ? "" : "es"}.</p>`;
+        : `<strong>${formatPercent(percent(greenRate))}</strong> of batches were green on their first CI run (${String(greenOnFirstRun)} of ${String(withCi)})`;
+    const summary = `<p>${green}; ${plural(dropped, "PR")} dropped from ${plural(batches, "batch", "batches")}.</p>`;
     if (!perBatch) return summary;
     const rows = perBatch
       .map(

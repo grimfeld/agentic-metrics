@@ -2,6 +2,7 @@ import { pullRequestRuns, verdict, type Ci } from "../ci.ts";
 import type { PullRequest } from "../github/load.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
+import { round } from "./stats.ts";
 
 export interface FixCycles {
   /** Mean fix cycles per PR with a CI run, to two decimals. */
@@ -51,7 +52,7 @@ export const fixCyclesMetric: Metric<FixCycles> = {
     const total = measured.reduce((sum, row) => sum + row.fixCycles, 0);
     return {
       value: {
-        perPullRequest: Math.round((total / measured.length) * 100) / 100,
+        perPullRequest: round(total / measured.length, 2),
         total,
         pullRequests: measured.length,
         withFixCycles: measured.filter((row) => row.fixCycles > 0).sort((a, b) => a.pullRequest - b.pullRequest),

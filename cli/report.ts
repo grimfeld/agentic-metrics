@@ -10,8 +10,8 @@ import type { Dataset } from "./dataset.ts";
 import { datasetPath } from "./dataset.ts";
 import { escapeHtml } from "./metrics/html.ts";
 import { METRICS, findMetric } from "./metrics/index.ts";
-import type { MetricResult } from "./metrics/metric.ts";
 import { UNKNOWN } from "./metrics/metric.ts";
+import { coverageText } from "./metrics/stats.ts";
 import { MIN_ANONYMIZED_TICKETS } from "./trends.ts";
 
 /** The headline cards, in order. A metric not computed yet shows as unknown under this name. */
@@ -22,10 +22,6 @@ const HEADLINES = [
   { id: "regressionRate", name: "Regression rate" },
 ] as const;
 
-function coverageText(result: MetricResult<unknown>): string {
-  return `${String(result.coverage.tickets)} of ${String(result.coverage.of)} tickets`;
-}
-
 function card(dataset: Dataset, id: string, fallbackName: string): string {
   const metric = findMetric(id);
   const result = dataset.metrics[id];
@@ -35,7 +31,7 @@ function card(dataset: Dataset, id: string, fallbackName: string): string {
   }
   const value = result.value === UNKNOWN || !metric.headline ? UNKNOWN : metric.headline(result.value);
   const unknownClass = value === UNKNOWN ? " unknown" : "";
-  return `<article class="card" data-metric="${id}"><h3>${name}</h3><p class="value${unknownClass}">${value}</p><p class="coverage">${coverageText(result)}</p></article>`;
+  return `<article class="card" data-metric="${id}"><h3>${name}</h3><p class="value${unknownClass}">${value}</p><p class="coverage">${coverageText(result.coverage)}</p></article>`;
 }
 
 /** Approved case studies, for a `full` dataset only. */
@@ -91,7 +87,7 @@ function methodology(datasets: Dataset[]): string {
   const entries = METRICS.flatMap((metric) => {
     const coverage = datasets.flatMap((dataset) => {
       const result = dataset.metrics[metric.id];
-      return result ? [`${escapeHtml(dataset.repo)} ${coverageText(result)}`] : [];
+      return result ? [`${escapeHtml(dataset.repo)} ${coverageText(result.coverage)}`] : [];
     });
     if (coverage.length === 0) return [];
     return [`<article data-methodology="${metric.id}"><h3>${escapeHtml(metric.name)}</h3>
