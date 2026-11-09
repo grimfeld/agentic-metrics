@@ -83,7 +83,7 @@ Each ticket gets an autonomy level. `full`: a transcript with at most one human 
 
 A regression is an issue labelled `regression` with a line starting `caused-by: #N` in its body or a comment; `#N` is the ticket or PR that caused it. The [GitHub Action](#github-action) adds the label when such a line is written.
 
-CI metrics (first-run CI rate, fix cycles, scheduled failures, batch health) read the repo's GitHub Actions runs. `ciWorkflow` names the main check workflow by path (`.github/workflows/check.yml`), file name or name; unset, it is the workflow that ran on the most PRs. A batch drops a PR it names (`#N` in its title or description) that merged only after it.
+CI metrics (first-run CI rate, fix cycles, scheduled failures, batch health) read the repo's GitHub Actions runs. `ciWorkflow` names the main check workflow by path (`.github/workflows/check.yml`), file name or name; unset, it is the workflow that ran on the most PRs. The `agentic-metrics.yml` workflow `init` installs is never CI. A batch drops a PR it names (`#N` in its title or description) that merged only after it.
 
 ```json
 { "ciWorkflow": "check.yml" }

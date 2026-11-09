@@ -76,7 +76,7 @@ export const fixCyclesMetric: Metric<FixCycles> = {
 
   methodology: {
     definition:
-      "Pushes to a PR's branch that followed a failed CI run or a review requesting changes on that PR, averaged over PRs with a CI run. A PR's pushes are the head commits its <code>pull_request</code> runs (any workflow) ran on, in order, each timed by its first run's creation. A push counts when a run on the previous head failed (first or latest attempt), or a changes-requested review was submitted between the previous push and this one. Re-running a run is not a push.",
+      "Pushes to a PR's branch that followed a failed CI run or a review requesting changes on that PR, averaged over PRs with a CI run. A PR's pushes are the head commits its <code>pull_request</code> runs (any workflow but the agentic-metrics one <code>init</code> installs) ran on, in order, each timed by its first run's creation. A push counts when a run on the previous head failed (first or latest attempt), or a changes-requested review was submitted between the previous push and this one. Re-running a run is not a push.",
     limits:
       "Only pushes that triggered CI are seen, and several commits pushed at once count as one push. Commit dates are not used, since authors control them. A PR with no CI run is left out. The first push, which opens the PR, is never a fix cycle.",
   },

@@ -1,6 +1,10 @@
-// The text conventions people write on issues (spec: "Regression", "Estimate").
-// One definition shared by the CLI (which measures them) and the GitHub Action
-// (which reminds about them), so both read the same lines the same way.
+// The conventions shared by the CLI (which measures them), `init` (which sets
+// them up) and the GitHub Action (which reminds about them): the lines people
+// write on issues (spec: "Regression", "Estimate"), the regression label and
+// the Action's workflow. One definition, so they read them the same way.
+
+/** The workflow `init` installs to run the Action. It reminds and labels: it is never CI. */
+export const ACTION_WORKFLOW = ".github/workflows/agentic-metrics.yml";
 
 /**
  * The label that marks an issue as a regression: `collect` counts only issues

@@ -50,6 +50,6 @@ export const firstRunCiRate: Metric<FirstRunCiRate> = {
     definition:
       "The share of PRs whose first CI result passed. The first result is the conclusion of the <em>first attempt</em> of the first run of the repo's main check workflow on the PR: a <code>pull_request</code> run on the PR's head branch, created between the PR's opening and its merge. A run that gave no result (cancelled, skipped) is passed over for the next one. The main check workflow is set per repo (<code>ciWorkflow</code>); unset, it is the workflow that ran on the most PRs. Re-runs: GitHub keeps a re-run under the same run, with the same id and creation time, and its listing shows only the latest attempt. The tool reads the first attempt of every re-run run (<code>attempts/1</code>), so passing on a re-run still counts as a failed first run. This was checked against real re-runs on GitHub.",
     limits:
-      "Only <code>pull_request</code> runs count: CI that runs on push alone gives no result. A PR with no run of the main workflow is left out, and so is a ticket with no such PR (tickets delivered only through a batch, for one). GitHub's own <code>dynamic</code> runs (CodeQL, Dependabot) are never CI.",
+      "Only <code>pull_request</code> runs count: CI that runs on push alone gives no result. A PR with no run of the main workflow is left out, and so is a ticket with no such PR (tickets delivered only through a batch, for one). GitHub's own <code>dynamic</code> runs (CodeQL, Dependabot) and the agentic-metrics workflow <code>init</code> installs are never CI.",
   },
 };

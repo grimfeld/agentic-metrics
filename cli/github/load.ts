@@ -1,5 +1,5 @@
 // Turns the GitHub source's raw `gh api` answers into the CLI's GitHub model.
-import { causedBy } from "../conventions.ts";
+import { ACTION_WORKFLOW, causedBy } from "../conventions.ts";
 import type { GitHubSource } from "./source.ts";
 
 export interface Repo {
@@ -123,7 +123,7 @@ export interface GitHubData {
   pullRequests: PullRequest[];
   issues: Issue[];
   regressions: RegressionIssue[];
-  /** Actions runs, newest first, GitHub's own `dynamic` runs left out. */
+  /** Actions runs, newest first, GitHub's own `dynamic` runs and the installed agentic-metrics workflow's left out. */
   workflowRuns: WorkflowRun[];
 }
 
@@ -272,7 +272,8 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
   const runPages = (await source.read("workflow-runs")) as { workflow_runs: RawRun[] }[];
   const workflowRuns = runPages
     .flatMap((page) => page.workflow_runs)
-    .filter((run) => run.event !== "dynamic")
+    // GitHub's own runs (CodeQL, Dependabot) and the Action `init` installs are not CI.
+    .filter((run) => run.event !== "dynamic" && run.path !== ACTION_WORKFLOW)
     .map((run): WorkflowRun => {
       const conclusion = run.status === "completed" ? (run.conclusion ?? undefined) : undefined;
       const first = run.run_attempt <= 1 ? { status: run.status, conclusion: run.conclusion } : run.first_attempt;

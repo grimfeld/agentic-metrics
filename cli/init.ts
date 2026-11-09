@@ -9,7 +9,7 @@ import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { DEFAULT_BRANCH_REGEX } from "./branch.ts";
 import { CONFIG_FILE, isAlias, readConfig, type PublishMode } from "./config.ts";
-import { REGRESSION_LABEL } from "./conventions.ts";
+import { ACTION_WORKFLOW, REGRESSION_LABEL } from "./conventions.ts";
 
 /** The GitHub calls `init` makes: the CLI's boundary to the repo's settings. */
 export interface RepoAdmin {
@@ -33,7 +33,7 @@ export interface InitOptions {
   publish?: PublishMode | undefined;
 }
 
-export const WORKFLOW_FILE = ".github/workflows/agentic-metrics.yml";
+export const WORKFLOW_FILE = ACTION_WORKFLOW;
 
 /** The bug label the Action watches; the config has no field for it. */
 const BUG_LABEL = "bug";

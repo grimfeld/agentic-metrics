@@ -1,8 +1,8 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { main } from "../../cli/main.ts";
 import { fixtureSource } from "../../cli/github/source.ts";
 
@@ -43,13 +43,13 @@ async function collect(fixture = "ci", config?: Record<string, unknown>): Promis
   let stderr = "";
   const status = await main(["collect"], {
     cwd,
-    github: fixtureSource(join(FIXTURES, fixture)),
+    github: fixtureSource(resolve(FIXTURES, fixture)),
     now: () => NOW,
     stdout: () => undefined,
     stderr: (text) => (stderr += text),
   });
   assert.equal(status, 0, stderr);
-  const repo = JSON.parse(readFileSync(join(FIXTURES, fixture, "repo.json"), "utf8")) as { full_name: string };
+  const repo = JSON.parse(readFileSync(resolve(FIXTURES, fixture, "repo.json"), "utf8")) as { full_name: string };
   const alias = config?.["alias"];
   const path = typeof alias === "string" && config?.["publish"] === "anonymized" ? `${alias}.json` : `${repo.full_name}.json`;
   const dataset = JSON.parse(readFileSync(join(cwd, "datasets", path), "utf8")) as { metrics: Record<string, Result> };
@@ -104,6 +104,34 @@ describe("fix cycles", () => {
   it("is unknown, not zero, when no PR has a CI run", async () => {
     const { fixCycles } = await collect("lifeline");
     assert.deepEqual(fixCycles, { value: "unknown", coverage: { tickets: 0, of: 5 } });
+  });
+});
+
+describe("the installed agentic-metrics workflow", () => {
+  /** The `ci` fixture plus a failed run of `agentic-metrics.yml` beside every PR run of the main check. */
+  function withConventionsRuns(): string {
+    const dir = mkdtempSync(join(tmpdir(), "am-ci-fixture-"));
+    cpSync(join(FIXTURES, "ci"), dir, { recursive: true });
+    const pages = JSON.parse(readFileSync(join(dir, "workflow-runs.json"), "utf8")) as { workflow_runs: Record<string, unknown>[] }[];
+    for (const page of pages) {
+      const extra = page.workflow_runs
+        .filter((run) => run["event"] === "pull_request" && run["path"] === ".github/workflows/check.yml")
+        .map((run) => ({ ...run, id: Number(run["id"]) + 1000, name: "agentic-metrics", path: ".github/workflows/agentic-metrics.yml", conclusion: "failure", run_attempt: 1 }));
+      page.workflow_runs.push(...extra);
+    }
+    writeFileSync(join(dir, "workflow-runs.json"), JSON.stringify(pages));
+    return dir;
+  }
+
+  it("is never taken for the main check, nor its failures for fix cycles", async () => {
+    const fixture = withConventionsRuns();
+    try {
+      const { firstRunCiRate, fixCycles } = await collect(fixture);
+      assert.equal((firstRunCiRate?.value as { workflow: string }).workflow, ".github/workflows/check.yml");
+      assert.equal((fixCycles?.value as { total: number }).total, 2);
+    } finally {
+      rmSync(fixture, { recursive: true, force: true });
+    }
   });
 });
 
