@@ -9,7 +9,8 @@ import type { GitHubSource } from "../../cli/github/source.ts";
 // Each test describes a small repo as `gh api` would answer for it. Every issue
 // is created at 00:00 and never labelled ready, so its lead time runs from
 // 00:00; a PR that ends up as a ticket of its own starts when it was opened, at
-// 02:00. The lead time therefore shows which ticket a PR was linked to.
+// 02:00 (its commits carry no dates unless a test sets them). The lead time
+// therefore shows which ticket a PR was linked to.
 const DAY = "2026-10-05";
 const NOW = new Date("2026-11-09T12:00:00Z");
 
@@ -21,6 +22,10 @@ interface FakePr {
   mergedAfter: number;
   closes?: number[];
   commits?: string[];
+  /** Hours after 00:00 when each of its commits was authored; without it, GitHub gives no commit dates. */
+  commitsAt?: number[];
+  /** Hours after 00:00 when it was opened; 2 by default. */
+  openedAfter?: number;
   author?: { login: string; __typename: string } | null;
 }
 
@@ -52,7 +57,7 @@ function fakeGitHub(issues: number[], prs: FakePr[]): GitHubSource {
               pageInfo: { hasNextPage: false, endCursor: null },
               nodes: prs.map((pr) => ({
                 number: pr.number,
-                createdAt: at(2),
+                createdAt: at(pr.openedAfter ?? 2),
                 mergedAt: at(pr.mergedAfter),
                 baseRefName: pr.base ?? "master",
                 headRefName: pr.head,
@@ -60,7 +65,12 @@ function fakeGitHub(issues: number[], prs: FakePr[]): GitHubSource {
                 closingIssuesReferences: {
                   nodes: (pr.closes ?? []).map((number) => ({ number, repository: { nameWithOwner: "grimfeld/lifeline" } })),
                 },
-                commits: { nodes: (pr.commits ?? []).map((messageHeadline) => ({ commit: { messageHeadline } })) },
+                commits: {
+                  nodes: [
+                    ...(pr.commits ?? []).map((messageHeadline) => ({ commit: { messageHeadline } })),
+                    ...(pr.commitsAt ?? []).map((hours) => ({ commit: { messageHeadline: "Work", authoredDate: at(hours) } })),
+                  ],
+                },
               })),
             },
           },
@@ -188,9 +198,52 @@ describe("linking a PR to its ticket", () => {
   });
 });
 
+describe("when a PR that is its own ticket starts", () => {
+  // Lifeline's Claude Code cloud sessions push their work and open the PR
+  // only to merge it, seconds later: its opening is not when the work began.
+  it("starts at its first commit when that is earlier than its opening", async () => {
+    const data = await collect(fakeGitHub([], [{ number: 301, head: "claude/x", openedAfter: 9.99, mergedAfter: 10, commitsAt: [4, 9.9] }]));
+
+    assert.deepEqual(leadTimes(data), { p50Hours: 6, p90Hours: 6 });
+  });
+
+  it("starts at its opening when it was opened before its commits (a draft PR, say)", async () => {
+    const data = await collect(fakeGitHub([], [{ number: 301, head: "draft", openedAfter: 2, mergedAfter: 10, commitsAt: [9] }]));
+
+    assert.deepEqual(leadTimes(data), { p50Hours: 8, p90Hours: 8 });
+  });
+
+  it("has an unknown lead time when it was opened after its one commit: GitHub shows nothing from before the work ended", async () => {
+    // Lifeline's PR #1: one commit authored at 18:28, opened 18:33:28, merged 10 s later.
+    const data = await collect(
+      fakeGitHub([201], [
+        { number: 301, head: "claude/x", openedAfter: 9.99, mergedAfter: 10, commitsAt: [9.9] },
+        { number: 302, head: "spec-201-y", mergedAfter: 10 },
+      ]),
+    );
+
+    assert.equal(data.tickets, 2);
+    assert.deepEqual(leadTimes(data), { p50Hours: 10, p90Hours: 10 });
+    assert.deepEqual(data.metrics["leadTime"]?.coverage, { tickets: 1, of: 2 });
+  });
+});
+
 function throughputWeek(dataset: Dataset): unknown {
   return (dataset.metrics["throughput"]?.value as { weeks: unknown[] } | undefined)?.weeks;
 }
+
+describe("throughput of a spec PR", () => {
+  // Lifeline's week of Oct 19: its issues began on Oct 18, and spec PRs each
+  // closed a spec issue and its slices (PR #115 closed #104–#114). Not a bulk
+  // close of old issues: each closed issue is a delivered ticket.
+  it("counts every issue a PR closes as a ticket delivered that week, and the PR once", async () => {
+    const issues = [104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114];
+    const data = await collect(fakeGitHub(issues, [{ number: 115, head: "demo", mergedAfter: 10, closes: issues }]));
+
+    assert.equal(data.tickets, 11);
+    assert.deepEqual(throughputWeek(data), [{ week: "2026-10-05", tickets: 11, pullRequests: 1 }]);
+  });
+});
 
 describe("integration PRs", () => {
   it("keeps a batch out of ticket metrics: it is no ticket and no PR of its own, but is counted apart", async () => {
