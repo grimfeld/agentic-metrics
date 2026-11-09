@@ -112,6 +112,94 @@ describe("Action: Closes #N from the branch name", () => {
   });
 });
 
+const REGRESSION_QUESTION =
+  "Regression? Reply `caused-by: #N` naming the ticket or PR that introduced it. <!-- agentic-metrics:regression-question -->";
+
+describe("Action: regression question on the bug label", () => {
+  it("asks whether a newly labelled bug is a regression", () => {
+    const operations = decide({ name: "issues", payload: fixture("issues-labeled-bug.json"), comments: [] });
+
+    assert.deepEqual(operations, [
+      { kind: "create-issue-comment", owner: "grimfeld", repo: "lifeline", issueNumber: 402, body: REGRESSION_QUESTION },
+    ]);
+  });
+
+  it("does not ask again when the question is already on the issue", () => {
+    const comments = [{ body: "Seen on Safari too." }, { body: REGRESSION_QUESTION }];
+
+    assert.deepEqual(decide({ name: "issues", payload: fixture("issues-labeled-bug.json"), comments }), []);
+  });
+
+  it("does not ask when the bug already names its cause", () => {
+    const comments = [{ body: "Found it.\ncaused-by: #376" }];
+
+    assert.deepEqual(decide({ name: "issues", payload: fixture("issues-labeled-bug.json"), comments }), []);
+  });
+
+  it("uses the repo's bug label when one is given", () => {
+    const payload = withLabel(fixture("issues-labeled-bug.json"), "type: bug");
+
+    assert.equal(decide({ name: "issues", payload, comments: [] }, { bugLabel: "Type: Bug" }).length, 1);
+    assert.deepEqual(decide({ name: "issues", payload: fixture("issues-labeled-bug.json"), comments: [] }, { bugLabel: "type: bug" }), []);
+  });
+
+  it("ignores a bug label added to a pull request", () => {
+    const payload = fixture("issues-labeled-bug.json");
+    (payload["issue"] as Record<string, unknown>)["pull_request"] = { url: "https://api.github.com/repos/grimfeld/lifeline/pulls/402" };
+
+    assert.deepEqual(decide({ name: "issues", payload, comments: [] }), []);
+  });
+
+  it("ignores other labels and other issue actions", () => {
+    const enhancement = withLabel(fixture("issues-labeled-bug.json"), "enhancement");
+    const unlabeled = { ...fixture("issues-labeled-bug.json"), action: "unlabeled" };
+
+    assert.deepEqual(decide({ name: "issues", payload: enhancement, comments: [] }), []);
+    assert.deepEqual(decide({ name: "issues", payload: unlabeled, comments: [] }), []);
+  });
+});
+
+const ESTIMATE_REMINDER =
+  "No estimate yet: reply `estimate: 2d` (h, d or w) before work starts, if you have one. <!-- agentic-metrics:estimate-reminder -->";
+
+describe("Action: estimate reminder on the ready label", () => {
+  it("reminds about an estimate when a ticket without one becomes ready", () => {
+    const comments = [{ body: "Context from #394: shelves are per user." }];
+
+    const operations = decide({ name: "issues", payload: fixture("issues-labeled-ready.json"), comments });
+
+    assert.deepEqual(operations, [
+      { kind: "create-issue-comment", owner: "grimfeld", repo: "lifeline", issueNumber: 376, body: ESTIMATE_REMINDER },
+    ]);
+  });
+
+  for (const estimate of ["estimate: 2d", "Estimate: 4h", "Looked at it.\nestimate: 1w"]) {
+    it(`stays quiet when the ticket already has an estimate (${JSON.stringify(estimate)})`, () => {
+      const comments = [{ body: "Context from #394." }, { body: estimate }];
+
+      assert.deepEqual(decide({ name: "issues", payload: fixture("issues-labeled-ready.json"), comments }), []);
+    });
+  }
+
+  it("does not remind again when the reminder is already on the issue", () => {
+    const comments = [{ body: ESTIMATE_REMINDER }];
+
+    assert.deepEqual(decide({ name: "issues", payload: fixture("issues-labeled-ready.json"), comments }), []);
+  });
+
+  it("uses the repo's ready label when one is given", () => {
+    const payload = withLabel(fixture("issues-labeled-ready.json"), "ready");
+
+    assert.equal(decide({ name: "issues", payload, comments: [] }, { readyLabel: "ready" }).length, 1);
+    assert.deepEqual(decide({ name: "issues", payload: fixture("issues-labeled-ready.json"), comments: [] }, { readyLabel: "ready" }), []);
+  });
+});
+
+function withLabel(payload: Record<string, unknown>, name: string): Record<string, unknown> {
+  payload["label"] = { name };
+  return payload;
+}
+
 function withBody(body: string | null, action = "opened"): Record<string, unknown> {
   const payload = fixture("pull-request-opened.json");
   (payload["pull_request"] as { body: string | null }).body = body;

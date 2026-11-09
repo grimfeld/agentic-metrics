@@ -2,19 +2,19 @@
 // operations out. It performs no I/O; `main.ts` carries the operations out.
 
 export type GitHubEvent = {
-  /** `GITHUB_EVENT_NAME`, e.g. `pull_request`. */
+  /** `GITHUB_EVENT_NAME`, e.g. `pull_request` or `issues`. */
   name: string;
   /** The parsed `GITHUB_EVENT_PATH` file. */
   payload: Record<string, unknown>;
+  /** For `issues` events: the issue's current comments, which the wrapper fetches. */
+  comments?: IssueComment[];
 };
 
-export type Operation = {
-  kind: "update-pr-body";
-  owner: string;
-  repo: string;
-  pullNumber: number;
-  body: string;
-};
+export type IssueComment = { body: string | null };
+
+export type Operation =
+  | { kind: "update-pr-body"; owner: string; repo: string; pullNumber: number; body: string }
+  | { kind: "create-issue-comment"; owner: string; repo: string; issueNumber: number; body: string };
 
 export type Options = {
   /**
@@ -22,7 +22,17 @@ export type Options = {
    * group that matched, or the whole match when the pattern has no groups.
    */
   branchRegex?: RegExp;
+  /** The label that marks a bug. Default `bug`. */
+  bugLabel?: string;
+  /** The label that marks a ticket ready for work. Default `ready-for-agent`. */
+  readyLabel?: string;
 };
+
+export const DEFAULT_BUG_LABEL = "bug";
+export const DEFAULT_READY_LABEL = "ready-for-agent";
+
+export const REGRESSION_MARKER = "<!-- agentic-metrics:regression-question -->";
+export const ESTIMATE_MARKER = "<!-- agentic-metrics:estimate-reminder -->";
 
 /**
  * Matches `16-title` (GitHub's "create a branch" default) at the start, or a
@@ -41,9 +51,75 @@ const PR_ACTIONS = new Set(["opened", "edited", "reopened"]);
 // `&#38;` is an HTML entity, not a reference.
 const ISSUE_REFERENCE = /(?:^|[^&])#\d+\b|github\.com\/[\w.-]+\/[\w.-]+\/(?:issues|pull)\/\d+/i;
 
+// A `caused-by: #N` line (spec: "Regression"), in the issue body or a reply.
+const CAUSED_BY = /^\s*caused-by:\s*(?:[\w.-]+\/[\w.-]+)?#\d+/im;
+
+// An `estimate: <n><h|d|w>` comment (spec: "Estimate").
+const ESTIMATE = /^\s*estimate:\s*\d+(?:\.\d+)?\s*[hdw]\b/im;
+
 export function decide(event: GitHubEvent, options: Options = {}): Operation[] {
-  if (event.name !== "pull_request") return [];
-  const payload = event.payload as PullRequestPayload;
+  if (event.name === "pull_request") return decidePullRequest(event.payload as PullRequestPayload, options);
+  if (event.name === "issues") return decideIssue(event.payload as IssuesPayload, event.comments ?? [], options);
+  return [];
+}
+
+function decideIssue(payload: IssuesPayload, comments: IssueComment[], options: Options): Operation[] {
+  if (payload.action !== "labeled") return [];
+  // Labelling a PR fires `issues` too; reminders are for issues only.
+  if (payload.issue.pull_request !== undefined) return [];
+  const label = payload.label?.name ?? "";
+  if (sameLabel(label, options.bugLabel ?? DEFAULT_BUG_LABEL)) return regressionQuestion(payload, comments);
+  if (sameLabel(label, options.readyLabel ?? DEFAULT_READY_LABEL)) return estimateReminder(payload, comments);
+  return [];
+}
+
+function regressionQuestion(payload: IssuesPayload, comments: IssueComment[]): Operation[] {
+  if (alreadyPosted(comments, REGRESSION_MARKER)) return [];
+  const texts = [payload.issue.body, ...comments.map((c) => c.body)];
+  if (texts.some((text) => CAUSED_BY.test(text ?? ""))) return [];
+
+  return [
+    comment(
+      payload,
+      `Regression? Reply \`caused-by: #N\` naming the ticket or PR that introduced it. ${REGRESSION_MARKER}`,
+    ),
+  ];
+}
+
+function estimateReminder(payload: IssuesPayload, comments: IssueComment[]): Operation[] {
+  if (alreadyPosted(comments, ESTIMATE_MARKER)) return [];
+  if (comments.some((c) => ESTIMATE.test(c.body ?? ""))) return [];
+
+  return [
+    comment(
+      payload,
+      `No estimate yet: reply \`estimate: 2d\` (h, d or w) before work starts, if you have one. ${ESTIMATE_MARKER}`,
+    ),
+  ];
+}
+
+// The hidden marker is what makes a reminder "at most once": it survives edits
+// to the comment and is invisible once rendered, so nobody copies it by accident.
+function alreadyPosted(comments: IssueComment[], marker: string): boolean {
+  return comments.some((c) => (c.body ?? "").includes(marker));
+}
+
+// GitHub label names are unique regardless of case.
+function sameLabel(a: string, b: string): boolean {
+  return a.toLowerCase() === b.toLowerCase();
+}
+
+function comment(payload: IssuesPayload, body: string): Operation {
+  return {
+    kind: "create-issue-comment",
+    owner: payload.repository.owner.login,
+    repo: payload.repository.name,
+    issueNumber: payload.issue.number,
+    body,
+  };
+}
+
+function decidePullRequest(payload: PullRequestPayload, options: Options): Operation[] {
   if (!PR_ACTIONS.has(payload.action)) return [];
 
   const pr = payload.pull_request;
@@ -87,4 +163,11 @@ type PullRequestPayload = {
     head: { ref: string; repo: { full_name: string } | null };
   };
   repository: { full_name: string; name: string; owner: { login: string } };
+};
+
+type IssuesPayload = {
+  action: string;
+  label?: { name: string };
+  issue: { number: number; body: string | null; pull_request?: unknown };
+  repository: { name: string; owner: { login: string } };
 };
