@@ -66,13 +66,14 @@ export const autonomy: Metric<AutonomyCounts> = {
 
   section(value) {
     const total = value.full + value.assisted + value.manual;
-    const counts = AUTONOMY_LEVELS.map((level) => `<tr><th>${NAMES[level]}</th><td>${String(value[level])}</td></tr>`).join("");
-    const overridden = `<p>${String(value.overridden)} of ${String(total)} tickets overridden by an <code>autonomy:*</code> label.</p>`;
-    if (!value.perTicket) return `<table><tbody>${counts}</tbody></table>${overridden}`;
-    const rows = value.perTicket
-      .map((row) => `<tr><td>${row.ticket}</td><td>${NAMES[row.level]}</td><td>${row.overridden ? `by label (computed: ${NAMES[row.computed]})` : "computed"}</td></tr>`)
-      .join("");
-    return `<table><tbody>${counts}</tbody></table>${overridden}<table><thead><tr><th>Ticket</th><th>Level</th><th>Set</th></tr></thead><tbody>${rows}</tbody></table>`;
+    const counts = AUTONOMY_LEVELS.map((level) => `${String(value[level])} ${level}`).join(", ");
+    return `<p><strong>${String(value.full)} of ${String(total)}</strong> tickets delivered at full autonomy (${counts}). ${String(value.overridden)} of ${String(total)} overridden by an <code>autonomy:*</code> label.</p>`;
+  },
+
+  ticketTable: {
+    columns: ["Level", "Set"],
+    rows: ({ perTicket }) =>
+      perTicket?.map((row) => ({ id: row.ticket, cells: [NAMES[row.level], row.overridden ? `by label (computed: ${NAMES[row.computed]})` : "computed"] })),
   },
 
   methodology: {

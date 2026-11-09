@@ -176,23 +176,22 @@ function trendRows(metricHtml: string): string {
 }
 
 describe("report: trends", () => {
-  it("shows each metric's figure per month with its coverage on its page, and the others' under the repo page's Detail", () => {
-    assert.equal(textOf(html, "data-trend", "periods"), "Metric 2026-10 4 tickets 2026-11 1 ticket");
-    assert.equal(textOf(html, "data-trend", "estimateVsActual"), "Estimate vs actual p50 actual / estimate 0.31 2 of 4 unknown 0 of 1");
+  it("shows each metric's figure per month with its coverage on its page, and none on the repo page", () => {
     assert.match(textOf(page("humanMessagesPerTicket"), "data-section", "trend"), /Month Human messages per ticket \(p50\) Tickets Oct 2026 3 3 of 4 Nov 2026 2 1 of 1$/);
     assert.equal(trendRows(page("leadTime")), "Oct 2026 12 h 4 of 4 Nov 2026 10 h 1 of 1");
+    assert.equal(trendRows(page("estimateVsActual")), "Oct 2026 0.31 2 of 4 Nov 2026 unknown 0 of 1");
     for (const metric of METRICS) assert.match(page(metric.id), /data-section="trend"/, metric.id);
-    for (const id of ["leadTime", "humanMessagesPerTicket"]) assert.doesNotMatch(html, new RegExp(`data-trend="${id}"`), `${id}: only on its page`);
+    assert.doesNotMatch(html, /data-trend=|data-section="trends"/);
   });
 });
 
 describe("report: comparison by autonomy level", () => {
-  it("shows each metric's figure per level, with its coverage", () => {
-    assert.equal(textOf(html, "data-autonomy", "levels"), "Metric Full 3 tickets Assisted 1 ticket Manual 1 ticket");
+  it("shows each metric's figure per level, with its coverage, on its page", () => {
+    assert.match(textOf(page("netLinesRemoved"), "data-section", "tiles"), / Full \+45 3 of 3 tickets Assisted \+90 1 of 1 tickets Manual \+195 1 of 1 tickets$/);
+    assert.doesNotMatch(html, /data-autonomy=|data-section="by-autonomy"/);
     assert.match(textOf(page("humanMessagesPerTicket"), "data-section", "tiles"), / Full 2 3 of 3 tickets Assisted 3 1 of 1 tickets Manual unknown 0 of 1 tickets$/);
     assert.match(textOf(page("regressionRate"), "data-section", "tiles"), / Full 33\.3% 3 of 3 tickets Assisted 100% 1 of 1 tickets Manual 100% 1 of 1 tickets$/);
     assert.match(page("regressionRate"), /<title id="autonomy-regressionRate-title">Regression rate by autonomy level<\/title>/);
-    assert.doesNotMatch(html, /data-autonomy="orchestrationTime"/);
     assert.doesNotMatch(page("orchestrationTime"), /data-tile="full"|data-section="by-autonomy"/);
   });
 });

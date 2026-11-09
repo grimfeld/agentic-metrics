@@ -33,6 +33,13 @@ export interface Figure<V> {
    * out of the comparison by autonomy level.
    */
   byAutonomy?: boolean;
+  /**
+   * True for a figure that reads the other way round from how it is shown:
+   * net lines changed keeps lines removed (positive when the code shrank) but
+   * shows lines changed. Charts and sparklines draw it negated, so that growth
+   * is up; `format` is still given the figure itself.
+   */
+  drawNegated?: boolean;
 }
 
 /**

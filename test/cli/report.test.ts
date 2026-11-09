@@ -111,16 +111,22 @@ describe("report", () => {
     assert.match(textOf("data-methodology", "throughput"), /^Throughput Tickets and pull requests delivered per week/);
   });
 
-  it("shows the test ratio and net lines changed, with each ticket's lines", () => {
+  it("shows the test ratio and net lines changed on their pages, with each ticket's lines", () => {
     assert.equal(
-      textOf("data-section", "testRatio", "grimfeld/lifeline"),
-      "Test lines per production line 0.59 test lines added per production line: 65 test lines for 110 production lines. " +
-        "Ticket Test lines Production lines #104 30 80 #105 30 80 #106 30 30 PR #137 5 0",
+      onMetricPage("grimfeld/lifeline", "testRatio", "testRatio"),
+      "Summary 0.59 test lines added per production line: 65 test lines for 110 production lines.",
+    );
+    assert.match(
+      onMetricPage("grimfeld/lifeline", "testRatio", "tickets"),
+      / Test lines Production lines Test \/ production #104 .* 30 80 0\.38 #105 .* 30 80 0\.38 #106 .* 30 30 1 PR #137 .* 5 0 unknown$/,
     );
     assert.equal(
-      textOf("data-section", "netLinesRemoved", "grimfeld/lifeline"),
-      "Net lines changed +240 net lines changed: 385 added, 145 deleted. Tickets removing more than they added: 1. " +
-        "Ticket Added Deleted Net change #104 120 30 +90 #105 120 30 +90 PR #136 200 5 +195 #106 60 110 −50 PR #137 5 0 +5",
+      onMetricPage("grimfeld/lifeline", "netLinesRemoved", "netLinesRemoved"),
+      "Summary +240 net lines changed: 385 added, 145 deleted. Tickets removing more than they added: 1.",
+    );
+    assert.match(
+      onMetricPage("grimfeld/lifeline", "netLinesRemoved", "tickets"),
+      / Added Deleted Net change #104 .* 120 30 \+90 #105 .* 120 30 \+90 PR #136 .* 200 5 \+195 #106 .* 60 110 −50 PR #137 .* 5 0 \+5$/,
     );
   });
 
@@ -139,20 +145,24 @@ describe("report", () => {
     );
   });
 
-  it("shows each ticket's size proxies", () => {
+  it("shows each ticket's size proxies on its page", () => {
+    assert.equal(onMetricPage("grimfeld/lifeline", "size", "size"), "Summary Median ticket: 150 lines changed in 3 files.");
     assert.match(
-      textOf("data-section", "size", "grimfeld/lifeline"),
-      /^Ticket size Median ticket: 150 lines changed in 3 files\. Ticket Diff lines Files Sub-tickets #104 150 3 2 #105 150 3 0 PR #136 205 101 0 #106 170 3 0 PR #137 5 1 0$/,
+      onMetricPage("grimfeld/lifeline", "size", "tickets"),
+      / Diff lines Files Sub-tickets #104 .* 150 3 2 #105 .* 150 3 0 PR #136 .* 205 101 0 #106 .* 170 3 0 PR #137 .* 5 1 0$/,
     );
   });
 
-  it("shows estimate vs actual beside each ticket's size proxies", () => {
+  it("shows estimate vs actual beside each ticket's size proxies on its page", () => {
     assert.equal(
-      textOf("data-section", "estimateVsActual", "grimfeld/lifeline"),
-      "Estimate vs actual Median actual / estimate: 0.31 . Left out because the estimate came after the first commit: 1. " +
-        "Ticket Estimate Actual Actual / estimate Diff lines Files Sub-tickets #104 4 h 11 h 2.75 150 3 2 #105 36 h 11 h 0.31 150 3 0",
+      onMetricPage("grimfeld/lifeline", "estimateVsActual", "estimateVsActual"),
+      "Summary Median actual / estimate: 0.31 . Left out because the estimate came after the first commit: 1.",
     );
-    assert.equal(textOf("data-section", "estimateVsActual", "grimfeld/agentic-metrics"), "Estimate vs actual unknown");
+    assert.match(
+      onMetricPage("grimfeld/lifeline", "estimateVsActual", "tickets"),
+      / Estimate Actual Actual \/ estimate Diff lines Files Sub-tickets #104 .* 4 h 11 h 2\.75 150 3 2 #105 .* 36 h 11 h 0\.31 150 3 0$/,
+    );
+    assert.equal(onMetricPage("grimfeld/agentic-metrics", "estimateVsActual", "estimateVsActual"), "Summary unknown");
   });
 
   it("defines the diff and estimate metrics in Methodology", () => {

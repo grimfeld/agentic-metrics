@@ -1,6 +1,6 @@
 import { batchDiffCommits, hasOwnDiff, type Ticket } from "../linker.ts";
-import { escapeHtml } from "./html.ts";
-import type { Metric } from "./metric.ts";
+import { trendLine } from "../report/charts.ts";
+import type { Figure, Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
 import { plural } from "./stats.ts";
 
@@ -24,6 +24,10 @@ export interface NetLinesRemoved {
   /** Each ticket's lines over its own PRs, in delivery order. Absent once anonymized. */
   tickets?: { ticket: string; linesAdded: number; linesDeleted: number }[];
 }
+
+// The figure stays lines removed, as trends in published datasets hold it; it
+// is shown as lines changed, and drawn negated so that growth is up.
+const NET_FIGURE: Figure<NetLinesRemoved> = { label: "net", of: ({ netLinesRemoved }) => netLinesRemoved, format: (removed) => signed(-removed), drawNegated: true };
 
 // Shown as "Net lines changed", lines added minus lines deleted, signed so that
 // growth reads `+`. The id and the `netLinesRemoved` field (deleted minus added)
@@ -49,19 +53,31 @@ export const netLinesRemoved: Metric<NetLinesRemoved> = {
   // Per-ticket rows name tickets: an anonymized dataset keeps the totals only.
   anonymize: ({ linesAdded, linesDeleted, netLinesRemoved, ticketsNetRemoving }) => ({ linesAdded, linesDeleted, netLinesRemoved, ticketsNetRemoving }),
 
-  // The figure stays lines removed, as trends in published datasets hold it; it is shown as lines changed.
-  figure: { label: "net", of: ({ netLinesRemoved }) => netLinesRemoved, format: (removed) => signed(-removed) },
+  figure: NET_FIGURE,
+
+  // Charts draw the figure negated (`drawNegated`): lines changed, growth up.
+  chart: {
+    title: "Net lines changed by month",
+    draw: (input) => trendLine(input, NET_FIGURE, "Net lines changed"),
+  },
 
   sentence: ({ linesAdded, linesDeleted, ticketsNetRemoving }) =>
     `Net lines changed: ${signed(linesAdded - linesDeleted)} (${count(linesAdded)} added, ${count(linesDeleted)} deleted); ${plural(ticketsNetRemoving, "ticket")} removed more code than ${ticketsNetRemoving === 1 ? "it" : "they"} added`,
 
-  section({ linesAdded, linesDeleted, ticketsNetRemoving, tickets }) {
-    const summary = `<p><strong>${signed(linesAdded - linesDeleted)}</strong> net lines changed: ${count(linesAdded)} added, ${count(linesDeleted)} deleted. Tickets removing more than they added: ${String(ticketsNetRemoving)}.</p>`;
-    if (!tickets?.length) return summary;
-    const rows = tickets
-      .map((t) => `<tr><td>${escapeHtml(t.ticket)}</td><td>${count(t.linesAdded)}</td><td>${count(t.linesDeleted)}</td><td>${signed(t.linesAdded - t.linesDeleted)}</td></tr>`)
-      .join("");
-    return `${summary}<table><thead><tr><th>Ticket</th><th>Added</th><th>Deleted</th><th>Net change</th></tr></thead><tbody>${rows}</tbody></table>`;
+  section: ({ linesAdded, linesDeleted, ticketsNetRemoving }) =>
+    `<p><strong>${signed(linesAdded - linesDeleted)}</strong> net lines changed: ${count(linesAdded)} added, ${count(linesDeleted)} deleted. Tickets removing more than they added: ${String(ticketsNetRemoving)}.</p>`,
+
+  ticketTable: {
+    columns: ["Added", "Deleted", "Net change"],
+    rows: ({ tickets }) =>
+      tickets?.map((t) => ({
+        id: t.ticket,
+        cells: [
+          { text: count(t.linesAdded), sort: t.linesAdded },
+          { text: count(t.linesDeleted), sort: t.linesDeleted },
+          { text: signed(t.linesAdded - t.linesDeleted), sort: t.linesAdded - t.linesDeleted },
+        ],
+      })),
   },
 
   methodology: {

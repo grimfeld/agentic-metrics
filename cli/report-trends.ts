@@ -1,80 +1,29 @@
-// The report's reader-facing summaries of a repo, all built from the dataset
-// and each metric's `figure` and `sentence`, so a new metric appears in them
-// by declaring those: trends over time, the comparison by autonomy level, and
-// CV-ready sentences. A sentence only ever quotes a known value, with its
-// coverage.
-import { AUTONOMY_LEVELS, type AutonomyLevel } from "./autonomy.ts";
+// The report's CV-ready sentences, built from the dataset and each metric's
+// `figure` and `sentence`, so a new metric appears in them by declaring those:
+// its value, its comparison by autonomy level and its trend over time. A
+// sentence only ever quotes a known value, with its coverage. Each metric's
+// trend and comparison as tables are on its own page (`report/metric-page.ts`).
 import type { Dataset } from "./dataset.ts";
 import { escapeHtml } from "./metrics/html.ts";
 import { METRICS } from "./metrics/index.ts";
-import type { Figure, FigureResult, Metric } from "./metrics/metric.ts";
-import { coverageText, plural } from "./metrics/stats.ts";
-import { SUPPRESSED, UNKNOWN } from "./metrics/metric.ts";
-import { MIN_ANONYMIZED_TICKETS } from "./trends.ts";
-
-const LEVEL_NAMES: Record<AutonomyLevel, string> = { full: "Full", assisted: "Assisted", manual: "Manual" };
-
+import type { Figure, Metric } from "./metrics/metric.ts";
+import { coverageText } from "./metrics/stats.ts";
+import { UNKNOWN } from "./metrics/metric.ts";
 
 /** `2026-10` as `October 2026`. */
 function monthName(period: string): string {
   return new Date(`${period}-01T00:00:00Z`).toLocaleString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
 }
 
-/** The metrics this version defines with a figure (of `metrics`, in report order), each with the figures `figures` holds for it. */
-function withFigures<T>(figures: Record<string, T> | undefined, metrics: readonly Metric<unknown>[] = METRICS): { metric: Metric<unknown>; figure: Figure<unknown>; results: T }[] {
+/** The metrics this version defines with a figure, in report order, each with the figures `figures` holds for it. */
+function withFigures<T>(figures: Record<string, T> | undefined): { metric: Metric<unknown>; figure: Figure<unknown>; results: T }[] {
   if (!figures) return [];
-  return metrics.flatMap((metric) => {
+  return METRICS.flatMap((metric) => {
     const results = figures[metric.id];
     return metric.figure && results ? [{ metric, figure: metric.figure, results }] : [];
   });
 }
 
-function rowHeader(metric: Metric<unknown>, figure: Figure<unknown>): string {
-  return `<th>${escapeHtml(metric.name)} <small>${escapeHtml(figure.label)}</small></th>`;
-}
-
-function cell(figure: Figure<unknown>, result: FigureResult): string {
-  const value =
-    result.value === UNKNOWN
-      ? `<span class="unknown">unknown</span>`
-      : result.value === SUPPRESSED
-        ? `<span class="unknown" title="Withheld: fewer than ${String(MIN_ANONYMIZED_TICKETS)} tickets">—</span>`
-        : escapeHtml(figure.format(result.value));
-  return `<td>${value} <small>${String(result.coverage.tickets)} of ${String(result.coverage.of)}</small></td>`;
-}
-
-/** `metrics`: the rows to show, in report order; every metric by default. */
-export function trendSection(dataset: Dataset, metrics?: readonly Metric<unknown>[]): string {
-  const trends = dataset.trends;
-  const rows = withFigures(trends?.metrics, metrics);
-  if (!trends || rows.length === 0 || trends.periods.length === 0) return "";
-  const head = trends.periods.map(({ period, tickets }) => `<th>${escapeHtml(period)} <small>${plural(tickets, "ticket")}</small></th>`).join("");
-  const body = rows
-    .map(({ metric, figure, results }) => `<tr data-trend="${metric.id}">${rowHeader(metric, figure)}${results.map((result) => cell(figure, result)).join("")}</tr>`)
-    .join("\n");
-  return `<section class="trends" data-section="trends"><h3>Trends</h3>
-<p>Each metric over the tickets delivered in each month (UTC), with its coverage within the month. Months with no delivery are left out.</p>
-<div class="scroll"><table><thead><tr data-trend="periods"><th>Metric</th>${head}</tr></thead><tbody>
-${body}
-</tbody></table></div></section>`;
-}
-
-/** `metrics`: the rows to show, in report order; every metric by default. */
-export function autonomySection(dataset: Dataset, metrics?: readonly Metric<unknown>[]): string {
-  const rows = withFigures(dataset.byAutonomy, metrics);
-  if (rows.length === 0) return "";
-  // Every metric covers the same tickets per level: the level's tickets are each result's `of`.
-  const first = rows[0]?.results;
-  const head = AUTONOMY_LEVELS.map((level) => `<th>${LEVEL_NAMES[level]} <small>${plural(first?.[level].coverage.of ?? 0, "ticket")}</small></th>`).join("");
-  const body = rows
-    .map(({ metric, figure, results }) => `<tr data-autonomy="${metric.id}">${rowHeader(metric, figure)}${AUTONOMY_LEVELS.map((level) => cell(figure, results[level])).join("")}</tr>`)
-    .join("\n");
-  return `<section class="by-autonomy" data-section="by-autonomy"><h3>By autonomy level</h3>
-<p>Each metric over the tickets at each autonomy level (see Autonomy level in Methodology), with its coverage within the level. Metrics no ticket owns, like orchestration time, are left out.</p>
-<div class="scroll"><table><thead><tr data-autonomy="levels"><th>Metric</th>${head}</tr></thead><tbody>
-${body}
-</tbody></table></div></section>`;
-}
 
 /** Every CV sentence of a dataset, keyed by what it quotes: `<metric>`, `<metric>:autonomy` or `<metric>:trend`. */
 export function cvSentences(dataset: Dataset): { key: string; text: string }[] {

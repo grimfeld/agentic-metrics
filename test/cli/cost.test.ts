@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../../cli/main.ts";
-import { readRepo } from "./report-pages.ts";
+import { readMetricPages, readRepo } from "./report-pages.ts";
 import { fixtureSource } from "../../cli/github/source.ts";
 import { transcriptCache } from "../../cli/transcripts/source.ts";
 
@@ -160,14 +160,19 @@ describe("delegation and cost", () => {
   it("labels the dollars API equivalent in the report and Methodology, with the price table used", async () => {
     await run(["collect"]);
     await run(["report"]);
-    const html = readRepo(join(cwd, "report"), "grimfeld/lifeline");
+    const site = join(cwd, "report");
+    const html = `${readMetricPages(site, "grimfeld/lifeline", ["apiEquivalentCost", "subAgents"])}\n${readRepo(site, "grimfeld/lifeline")}`;
     const text = (pattern: RegExp) => (pattern.exec(html)?.[1] ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 
     const section = text(/data-section="apiEquivalentCost">([\s\S]*?)<\/section>/);
-    assert.match(section, /^API-equivalent cost \$1\.24 API equivalent over the tickets with transcripts \(p50 \$1\.17, p90 \$1\.17 per ticket\), and \$0\.01 API equivalent on no ticket/);
+    assert.match(section, /^Summary \$1\.24 API equivalent over the tickets with transcripts \(p50 \$1\.17, p90 \$1\.17 API equivalent per ticket\), and \$0\.01 API equivalent on no ticket/);
     assert.match(section, /prices of 2026-11-09/);
     assert.match(section, /claude-future-9/);
-    assert.match(text(/data-section="subAgents">([\s\S]*?)<\/section>/), /^Sub-agents per ticket 2 sub-agents/);
+    assert.match(text(/data-section="tickets">([\s\S]*?)<\/section>/), / API equivalent #104 .* \$1\.17 #105 .* \$1\.17 #106 .* \$0\.02 PR #137 .* unknown$/);
+    assert.equal(
+      text(/data-section="subAgents">([\s\S]*?)<\/section>/),
+      "Summary 2 sub-agents on the tickets with transcripts: half the tickets had up to 0, nine in ten up to 2. Models: claude-haiku-5-5 1, claude-sonnet-5-5 1.",
+    );
     const methodology = text(/data-methodology="apiEquivalentCost">([\s\S]*?)<\/article>/);
     assert.match(methodology, /API equivalent/);
     assert.match(methodology, /not (what was )?billed/);

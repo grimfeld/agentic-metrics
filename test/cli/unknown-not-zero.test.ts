@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { main } from "../../cli/main.ts";
 import { fixtureSource } from "../../cli/github/source.ts";
 import { transcriptCache } from "../../cli/transcripts/source.ts";
-import { readRepo } from "./report-pages.ts";
+import { readMetricPages, readRepo } from "./report-pages.ts";
 
 const GITHUB = join(import.meta.dirname, "../fixtures/github");
 const BATCH_CACHE = join(import.meta.dirname, "../fixtures/transcript-cache/batch");
@@ -55,6 +55,11 @@ function report(repo = "grimfeld/agentic-metrics"): string {
   return readRepo(join(cwd, "report"), repo);
 }
 
+/** A metric's page of the repo. */
+function metricPage(id: string, repo = "grimfeld/agentic-metrics"): string {
+  return readMetricPages(join(cwd, "report"), repo, [id]);
+}
+
 /** The visible text of the first element carrying `attribute="value"`, or undefined. */
 function textOf(html: string, attribute: string, value: string): string | undefined {
   const match = new RegExp(`<(\\w+)[^>]* ${attribute}="${value}"[^>]*>([\\s\\S]*?)</\\1>`).exec(html);
@@ -97,9 +102,12 @@ describe("unknown, not zero", () => {
     await run(["collect"], batchWithoutDiffs());
     await run(["report"], join(GITHUB, "batch"));
     const html = report();
+    const page = metricPage("netLinesRemoved");
 
-    assert.equal(textOf(html, "data-section", "netLinesRemoved"), "Net lines changed unknown");
-    assert.match(textOf(html, "data-trend", "netLinesRemoved") ?? "", /^Net lines changed net unknown 0 of 5$/);
+    assert.equal(textOf(page, "data-section", "netLinesRemoved"), "Summary unknown");
+    assert.match(textOf(page, "data-section", "trend") ?? "", / unknown 0 of 5$/);
+    assert.equal(textOf(page, "data-section", "chart"), "Net lines changed by month unknown");
+    assert.doesNotMatch(page, /<svg class="chart"/);
     assert.equal(textOf(html, "data-sentence", "netLinesRemoved"), undefined);
     assert.equal(textOf(html, "data-sentence", "netLinesRemoved:trend"), undefined);
   });
@@ -114,7 +122,10 @@ describe("unknown, not zero", () => {
 
     await run(["report"], join(GITHUB, "batch"));
     const html = report();
-    assert.equal(textOf(html, "data-section", "orchestrationTime"), "Orchestration time unknown");
+    const page = metricPage("orchestrationTime");
+    assert.equal(textOf(page, "data-section", "orchestrationTime"), "Summary unknown");
+    assert.equal(textOf(page, "data-section", "chart"), "Orchestration time by month unknown");
+    assert.doesNotMatch(page, /<svg class="chart"/);
     assert.equal(textOf(html, "data-sentence", "orchestrationTime"), undefined);
     assert.match(textOf(html, "data-methodology", "orchestrationTime") ?? "", /unknown, not 0 h, when no session linked to no ticket has measured activity/);
   });
@@ -148,7 +159,7 @@ describe("net lines changed", () => {
   it("shows net lines as lines changed with a sign, in the section, the CV sentences, the trends and Methodology; the dataset keeps its id", async () => {
     await run(["collect"], join(GITHUB, "lifeline"));
     await run(["report"], join(GITHUB, "lifeline"));
-    const html = report("grimfeld/lifeline");
+    const html = `${report("grimfeld/lifeline")}\n${metricPage("netLinesRemoved", "grimfeld/lifeline")}`;
 
     // #115 +120/-30, #116 +50/-70, #117 +10/-40, #136 +200/-5, #137 +5/-0: 385 added, 145 deleted.
     assert.equal(dataset("grimfeld/lifeline").metrics["netLinesRemoved"]?.coverage.tickets, 5);
@@ -157,7 +168,7 @@ describe("net lines changed", () => {
       textOf(html, "data-sentence", "netLinesRemoved"),
       "Net lines changed: +240 (385 added, 145 deleted); 1 ticket removed more code than it added, over 5 of 5 tickets. Copy",
     );
-    assert.match(textOf(html, "data-trend", "netLinesRemoved") ?? "", /^Net lines changed net [+−]?\d/);
+    assert.match(textOf(html, "data-section", "trend") ?? "", /Net lines changed \(net\) Tickets Oct 2026 \+235 4 of 4 Nov 2026 \+5 1 of 1$/);
     assert.match(textOf(html, "data-methodology", "netLinesRemoved") ?? "", /^Net lines changed Lines added minus lines deleted/);
     assert.doesNotMatch(html, /[Nn]et lines removed|[Nn]et removed/);
   });
@@ -170,6 +181,6 @@ describe("net lines changed", () => {
     await run(["collect"], github);
     await run(["report"], github);
 
-    assert.match(textOf(report("grimfeld/lifeline"), "data-section", "netLinesRemoved") ?? "", /^Net lines changed \+103,030 net lines changed: 103,175 added, 145 deleted\./);
+    assert.match(textOf(metricPage("netLinesRemoved", "grimfeld/lifeline"), "data-section", "netLinesRemoved") ?? "", /^Summary \+103,030 net lines changed: 103,175 added, 145 deleted\./);
   });
 });
