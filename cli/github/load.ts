@@ -1,5 +1,6 @@
 // Turns the GitHub source's raw `gh api` answers into the CLI's GitHub model.
 import { ACTION_WORKFLOW, causedBy } from "../conventions.ts";
+import { parseRecords, type SessionRecord } from "../records.ts";
 import type { GitHubSource } from "./source.ts";
 
 export interface Repo {
@@ -57,6 +58,8 @@ export interface CommitTrailers {
 
 /** One commit of a PR, as its commit listing shows it. */
 export interface Commit extends CommitTrailers {
+  /** The session records its message carries (`records.ts`); none for a commit made outside a recorded session. */
+  records: SessionRecord[];
   oid: string;
   /** Its parents' oids: two or more for a merge. */
   parents: string[];
@@ -347,6 +350,7 @@ function commitOf(raw: RawCommit): Commit {
     deletions: raw.deletions ?? 0,
     changedFiles: raw.changedFilesIfAvailable ?? undefined,
     ...trailersOf(raw.messageBody ?? ""),
+    records: parseRecords(raw.messageBody ?? ""),
   };
 }
 

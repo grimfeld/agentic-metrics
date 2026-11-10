@@ -14,6 +14,7 @@ import { loadGitHub } from "./github/load.ts";
 import { ghAdmin, init, type RepoAdmin } from "./init.ts";
 import { ghSource, type GitHubSource } from "./github/source.ts";
 import { link } from "./linker.ts";
+import { linkRecords } from "./records.ts";
 import { writeSite } from "./report.ts";
 import { linkSessions } from "./transcripts/link.ts";
 import { loadSessions } from "./transcripts/load.ts";
@@ -144,7 +145,7 @@ async function collect(args: string[], deps: Dependencies, stdout: (text: string
     deps.transcripts ??
     (deps.github || checkout === undefined ? noTranscripts : transcriptCache({ dir: cacheDir ?? defaultCacheDir(), repoDir: resolve(deps.cwd, checkout) }));
   const sessions = loadSessions(await transcripts.read());
-  const work = classifyAutonomy(linkSessions(link(data, config), sessions, config, data.repo.fullName), config.autonomy);
+  const work = classifyAutonomy(linkRecords(linkSessions(link(data, config), sessions, config, data.repo.fullName), sessions), config.autonomy);
   const dataset = buildDataset(data.repo, work, now(), publish, config.alias);
 
   // Only this collect's dataset may stay in the datasets folder: a dataset left

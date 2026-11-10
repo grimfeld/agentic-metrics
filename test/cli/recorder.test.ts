@@ -5,6 +5,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { addTrailer } from "../../cli/recorder.mjs";
+import { parseRecords, recordKey } from "../../cli/records.ts";
 
 const RECORDER = join(import.meta.dirname, "../../cli/recorder.mjs");
 const SESSION = "7a63028a-8016-5e56-9126-f53d22b0bd7d";
@@ -130,6 +131,30 @@ describe("recorder: counters", () => {
     hook("18:00", prompt("Start"), { CLAUDE_PROJECT_DIR: worktree });
 
     assert.equal(readdirSync(join(repo, ".git/agentic-metrics")).length, 1);
+  });
+});
+
+describe("recorder: end to end", () => {
+  it("writes a record that git keeps as a trailer and collect reads back", () => {
+    rmSync(join(repo, ".git"), { recursive: true });
+    const git = (...args: string[]) => spawnSync("git", args, { cwd: repo, encoding: "utf8" });
+    git("init", "-q");
+    git("config", "user.email", "dev@example.com");
+    git("config", "user.name", "Dev");
+    writeFileSync(join(repo, "file.txt"), "1\n");
+    git("add", "file.txt");
+    hook("18:00", prompt("Implement the ticket"));
+    hook("18:04", tool());
+    const out = rewritten("18:04", 'git commit -q -m "Add the file" -m "Co-Authored-By: Claude <noreply@anthropic.com>"');
+    assert.ok(out);
+    const commit = spawnSync("sh", ["-c", out.command], { cwd: repo, encoding: "utf8" });
+    assert.equal(commit.status, 0, commit.stderr);
+
+    const body = git("log", "-1", "--format=%b").stdout;
+    assert.match(git("log", "-1", "--format=%(trailers:key=Session-Record)").stdout, /^Session-Record: v1 k=[0-9a-f]{12} active=240 human=1 agents=0 started=2026-11-10T18:00:00Z\n+$/);
+    assert.deepEqual(parseRecords(body), [{ key: recordKey(SESSION), activeMs: 240_000, human: 1, agents: 0, startedAt: new Date("2026-11-10T18:00:00Z"), parent: undefined }]);
+    // The state it keeps is not something git would commit.
+    assert.equal(git("status", "--porcelain").stdout, "");
   });
 });
 

@@ -331,6 +331,11 @@ describe("init", () => {
       assert.deepEqual({ status: gone.status, stdout: gone.stdout, stderr: gone.stderr }, { status: 0, stdout: "", stderr: "" });
     });
 
+    it("is the recorder this repo itself carries: run init here after changing the script", () => {
+      const root = join(import.meta.dirname, "../..");
+      assert.equal(readFileSync(join(root, SCRIPT), "utf8"), readFileSync(join(root, "cli/recorder.mjs"), "utf8"));
+    });
+
     it("changes nothing on a second run", async () => {
       const { admin } = fakeGitHub();
       assert.equal(await init(admin), 0, stderr);
