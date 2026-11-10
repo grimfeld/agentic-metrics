@@ -54,14 +54,14 @@ function section(repo: string): string {
 }
 
 describe("report", () => {
-  it("shows the four headline tiles first for each repo, in order", () => {
+  it("shows the headline tiles first for each repo, in order: active time, not lead time, leads", () => {
     const tiles = [...section("grimfeld/lifeline").matchAll(/<a class="tile lg" [^>]*data-metric="(\w+)"/g)].map((m) => m[1]);
-    assert.deepEqual(tiles, ["leadTime", "firstRunCiRate", "humanMessagesPerTicket", "regressionRate"]);
-    assert.match(section("grimfeld/lifeline"), /^\s*<section class="tiles"[^>]*>\s*<a class="tile lg" [^>]*data-metric="leadTime"/);
+    assert.deepEqual(tiles, ["activeTime", "estimatedActiveTime", "firstRunCiRate", "humanMessagesPerTicket", "regressionRate"]);
+    assert.match(section("grimfeld/lifeline"), /^\s*<section class="tiles"[^>]*>\s*<a class="tile lg" [^>]*data-metric="activeTime"/);
   });
 
-  it("shows lead time p50 and p90 with its coverage", () => {
-    assert.equal(textOf("data-metric", "leadTime", "grimfeld/lifeline"), "Lead time 12 h p50 · 7.5 d p90 5 of 5 tickets");
+  it("shows lead time as a supporting figure, with its coverage", () => {
+    assert.equal(textOf("data-metric", "leadTime", "grimfeld/lifeline"), "Lead time 12 h p50 5 of 5 tickets");
   });
 
   it("shows the first-run CI rate as unknown when no PR has a CI run", () => {

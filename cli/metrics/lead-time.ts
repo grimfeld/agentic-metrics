@@ -127,17 +127,6 @@ export const leadTime: Metric<LeadTime> = {
     },
   },
 
-  headline: {
-    order: 1,
-    card: ({ p50Hours, p90Hours }) => `${formatHours(p50Hours)} <small>p50</small> · ${formatHours(p90Hours)} <small>p90</small>`,
-    // Percentiles over every repo's tickets: an anonymized repo, with no rows, never pools.
-    pool(known) {
-      const hours = known.flatMap(({ value }) => (value.tickets ?? []).map((row) => row.hours));
-      if (hours.length === 0) return undefined;
-      return { p50Hours: round(percentile(hours, 50), 1), p90Hours: round(percentile(hours, 90), 1) };
-    },
-  },
-
   section({ p50Hours, p90Hours, phases }) {
     const whole = `<p>Half the tickets took up to <strong>${formatHours(p50Hours)}</strong> from ready to delivered, and nine in ten up to <strong>${formatHours(p90Hours)}</strong>.</p>`;
     if (!phases) return whole;

@@ -19,7 +19,14 @@ const NOW = new Date("2026-11-09T12:00:00Z");
 
 /** Where each metric has data: the `ci` fixture has CI, `lifeline` the rest. */
 const CI = new Set(["firstRunCiRate", "fixCycles", "scheduledFailures", "batchHealth"]);
-const PART_1 = ["leadTime", "throughput", "firstRunCiRate", "fixCycles", "scheduledFailures", "batchHealth", "regressionRate", "humanMessagesPerTicket"];
+/**
+ * Every ticket here has a transcript or a single commit, so active time is
+ * measured where it is known and estimated nowhere: the estimate's page says
+ * unknown, with no chart or per-ticket table (`activity.test.ts` checks both
+ * on a repo with no transcript).
+ */
+const ESTIMATED = "estimatedActiveTime";
+const PART_1 = ["activeTime", "estimatedActiveTime", "leadTime", "throughput", "firstRunCiRate", "fixCycles", "scheduledFailures", "batchHealth", "regressionRate", "humanMessagesPerTicket"];
 const PART_2 = ["orchestrationTime", "subAgents", "apiEquivalentCost", "autonomy", "testRatio", "netLinesRemoved", "size", "estimateVsActual"];
 /** Repo-level metrics: no ticket owns them, so they have no per-ticket table. */
 const REPO_LEVEL = new Set(["orchestrationTime"]);
@@ -77,7 +84,7 @@ function rows(table: string): string[] {
 describe("metric page", () => {
   it("shows the metric's number tiles, with its coverage", () => {
     const tiles = element(page("grimfeld/lifeline", "leadTime"), "data-section", "tiles");
-    assert.match(text(tiles), /^Lead time 12 h p50 · 7\.5 d p90 5 of 5 tickets Months known 2 of 2/);
+    assert.match(text(tiles), /^Lead time 12 h p50 5 of 5 tickets Months known 2 of 2/);
     assert.match(text(tiles), /Full \S+ h 3 of 3 tickets/);
   });
 
@@ -141,10 +148,11 @@ describe("metric pages: every metric", () => {
   it("each has tiles, a chart, a monthly trend, a definition and, for a full repo, a per-ticket table", () => {
     for (const { id } of METRICS) {
       const html = page(CI.has(id) ? "grimfeld/ci" : "grimfeld/lifeline", id);
-      for (const section of ["tiles", "trend", "definition", ...(REPO_LEVEL.has(id) ? [] : ["tickets"])]) {
+      for (const section of ["tiles", "trend", "definition", ...(REPO_LEVEL.has(id) || id === ESTIMATED ? [] : ["tickets"])]) {
         assert.match(html, new RegExp(`data-section="${section}"`), `${id}: ${section}`);
       }
-      assert.match(html, /<svg class="chart"[^>]* role="img"/, id);
+      if (id === ESTIMATED) assert.match(html, /class="unknown">unknown</, id);
+      else assert.match(html, /<svg class="chart"[^>]* role="img"/, id);
     }
   });
 

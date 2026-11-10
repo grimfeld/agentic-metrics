@@ -84,13 +84,13 @@ describe("repo page: number tiles", () => {
   it("shows a tile per metric, headline metrics first, each linking to the metric's page", () => {
     const tiles = [...full.matchAll(/<a class="tile[^"]*" href="([^"]+)" data-metric="(\w+)"/g)].map((match) => [match[1], match[2]]);
     const ids = tiles.map(([, id]) => id);
-    assert.deepEqual(ids.slice(0, 4), ["leadTime", "firstRunCiRate", "humanMessagesPerTicket", "regressionRate"]);
+    assert.deepEqual(ids.slice(0, 5), ["activeTime", "estimatedActiveTime", "firstRunCiRate", "humanMessagesPerTicket", "regressionRate"]);
     assert.deepEqual([...ids].sort(), METRICS.map((metric) => metric.id).sort());
     for (const [href, id] of tiles) assert.equal(href, `${id ?? ""}.html`);
   });
 
   it("states each tile's number and coverage as text", () => {
-    assert.equal(text(element(full, "data-metric", "leadTime")), "Lead time 12 h p50 · 7.5 d p90 5 of 5 tickets");
+    assert.equal(text(element(full, "data-metric", "leadTime")), "Lead time 12 h p50 5 of 5 tickets");
     assert.equal(text(element(full, "data-metric", "throughput")), "Throughput 5 tickets 5 of 5 tickets");
     assert.equal(text(element(full, "data-metric", "firstRunCiRate")), "First-run CI rate unknown 0 of 5 tickets");
   });
@@ -114,6 +114,8 @@ describe("repo page: chart grid", () => {
 
   it("has a card for each metric that declares a chart, in report order", () => {
     assert.deepEqual(charted, [
+      "activeTime",
+      "estimatedActiveTime",
       "leadTime",
       "throughput",
       "orchestrationTime",
@@ -132,6 +134,11 @@ describe("repo page: chart grid", () => {
   it("draws each chart as an inline SVG with an accessible title and description", () => {
     for (const id of charted) {
       const card = chartCard(full, id);
+      // Lifeline's tickets have a transcript or a single commit: none is estimated.
+      if (id === "estimatedActiveTime") {
+        assert.equal(text(card), "Active time, estimated per ticket unknown 0 of 5 tickets");
+        continue;
+      }
       const svg = /<svg class="chart"[^>]* role="img" aria-labelledby="([\w-]+) ([\w-]+)">\s*<title id="\1">([^<]+)<\/title><desc id="\2">([^<]+)<\/desc>/.exec(card);
       assert.ok(svg, `${id}: no accessible svg`);
     }
