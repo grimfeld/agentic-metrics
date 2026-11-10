@@ -56,6 +56,12 @@ export interface Session {
   responses: ApiResponse[];
   /** Sub-agents it spawned with the Agent tool. Agent ids are never published. */
   spawns: AgentSpawn[];
+  /**
+   * Set for a session read from session records (`records.ts`), not from a
+   * transcript: it has counts and activity but no API response, so its cost is
+   * unknown, not zero. `parent` is its parent's id, for a sub-agent.
+   */
+  recorded?: { parent: string | undefined };
 }
 
 export interface ApiResponse {

@@ -76,7 +76,8 @@ export const apiEquivalentCost: Metric<ApiEquivalentCost> = {
   name: "API-equivalent cost",
 
   compute({ tickets, transcripts }) {
-    const withTranscripts = tickets.filter((ticket) => ticket.sessions.length > 0);
+    // A session read from session records has no API response: its cost is unknown, not $0.
+    const withTranscripts = tickets.filter((ticket) => ticket.sessions.some((session) => !session.recorded));
     const coverage = { tickets: withTranscripts.length, of: tickets.length };
     if (withTranscripts.length === 0) return { value: UNKNOWN, coverage };
 
@@ -157,6 +158,6 @@ export const apiEquivalentCost: Metric<ApiEquivalentCost> = {
   methodology: {
     definition: `Tokens of the Claude Code sessions of a ticket (sub-agents included, linked as for human messages), per model and in four categories from each API response's usage: input, output, cache writes (5-minute and 1-hour) and cache reads. One API response is written as several transcript lines repeating its usage, so each response counts once (by message id), also in totals over tickets that share a session. Local placeholder responses (<code>&lt;synthetic&gt;</code>) are skipped. The dollar figure is an <strong>API equivalent</strong>: those tokens priced at Anthropic's public API list prices, from a versioned price table kept in the tool (the dataset records the version used), with 1-hour cache writes, the long-prompt tier of models that have one, the US-region surcharge and web searches priced as the API prices them.`,
     limits:
-      "Cost is an API equivalent, not what was billed: sessions on a Claude subscription are not charged per token, and real billing data is out of scope. A model missing from the price table is unpriced: its cost is unknown, never zero, and it is left out of the totals and named. Older transcripts without the 5-minute/1-hour cache-write split are priced as 5-minute writes. Only tickets with cached local transcripts are measured. A session linked to several tickets counts in full on each, and once in the total.",
+      "Cost is an API equivalent, not what was billed: sessions on a Claude subscription are not charged per token, and real billing data is out of scope. A model missing from the price table is unpriced: its cost is unknown, never zero, and it is left out of the totals and named. Older transcripts without the 5-minute/1-hour cache-write split are priced as 5-minute writes. Only tickets with cached local transcripts are measured. A session linked to several tickets counts in full on each, and once in the total. A ticket known only through session records has no token counts: it is left out of coverage, never counted as $0.",
   },
 };

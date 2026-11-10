@@ -15,7 +15,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node -e \"fs.copyFileSync('cli/recorder.mjs', 'dist/recorder.mjs')\"",
     "lint": "eslint .",
     "typecheck": "tsc",
     "test": "node --test \"test/**/*.test.ts\"",

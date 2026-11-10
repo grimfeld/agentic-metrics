@@ -1,5 +1,6 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -269,5 +270,111 @@ describe("init", () => {
     assert.equal(readFileSync(join(cwd, WORKFLOW), "utf8"), "# edited by hand\n");
     assert.equal(created.length, labelsCreated);
     assert.match(stdout, /kept/);
+  });
+
+  describe("the recorder", () => {
+    const SETTINGS = ".claude/settings.json";
+    const SCRIPT = ".agentic-metrics/recorder.mjs";
+    const COMMAND = 'node "${CLAUDE_PROJECT_DIR:-.}/.agentic-metrics/recorder.mjs" 2>/dev/null || true';
+    const settings = () => JSON.parse(readFileSync(join(cwd, SETTINGS), "utf8")) as { hooks: Record<string, { matcher?: string; hooks: { type: string; command: string }[] }[]>; permissions?: unknown };
+
+    it("writes the recorder script and its hooks into a repo that has no Claude settings", async () => {
+      const { admin } = fakeGitHub();
+      assert.equal(await init(admin), 0, stderr);
+
+      assert.equal(readFileSync(join(cwd, SCRIPT), "utf8"), readFileSync(join(import.meta.dirname, "../../cli/recorder.mjs"), "utf8"));
+      assert.deepEqual(settings(), {
+        hooks: {
+          UserPromptSubmit: [{ hooks: [{ type: "command", command: COMMAND }] }],
+          PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: COMMAND }] }],
+          PostToolUse: [{ hooks: [{ type: "command", command: COMMAND }] }],
+          Stop: [{ hooks: [{ type: "command", command: COMMAND }] }],
+          SubagentStop: [{ hooks: [{ type: "command", command: COMMAND }] }],
+        },
+      });
+      assert.match(stdout, /\.agentic-metrics\/recorder\.mjs: written/);
+      assert.match(stdout, /\.claude\/settings\.json: recorder hooks added \(UserPromptSubmit, PreToolUse, PostToolUse, Stop, SubagentStop\)/);
+    });
+
+    it("keeps the repo's own hooks and permissions, adding the recorder's beside them", async () => {
+      mkdirSync(join(cwd, ".claude"));
+      const own = {
+        permissions: { allow: ["Bash(npm test)"] },
+        hooks: { PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: "./guard.sh" }] }], SessionStart: [{ hooks: [{ type: "command", command: "./setup.sh" }] }] },
+      };
+      writeFileSync(join(cwd, SETTINGS), JSON.stringify(own));
+      const { admin } = fakeGitHub();
+      assert.equal(await init(admin), 0, stderr);
+
+      const after = settings();
+      assert.deepEqual(after.permissions, own.permissions);
+      assert.deepEqual(after.hooks["SessionStart"], own.hooks.SessionStart);
+      assert.deepEqual(after.hooks["PreToolUse"], [...own.hooks.PreToolUse, { matcher: "Bash", hooks: [{ type: "command", command: COMMAND }] }]);
+    });
+
+    it("registers a command that runs the installed script, and never fails the session when it can't", () => {
+      mkdirSync(join(cwd, ".agentic-metrics"));
+      mkdirSync(join(cwd, ".git"));
+      writeFileSync(join(cwd, SCRIPT), readFileSync(join(import.meta.dirname, "../../cli/recorder.mjs"), "utf8"));
+      const event = JSON.stringify({ session_id: "s", hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "git commit -m x" } });
+      const run = (env: Record<string, string>) => spawnSync("sh", ["-c", COMMAND], { cwd, input: event, encoding: "utf8", env: { PATH: process.env["PATH"] ?? "", ...env } });
+
+      // From a sub-folder, with the project folder given: the commit is rewritten.
+      mkdirSync(join(cwd, "src"));
+      const fromSubfolder = spawnSync("sh", ["-c", COMMAND], { cwd: join(cwd, "src"), input: event, encoding: "utf8", env: { PATH: process.env["PATH"] ?? "", CLAUDE_PROJECT_DIR: cwd } });
+      assert.match(fromSubfolder.stdout, /git commit --trailer \\"Session-Record: v1 /);
+      // With no project folder in the environment, the current folder stands for it.
+      assert.match(run({}).stdout, /Session-Record: v1 /);
+      // A script that is gone is silent, and exits 0.
+      rmSync(join(cwd, SCRIPT));
+      const gone = run({ CLAUDE_PROJECT_DIR: cwd });
+      assert.deepEqual({ status: gone.status, stdout: gone.stdout, stderr: gone.stderr }, { status: 0, stdout: "", stderr: "" });
+    });
+
+    it("is the recorder this repo itself carries: run init here after changing the script", () => {
+      const root = join(import.meta.dirname, "../..");
+      assert.equal(readFileSync(join(root, SCRIPT), "utf8"), readFileSync(join(root, "cli/recorder.mjs"), "utf8"));
+    });
+
+    it("changes nothing on a second run", async () => {
+      const { admin } = fakeGitHub();
+      assert.equal(await init(admin), 0, stderr);
+      const before = readFileSync(join(cwd, SETTINGS), "utf8");
+      assert.equal(await init(admin), 0, stderr);
+
+      assert.equal(readFileSync(join(cwd, SETTINGS), "utf8"), before);
+      assert.match(stdout, /\.agentic-metrics\/recorder\.mjs: kept as it is/);
+      assert.match(stdout, /\.claude\/settings\.json: kept as it is/);
+    });
+
+    it("replaces an older recorder script with this version's, and says so", async () => {
+      mkdirSync(join(cwd, ".agentic-metrics"));
+      writeFileSync(join(cwd, SCRIPT), "// an older recorder\n");
+      const { admin } = fakeGitHub();
+      assert.equal(await init(admin), 0, stderr);
+
+      assert.match(readFileSync(join(cwd, SCRIPT), "utf8"), /Session-Record/);
+      assert.match(stdout, /\.agentic-metrics\/recorder\.mjs: updated/);
+    });
+
+    it("warns when git ignores the settings file: uncommitted, the recorder runs nowhere else", async () => {
+      spawnSync("git", ["init", "-q"], { cwd });
+      writeFileSync(join(cwd, ".gitignore"), ".claude/\n");
+      const { admin } = fakeGitHub();
+      assert.equal(await init(admin), 0, stderr);
+
+      assert.match(stdout, /\.claude\/settings\.json: ignored by git/);
+      assert.doesNotMatch(stdout, /recorder\.mjs: ignored by git/);
+    });
+
+    it("leaves a settings file it cannot read as JSON untouched, and says so", async () => {
+      mkdirSync(join(cwd, ".claude"));
+      writeFileSync(join(cwd, SETTINGS), "{ // my settings\n}");
+      const { admin } = fakeGitHub();
+      assert.equal(await init(admin), 0, stderr);
+
+      assert.equal(readFileSync(join(cwd, SETTINGS), "utf8"), "{ // my settings\n}");
+      assert.match(stdout, /\.claude\/settings\.json: not changed/);
+    });
   });
 });
