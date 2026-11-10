@@ -1,5 +1,7 @@
 node_modules/
 dist/
 .DS_Store
-.claude/
+.claude/*
+# The recorder's hooks are committed: a cloud session runs them from here.
+!.claude/settings.json
 .agentic-metrics-local/

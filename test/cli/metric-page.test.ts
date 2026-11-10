@@ -19,7 +19,14 @@ const NOW = new Date("2026-11-09T12:00:00Z");
 
 /** Where each metric has data: the `ci` fixture has CI, `lifeline` the rest. */
 const CI = new Set(["firstRunCiRate", "fixCycles", "scheduledFailures", "batchHealth"]);
-const PART_1 = ["leadTime", "throughput", "firstRunCiRate", "fixCycles", "scheduledFailures", "batchHealth", "regressionRate", "humanMessagesPerTicket"];
+/**
+ * Every ticket here has a transcript or a single commit, so active time is
+ * measured where it is known and estimated nowhere: the estimate's page says
+ * unknown, with no chart or per-ticket table (`activity.test.ts` checks both
+ * on a repo with no transcript).
+ */
+const ESTIMATED = "estimatedActiveTime";
+const PART_1 = ["activeTime", "estimatedActiveTime", "leadTime", "throughput", "firstRunCiRate", "fixCycles", "scheduledFailures", "batchHealth", "regressionRate", "humanMessagesPerTicket"];
 const PART_2 = ["orchestrationTime", "subAgents", "apiEquivalentCost", "autonomy", "testRatio", "netLinesRemoved", "size", "estimateVsActual"];
 /** Repo-level metrics: no ticket owns them, so they have no per-ticket table. */
 const REPO_LEVEL = new Set(["orchestrationTime"]);
@@ -77,7 +84,7 @@ function rows(table: string): string[] {
 describe("metric page", () => {
   it("shows the metric's number tiles, with its coverage", () => {
     const tiles = element(page("grimfeld/lifeline", "leadTime"), "data-section", "tiles");
-    assert.match(text(tiles), /^Lead time 12 h p50 · 7\.5 d p90 5 of 5 tickets Months known 2 of 2/);
+    assert.match(text(tiles), /^Lead time 12 h p50 5 of 5 tickets Months known 2 of 2/);
     assert.match(text(tiles), /Full \S+ h 3 of 3 tickets/);
   });
 
@@ -87,7 +94,7 @@ describe("metric page", () => {
       assert.match(element(html, "data-section", section), /<svg class="chart"[^>]* role="img" aria-labelledby="[\w-]+ [\w-]+"><title id="[\w-]+">[^<]+<\/title><desc/, section);
     }
     const titles = [...html.matchAll(/<title id="[\w-]+">([^<]+)<\/title>/g)].map((m) => m[1]);
-    assert.deepEqual(titles, ["Lead time per ticket", "Lead time by month", "Lead time by autonomy level"]);
+    assert.deepEqual(titles, ["Lead time breakdown", "Lead time by month", "Lead time by autonomy level"]);
   });
 
   it("tabulates the monthly trend, with each month's coverage", () => {
@@ -104,12 +111,12 @@ describe("metric page", () => {
   it("lists every ticket in a table that sorts by its column headings, and reads in delivery order without JavaScript", () => {
     const table = element(page("grimfeld/lifeline", "leadTime"), "data-section", "tickets");
     assert.deepEqual(rows(table), [
-      "Ticket Title Delivered Lead time",
-      "#104 Lifeline issue title 104 2026-10-19 12 h",
-      "#105 Lifeline issue title 105 2026-10-19 20 h",
-      "PR #136 Lifeline PR title 136 2026-10-27 6 h",
-      "#106 Lifeline issue title 106 2026-10-28 7.5 d",
-      "PR #137 Lifeline PR title 137 2026-11-09 10 h",
+      "Ticket Title Delivered Lead time Queue Work Landing wait",
+      "#104 Lifeline issue title 104 2026-10-19 12 h 0 h 1.5 h 10.5 h",
+      "#105 Lifeline issue title 105 2026-10-19 20 h 8 h 1.5 h 10.5 h",
+      "PR #136 Lifeline PR title 136 2026-10-27 6 h 1 h 0 h 5 h",
+      "#106 Lifeline issue title 106 2026-10-28 7.5 d 8 h 7 d 3 h",
+      "PR #137 Lifeline PR title 137 2026-11-09 10 h 0 h 1 h 9 h",
     ]);
     assert.match(table, /<table class="sortable">/);
     assert.match(table, /<td><a href="https:\/\/github\.com\/grimfeld\/lifeline\/issues\/106">#106<\/a><\/td>/);
@@ -141,10 +148,11 @@ describe("metric pages: every metric", () => {
   it("each has tiles, a chart, a monthly trend, a definition and, for a full repo, a per-ticket table", () => {
     for (const { id } of METRICS) {
       const html = page(CI.has(id) ? "grimfeld/ci" : "grimfeld/lifeline", id);
-      for (const section of ["tiles", "trend", "definition", ...(REPO_LEVEL.has(id) ? [] : ["tickets"])]) {
+      for (const section of ["tiles", "trend", "definition", ...(REPO_LEVEL.has(id) || id === ESTIMATED ? [] : ["tickets"])]) {
         assert.match(html, new RegExp(`data-section="${section}"`), `${id}: ${section}`);
       }
-      assert.match(html, /<svg class="chart"[^>]* role="img"/, id);
+      if (id === ESTIMATED) assert.match(html, /class="unknown">unknown</, id);
+      else assert.match(html, /<svg class="chart"[^>]* role="img"/, id);
     }
   });
 
@@ -167,7 +175,7 @@ describe("metric pages: part 2", () => {
     assert.equal(table("testRatio")[0], "Ticket Title Delivered Test lines Production lines Test / production");
     assert.deepEqual(table("netLinesRemoved").slice(0, 2), ["Ticket Title Delivered Added Deleted Net change", "#104 Lifeline issue title 104 2026-10-19 120 30 +90"]);
     assert.equal(table("size")[0], "Ticket Title Delivered Diff lines Files Sub-tickets");
-    assert.equal(table("estimateVsActual")[0], "Ticket Title Delivered Estimate Actual Actual / estimate Diff lines Files Sub-tickets");
+    assert.equal(table("estimateVsActual")[0], "Ticket Title Delivered Estimate Actual Actual is Actual / estimate Diff lines Files Sub-tickets");
     assert.equal(table("autonomy")[0], "Ticket Title Delivered Level Set");
     assert.equal(table("subAgents")[0], "Ticket Title Delivered Sub-agents Models");
     assert.equal(table("apiEquivalentCost")[0], "Ticket Title Delivered API equivalent");

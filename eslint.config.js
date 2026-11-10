@@ -22,7 +22,8 @@ export default tseslint.config(
     },
   },
   {
-    files: ["**/*.js"],
+    // Plain JavaScript: the config itself, and the recorder `init` copies into repos as it is.
+    files: ["**/*.js", "**/*.mjs"],
     ...tseslint.configs.disableTypeChecked,
   },
 );

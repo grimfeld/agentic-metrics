@@ -28,9 +28,10 @@ export function causedBy(texts: readonly (string | null | undefined)[]): number[
 
 /** `estimate: 2d` at the start of a line; decimals allowed; `h`, `d` or `w`. */
 const ESTIMATE = /^[ \t]*estimate:[ \t]*(\d+(?:\.\d+)?)[ \t]*([hdw])\b/im;
-const UNIT_HOURS = { h: 1, d: 24, w: 168 } as const;
+// An estimate is of working time, as active time is: a day is 8 hours of work and a week 5 such days.
+const UNIT_HOURS = { h: 1, d: 8, w: 40 } as const;
 
-/** The estimate an `estimate:` line in `text` gives, in hours (days and weeks are calendar time). */
+/** The estimate an `estimate:` line in `text` gives, in hours of work (a day is 8 h, a week 40 h). */
 export function estimateHours(text: string | null | undefined): number | undefined {
   const match = ESTIMATE.exec(text ?? "");
   if (!match) return undefined;

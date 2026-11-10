@@ -101,7 +101,7 @@ export const subAgents: Metric<SubAgents> = {
 
   methodology: {
     definition:
-      "Sub-agents that worked on a ticket: those whose own transcript is linked to the ticket (as for human messages: their branch or worktree, else the ticket of the session that spawned them), and those spawned with the Agent tool from one of the ticket's sessions. Each runs on the model of most of its API responses, or, without a transcript, the model Claude Code resolved when spawning it. The total counts a sub-agent once even when it worked on several tickets; p50 and p90 (nearest rank) are over the tickets that have transcripts, including those with no sub-agent.",
+      "Sub-agents that worked on a ticket: those whose own transcript is linked to the ticket (as for human messages: their branch or worktree, else the ticket of the session that spawned them), and those spawned with the Agent tool from one of the ticket's sessions. Each runs on the model of most of its API responses, or, without a transcript, the model Claude Code resolved when spawning it. The total counts a sub-agent once even when it worked on several tickets; p50 and p90 (nearest rank) are over the tickets that have transcripts, including those with no sub-agent. A session read from session records, not a transcript, gives the number of sub-agents it spawned and the sub-agents that committed, but not the model they ran on: those count under <code>unknown</code>.",
     limits:
       "Only tickets with cached local transcripts are measured; others are left out, not counted as zero. Sub-agents spawned from a session linked to no ticket count only on the ticket their own branch names. A sub-agent that switched models counts under the one it used most.",
   },

@@ -34,8 +34,69 @@ A repo overrides one by name: `.agentic-metrics/addenda/<skill>.md` at its root 
 - creates the `regression`, `autonomy:full`, `autonomy:assisted` and `autonomy:manual` labels that are missing;
 - installs `.github/workflows/agentic-metrics.yml` (see [GitHub Action](#github-action)), passing the config's ready label and branch pattern, with the Action pinned to a commit SHA;
 - reads the repo's Actions permissions and, when only selected actions are allowed and no pattern covers the Action, prints the pattern to add. It never changes those settings.
+- installs the recorder: `.agentic-metrics/recorder.mjs` and its hook entries in `.claude/settings.json`, beside whatever that file already holds (see [Session records](#session-records)).
 
-Re-running is safe: an existing config or workflow is kept as it is, and only missing labels are created. Addenda overrides go in `.agentic-metrics/addenda/` (see above). Review and commit the two files.
+Re-running is safe: an existing config or workflow is kept as it is, only missing labels are created, and the recorder script is replaced only when this version's differs. Addenda overrides go in `.agentic-metrics/addenda/` (see above). Review and commit the files it wrote.
+
+### Session records
+
+Transcripts stay on the device a session ran on, so work done on another machine, or in a Claude Code cloud session, has none. The recorder makes a session's counts travel with the repo instead: each commit a session makes carries a **session record** as a trailer.
+
+```
+Session-Record: v1 k=3fa9c1d2e4b7 active=754 human=3 agents=2 started=2026-11-10T18:00:00Z
+```
+
+- `k`: an opaque key for the session (a hash; a sub-agent has its own, and names its parent's as `parent=`).
+- `active`: seconds the session has been active so far: the gaps between its prompts and tool calls, each capped at 5 minutes.
+- `human`: the prompts a person typed so far. Slash commands, shell escapes and text written by the tooling or another agent don't count.
+- `agents`: the sub-agents it has spawned so far.
+- `started`: when it began.
+
+Counts only: no session id, path or text. The record is public wherever the repo's history is.
+
+The recorder is one script, `.agentic-metrics/recorder.mjs`, run by hooks in the repo's committed `.claude/settings.json` (on each prompt, each tool call, and at the end of a turn). It lives in the repo, not in the plugin, because a cloud session loads no plugin but does run the repo's own hooks. It needs Node 18 or later and git 2.32 or later, keeps its counters in `.git/agentic-metrics/` (never committed), and adds the trailer by rewriting the agent's `git commit` command, and `git merge` when it has a message. It grants no permission: the rewritten command goes through the session's usual permission flow. On any error it does nothing, so it never blocks a prompt, a tool call or a commit. A commit you type yourself in a terminal carries no record.
+
+To upgrade the recorder, run `init` again in the repo and commit the changed script. To remove it, delete the script and its entries from `.claude/settings.json`.
+
+`collect` reads the records from the commits it already loads, so nothing changes in how you run it. A session's counters are cumulative and one session can work on several tickets, so what a commit adds is the difference from that session's previous commit, and it goes to the ticket the commit belongs to. What a merge commit adds, or a commit of no ticket, is orchestration. Human messages per ticket, autonomy, sub-agents per ticket, orchestration time, active time and lead time's phases all read records as they read transcripts; API-equivalent cost does not (a record has no token counts), so a ticket known only through records has an unknown cost.
+
+Limits: what a session does after its last commit is not recorded, and a session that never commits leaves nothing. Where a transcript is cached for the same session, `collect` reads the transcript and ignores its records. A sub-agent known only through records has no model. Squashing commits before the PR is opened keeps the records (the trailers are in the squashed message), but a squash that rewrites the message by hand can drop them.
+
+### Working on several devices
+
+A repo worked on from a laptop, a desktop and cloud sessions leaves its traces in three places. This is how to get all of them into one report.
+
+**From now on: commit the recorder.** In each measured repo, once:
+
+1. Run `npx agentic-metrics init` (or `/agentic-metrics:init`) in a clone of the repo.
+2. Commit `.agentic-metrics/recorder.mjs` and `.claude/settings.json`, and push. If `init` warns that git ignores either file, un-ignore it first.
+3. On every other device, pull. A cloud session gets the files with its clone.
+
+From then on every session, on any device or in the cloud, leaves a [session record](#session-records) on its commits, and `collect` reads it from GitHub wherever you run it. Nothing needs copying between devices. To check it works, make a commit from a Claude Code session and look for a `Session-Record:` trailer in `git log -1`.
+
+**For past work: import each device's transcripts.** A session that ran before the recorder was installed is only known through its transcript, which stays on the device it ran on:
+
+| Where the session ran | What is left of it | Where |
+| --- | --- | --- |
+| A device with the plugin installed | Its full transcript, kept for good | `~/.cache/agentic-metrics/` on that device |
+| A device without the plugin | Its transcript, until Claude Code's cleanup removes it (after 30 days by default, the `cleanupPeriodDays` setting) | `~/.claude/projects/` on that device |
+| A cloud session | Nothing: the transcript went with its container | Its commits only |
+
+Pick one device to run `collect` on, and for each other device:
+
+1. Copy that device's `~/.cache/agentic-metrics` folder (or, without the plugin, its `~/.claude/projects` folder) to the collecting device, anywhere, for example `~/from-laptop`. Copy `~/.claude/projects` soon: it empties itself.
+2. On the collecting device, from the repo's clone, see what would be imported, then import it:
+
+   ```
+   npx agentic-metrics import-transcripts ~/from-laptop --dry-run
+   npx agentic-metrics import-transcripts ~/from-laptop
+   ```
+
+   It finds the project folders named after the clone and copies them into this device's cache under the local clone's name, worktrees and sub-agents included. Claude Code names a transcript folder after the clone's path, which differs between devices; that is why a plain copy is not enough. If the clone's folder is called something else on the other device, pass it: `--name life`. From outside the clone, add `--checkout ~/path/to/clone`.
+3. Repeat for each repo (run it from each repo's clone) and each device. Importing twice is safe: a transcript already there is kept, unless the imported one is longer.
+4. Run `collect` again for each repo.
+
+A ticket with neither a transcript nor a session record still gets what commits alone give: lead time with its phases, and an estimated active time. Its human messages, cost and sub-agents stay unknown.
 
 ## CLI
 
@@ -45,6 +106,8 @@ Run it from a clone of the repo to measure. It reads GitHub through your `gh` lo
 npx agentic-metrics collect   # writes datasets/<owner>/<repo>.json
 npx agentic-metrics report    # renders datasets/ as a site in report/ (open report/index.html)
 ```
+
+`import-transcripts` brings another device's transcripts into this one's cache; see [Working on several devices](#working-on-several-devices).
 
 The first `collect` on a repo reads its whole history. Later runs read only the PRs and issues updated since the last run and merge them into a local cache of raw GitHub items, `~/.cache/agentic-metrics/github/<owner>/<repo>/` (or under `$AGENTIC_METRICS_CACHE_DIR`), so the dataset comes out the same as a full re-collection. `collect --full` reads everything again, for example after a metric definition changes. Editing a request's query also triggers a full read of that request on the next run.
 
@@ -74,9 +137,14 @@ Linking PRs to tickets. A merged PR is linked to an issue by the first of: its c
 - `integrationBranchPrefix` (one string or a list; default `integration/`): PRs from these branches are batches. They count as no ticket and no PR, and are counted apart (`integrationPullRequests` in the dataset). A batch delivers the PRs merged into its branch, and the issues it closes that no PR of their own delivered. Such an issue is credited the batch's commits that name it (`Merge ticket-N: …`, a merged branch `branchRegex` resolves, or `(#N)`) and the commits those merges brought in; autonomy and the diff metrics read them. Commits naming no ticket count for none.
 - `exclude`: PRs by these authors (logins; `dependabot` and `dependabot[bot]` both match) or from branches starting with these prefixes count in no metric. Nothing is excluded by default.
 
-Transcript metrics (human messages per ticket, orchestration time) come from the transcripts the plugin caches, for the clone `collect` runs in (with `--repo`, pass that repo's clone as `--checkout dir`, else they are unknown). A session belongs to a ticket through its branch (a ticket PR's head, or the issue number `branchRegex` finds), else its worktree's name, else the PRs it opened; a sub-agent with none of these inherits its parent's ticket. Sessions naming no work are orchestration time. Only counts reach the dataset: no transcript text, account or organisation identifier, session id or path.
+How long a ticket took. Two figures answer it, defined in `GLOSSARY.md`:
 
-Each ticket gets an autonomy level. `full`: a transcript with at most one human message beyond the opening request, and every commit co-authored by Claude (a `Co-Authored-By: Claude …` trailer, or a `Claude-Session:` trailer from a cloud session). `manual`: no transcript and no such commit. `assisted`: anything between. The thresholds are set per repo, and an `autonomy:full`, `autonomy:assisted` or `autonomy:manual` label on the ticket's issue (or, else, its PR) wins; the report counts the tickets so overridden:
+- **Active time**, the headline: how long the ticket was actually worked on, with the idle left out. It is *measured* from the ticket's Claude Code sessions when their transcripts are cached (the gaps between a session's lines, each capped at 5 minutes; a stretch several sessions or sub-agents ran in counts once). For a ticket with no transcript it is *estimated* from its commits (the gaps between consecutive commits, each capped at 30 minutes), and unknown when the ticket has a single commit. The two are separate metrics, `activeTime` and `estimatedActiveTime`, over different tickets, and are never pooled together.
+- **Lead time**: calendar time from the ticket becoming ready to its delivery, idle included. It is split into three phases that add up to it: *queue* (ready to the first activity), *work* (first to last activity) and *landing wait* (last activity to delivery, the wait for a batch to land included). Activity is the ticket's own commits, merges left out, and the lines of its sessions.
+
+Transcript metrics (human messages per ticket, orchestration time, measured active time) come from the transcripts the plugin caches, and, for sessions with no cached transcript, from the [session records](#session-records) on their commits. Transcripts are read for the clone `collect` runs in (with `--repo`, pass that repo's clone as `--checkout dir`, else they are unknown). A session belongs to a ticket through its branch (a ticket PR's head, or the issue number `branchRegex` finds), else its worktree's name, else the PRs it opened; a sub-agent with none of these inherits its parent's ticket. Sessions naming no work are orchestration time. Only counts reach the dataset: no transcript text, account or organisation identifier, session id or path.
+
+Each ticket gets an autonomy level. `full`: a transcript, or session records, with at most one human message beyond the opening request, and every commit co-authored by Claude (a `Co-Authored-By: Claude …` trailer, or a `Claude-Session:` trailer from a cloud session). `manual`: no transcript, no session record and no such commit. `assisted`: anything between. The thresholds are set per repo, and an `autonomy:full`, `autonomy:assisted` or `autonomy:manual` label on the ticket's issue (or, else, its PR) wins; the report counts the tickets so overridden:
 
 ```json
 { "autonomy": { "fullMaxFollowUps": 1, "fullMinClaudeCommitShare": 1 } }
@@ -178,7 +246,7 @@ Add it under Settings > Actions > General > Actions permissions > Allow specifie
 
 When a PR's description references no issue and its branch name carries one (`spec-376-…`, `spec/363-…`, `ticket-16`, `16-title`), the Action appends `Closes #N`. A description that already mentions an issue (`#12`, `owner/repo#12`, an issue link) is left alone, and so are PRs from forks. It needs only the default workflow token. `branch-regex` overrides the built-in pattern; the number is its first capture group that matched.
 
-When an issue's description (on opening or editing) or a new comment has a line starting `caused-by: #N`, the Action adds the `regression` label, which `collect` needs to count the regression. `owner/repo#N` is not accepted: work in another repo can't be traced. When an issue gets the bug label (`bug-label`, default `bug`), the Action asks "Regression? Reply `caused-by: #N`", unless the issue already carries a `caused-by: #N` line. When a ticket gets the ready label (`ready-label`, default `ready-for-agent`) and no comment starts with `estimate: <n><h|d|w>`, it posts a one-line estimate reminder. Each reminder carries a hidden marker and is posted at most once per issue, however often the label is removed and added again.
+When an issue's description (on opening or editing) or a new comment has a line starting `caused-by: #N`, the Action adds the `regression` label, which `collect` needs to count the regression. `owner/repo#N` is not accepted: work in another repo can't be traced. When an issue gets the bug label (`bug-label`, default `bug`), the Action asks "Regression? Reply `caused-by: #N`", unless the issue already carries a `caused-by: #N` line. When a ticket gets the ready label (`ready-label`, default `ready-for-agent`) and no comment starts with `estimate: <n><h|d|w>`, it posts a one-line estimate reminder. An estimate is of working time (a day is 8 h, a week 5 days), and is compared with the ticket's active time. Each reminder carries a hidden marker and is posted at most once per issue, however often the label is removed and added again.
 
 ## Repository layout
 

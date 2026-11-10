@@ -112,7 +112,12 @@ describe("publish: anonymized", () => {
     assert.equal(dataset.repo, "client-a");
     assert.equal(dataset.publish, "anonymized");
     assert.equal(dataset.tickets, 5);
-    assert.deepEqual(dataset.metrics["leadTime"]?.value, { p50Hours: 12, p90Hours: 180 });
+    // The percentiles and the phases' aggregates stay; the per-ticket rows go.
+    assert.deepEqual(dataset.metrics["leadTime"]?.value, {
+      p50Hours: 12,
+      p90Hours: 180,
+      phases: { tickets: 5, queue: { p50Hours: 1, share: 0.092 }, work: { p50Hours: 0.5, share: 0.741 }, landing: { p50Hours: 9, share: 0.167 } },
+    });
     assert.deepEqual(dataset.metrics["regressionRate"]?.value, { rate: 0.6, regressions: 4, regressedTickets: 3 });
     // Per-ticket rows go; the medians stay.
     for (const id of ["size", "estimateVsActual"]) {
