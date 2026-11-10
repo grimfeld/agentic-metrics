@@ -45,7 +45,7 @@ The last phase of lead time: from a ticket's last activity to it being delivered
 _Avoid_: Review time, merge time
 
 **Active time**:
-The time actually spent working on a ticket: its work phase with the idle taken out. The headline measure of how long a ticket took.
+The time actually spent working on a ticket: its work phase with the idle taken out, counted once however many agents worked in parallel. The headline measure of how long a ticket took.
 _Avoid_: Effort, hands-on time, work time
 
 **Measured** / **Estimated**:
@@ -58,8 +58,16 @@ _Avoid_: Exact, approximate, guessed
 One Claude Code conversation working in a repo, on any device or in a cloud container.
 _Avoid_: Chat, run
 
+**Sub-agent**:
+An agent a session spawns to do part of its work. Its time counts on the ticket it worked on; it receives no human messages.
+_Avoid_: Worker, child session
+
+**Orchestration**:
+What a session does when it belongs to no ticket: planning, spawning sub-agents, landing batches. Its human messages and active time are reported apart from any ticket's.
+_Avoid_: Coordination, overhead, planning time
+
 **Session record**:
-The counts a session leaves on the commits it makes: how long it has been active and how many human messages it has received. It holds no message text.
+The counts a session leaves on the commits it makes: how long it has been active, how many human messages it has received and how many sub-agents it has spawned. It holds no message text.
 _Avoid_: Stamp, session log, telemetry
 
 **Transcript**:
