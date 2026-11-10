@@ -105,10 +105,10 @@ export const leadTime: Metric<LeadTime> = {
   sentence: ({ p50Hours, p90Hours }) =>
     `Median lead time of ${formatHours(p50Hours)} from a ticket being ready to its last PR merging (p90 ${formatHours(p90Hours)})`,
 
-  // Where the lead time went, by phase. Without phases (no dated activity, or a dataset written
+  // Its breakdown: where the lead time went, by phase. Without phases (no dated activity, or a dataset written
   // before the split): each ticket's lead time, or, anonymized, its p50 by month.
   chart: {
-    title: "Lead time by phase",
+    title: "Lead time breakdown",
     draw(input) {
       const { p50Hours, p90Hours, tickets, phases } = input.value;
       if (phases) return phasesChart(phases);

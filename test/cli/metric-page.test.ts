@@ -94,7 +94,7 @@ describe("metric page", () => {
       assert.match(element(html, "data-section", section), /<svg class="chart"[^>]* role="img" aria-labelledby="[\w-]+ [\w-]+"><title id="[\w-]+">[^<]+<\/title><desc/, section);
     }
     const titles = [...html.matchAll(/<title id="[\w-]+">([^<]+)<\/title>/g)].map((m) => m[1]);
-    assert.deepEqual(titles, ["Lead time by phase", "Lead time by month", "Lead time by autonomy level"]);
+    assert.deepEqual(titles, ["Lead time breakdown", "Lead time by month", "Lead time by autonomy level"]);
   });
 
   it("tabulates the monthly trend, with each month's coverage", () => {

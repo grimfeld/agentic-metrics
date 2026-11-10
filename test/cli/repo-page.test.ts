@@ -164,7 +164,7 @@ describe("repo page: chart grid", () => {
   it("says unknown, with no chart, when a metric has no data", () => {
     const card = chartCard(empty, "leadTime");
     assert.doesNotMatch(card, /<svg/);
-    assert.equal(text(card), "Lead time by phase unknown 0 of 0 tickets");
+    assert.equal(text(card), "Lead time breakdown unknown 0 of 0 tickets");
   });
 });
 
