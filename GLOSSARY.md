@@ -47,3 +47,25 @@ _Avoid_: Review time, merge time
 **Active time**:
 The time actually spent working on a ticket: its work phase with the idle taken out. The headline measure of how long a ticket took.
 _Avoid_: Effort, hands-on time, work time
+
+**Measured** / **Estimated**:
+An active time is measured when it comes from a session's own record of its activity, and estimated when it is inferred from commit times alone. The two are never mixed in one figure.
+_Avoid_: Exact, approximate, guessed
+
+### Sessions
+
+**Session**:
+One Claude Code conversation working in a repo, on any device or in a cloud container.
+_Avoid_: Chat, run
+
+**Session record**:
+The counts a session leaves on the commits it makes: how long it has been active and how many human messages it has received. It holds no message text.
+_Avoid_: Stamp, session log, telemetry
+
+**Transcript**:
+A session's full log, kept only on the device it ran on. Where one is available it is preferred to the session record.
+_Avoid_: History, chat log
+
+**Human message**:
+A prompt a person typed into a session, as opposed to anything the tooling or another agent wrote.
+_Avoid_: Interaction, intervention, prompt
