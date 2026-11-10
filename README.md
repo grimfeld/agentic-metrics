@@ -62,6 +62,42 @@ To upgrade the recorder, run `init` again in the repo and commit the changed scr
 
 Limits: what a session does after its last commit is not recorded, and a session that never commits leaves nothing. Where a transcript is cached for the same session, `collect` reads the transcript and ignores its records. A sub-agent known only through records has no model. Squashing commits before the PR is opened keeps the records (the trailers are in the squashed message), but a squash that rewrites the message by hand can drop them.
 
+### Working on several devices
+
+A repo worked on from a laptop, a desktop and cloud sessions leaves its traces in three places. This is how to get all of them into one report.
+
+**From now on: commit the recorder.** In each measured repo, once:
+
+1. Run `npx agentic-metrics init` (or `/agentic-metrics:init`) in a clone of the repo.
+2. Commit `.agentic-metrics/recorder.mjs` and `.claude/settings.json`, and push. If `init` warns that git ignores either file, un-ignore it first.
+3. On every other device, pull. A cloud session gets the files with its clone.
+
+From then on every session, on any device or in the cloud, leaves a [session record](#session-records) on its commits, and `collect` reads it from GitHub wherever you run it. Nothing needs copying between devices. To check it works, make a commit from a Claude Code session and look for a `Session-Record:` trailer in `git log -1`.
+
+**For past work: import each device's transcripts.** A session that ran before the recorder was installed is only known through its transcript, which stays on the device it ran on:
+
+| Where the session ran | What is left of it | Where |
+| --- | --- | --- |
+| A device with the plugin installed | Its full transcript, kept for good | `~/.cache/agentic-metrics/` on that device |
+| A device without the plugin | Its transcript, until Claude Code's cleanup removes it (after 30 days by default, the `cleanupPeriodDays` setting) | `~/.claude/projects/` on that device |
+| A cloud session | Nothing: the transcript went with its container | Its commits only |
+
+Pick one device to run `collect` on, and for each other device:
+
+1. Copy that device's `~/.cache/agentic-metrics` folder (or, without the plugin, its `~/.claude/projects` folder) to the collecting device, anywhere, for example `~/from-laptop`. Copy `~/.claude/projects` soon: it empties itself.
+2. On the collecting device, from the repo's clone, see what would be imported, then import it:
+
+   ```
+   npx agentic-metrics import-transcripts ~/from-laptop --dry-run
+   npx agentic-metrics import-transcripts ~/from-laptop
+   ```
+
+   It finds the project folders named after the clone and copies them into this device's cache under the local clone's name, worktrees and sub-agents included. Claude Code names a transcript folder after the clone's path, which differs between devices; that is why a plain copy is not enough. If the clone's folder is called something else on the other device, pass it: `--name life`. From outside the clone, add `--checkout ~/path/to/clone`.
+3. Repeat for each repo (run it from each repo's clone) and each device. Importing twice is safe: a transcript already there is kept, unless the imported one is longer.
+4. Run `collect` again for each repo.
+
+A ticket with neither a transcript nor a session record still gets what commits alone give: lead time with its phases, and an estimated active time. Its human messages, cost and sub-agents stay unknown.
+
 ## CLI
 
 Run it from a clone of the repo to measure. It reads GitHub through your `gh` login, so there's no token to set up:
@@ -70,6 +106,8 @@ Run it from a clone of the repo to measure. It reads GitHub through your `gh` lo
 npx agentic-metrics collect   # writes datasets/<owner>/<repo>.json
 npx agentic-metrics report    # renders datasets/ as a site in report/ (open report/index.html)
 ```
+
+`import-transcripts` brings another device's transcripts into this one's cache; see [Working on several devices](#working-on-several-devices).
 
 The first `collect` on a repo reads its whole history. Later runs read only the PRs and issues updated since the last run and merge them into a local cache of raw GitHub items, `~/.cache/agentic-metrics/github/<owner>/<repo>/` (or under `$AGENTIC_METRICS_CACHE_DIR`), so the dataset comes out the same as a full re-collection. `collect --full` reads everything again, for example after a metric definition changes. Editing a request's query also triggers a full read of that request on the next run.
 

@@ -16,6 +16,7 @@ import { ghSource, type GitHubSource } from "./github/source.ts";
 import { link } from "./linker.ts";
 import { linkRecords } from "./records.ts";
 import { writeSite } from "./report.ts";
+import { importTranscripts } from "./transcripts/import.ts";
 import { linkSessions } from "./transcripts/link.ts";
 import { loadSessions } from "./transcripts/load.ts";
 import { noTranscripts, transcriptCache, type TranscriptSource } from "./transcripts/source.ts";
@@ -75,6 +76,15 @@ const USAGE = `Usage:
       A repo published \`full\` gets a case-study draft per candidate in
       <case-studies>/<owner>/<name>/ (default: case-studies); an existing
       draft is never overwritten.
+  agentic-metrics import-transcripts <folder> [--checkout dir] [--name clone-folder]... [--dry-run]
+      Bring another device's Claude Code transcripts of this repo into this
+      device's transcript cache, so that collect reads them. <folder> is that
+      device's ~/.cache/agentic-metrics or ~/.claude/projects, copied here.
+      Its project folders named after the clone (the current folder's name,
+      or --checkout's; --name when the clone is called something else there)
+      are copied under the local clone's name, worktrees included. A
+      transcript already in the cache is kept unless the imported one is
+      longer. --dry-run lists what would be copied.
   agentic-metrics report [--datasets dir] [--out dir] [--case-studies dir]
       Render every dataset in <dir> (default: datasets) as a static site in
       <out> (default: report): an overview (index.html), a page per repo, per
@@ -96,6 +106,9 @@ export async function main(argv: string[], deps: Dependencies): Promise<number> 
         return 0;
       case "init":
         await initCommand(rest, deps, stdout);
+        return 0;
+      case "import-transcripts":
+        await importCommand(rest, deps, stdout);
         return 0;
       default:
         stderr(USAGE);
@@ -192,6 +205,28 @@ async function originRepo(dir: string): Promise<string | undefined> {
   } catch {
     return undefined;
   }
+}
+
+async function importCommand(args: string[], deps: Dependencies, stdout: (text: string) => void): Promise<void> {
+  const { values, positionals } = parseArgs({
+    args,
+    allowPositionals: true,
+    options: {
+      checkout: { type: "string" },
+      name: { type: "string", multiple: true, default: [] },
+      "dry-run": { type: "boolean", default: false },
+    },
+  });
+  const [source, ...extra] = positionals;
+  if (source === undefined || extra.length > 0) throw new Error("import-transcripts takes one folder: the other device's ~/.cache/agentic-metrics or ~/.claude/projects, copied here");
+  const lines = await importTranscripts({
+    source: resolve(deps.cwd, source),
+    checkout: resolve(deps.cwd, values.checkout ?? "."),
+    cacheDir: deps.cacheDir ?? defaultCacheDir(),
+    names: values.name,
+    dryRun: values["dry-run"],
+  });
+  stdout(`${lines.join("\n")}\n`);
 }
 
 function sameRepo(a: string | undefined, b: string): boolean {
