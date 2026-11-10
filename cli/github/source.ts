@@ -58,7 +58,7 @@ export interface IncrementalRequest {
 const PULL_REQUESTS_QUERY = `
 query($owner: String!, $name: String!, $endCursor: String) {
   repository(owner: $owner, name: $name) {
-    pullRequests(first: 50, after: $endCursor, states: [MERGED], orderBy: {field: UPDATED_AT, direction: DESC}) {
+    pullRequests(first: 20, after: $endCursor, states: [MERGED], orderBy: {field: UPDATED_AT, direction: DESC}) {
       pageInfo { hasNextPage endCursor }
       nodes {
         number title url body createdAt updatedAt mergedAt baseRefName headRefName
