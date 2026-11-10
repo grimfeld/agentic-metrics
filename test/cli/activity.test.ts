@@ -345,3 +345,50 @@ describe("active time", () => {
     assert.match(page, /<svg class="chart"[^>]* role="img"/);
   });
 });
+
+describe("estimate vs actual", () => {
+  interface EstimateValue {
+    p50Ratio: number;
+    excludedLate: number;
+    excludedUnknownActual: number;
+    tickets: { ticket: string; estimateHours: number; actualHours: number; actual: string; ratio: number }[];
+  }
+  const estimates = (dataset: Dataset) => dataset.metrics["estimateVsActual"] as { value: "unknown" | EstimateValue; coverage: { tickets: number; of: number } };
+  const pr = (number: number, issue: number, commitsAt: number[]) => ({ number, head: `ticket-${String(issue)}`, closes: [issue], openedAfter: 2, mergedAfter: 100, commitsAt });
+  const rows = (dataset: Dataset) =>
+    (estimates(dataset).value as EstimateValue).tickets.map(({ ticket, estimateHours, actualHours, actual, ratio }) => ({ ticket, estimateHours, actualHours, actual, ratio }));
+
+  it("compares the estimate with the ticket's active time, a day being 8 hours of work", async () => {
+    // Estimated at a day; worked on for 4 h, and delivered four days later.
+    const github = fakeGitHub([{ number: 1, ready: 0, comments: [{ after: 1, body: "estimate: 1d" }] }], [pr(10, 1, [8])]);
+    const dataset = await collect(github, [session("s1", "ticket-1", steady(4, 8))]);
+
+    assert.deepEqual(rows(dataset), [{ ticket: "#1", estimateHours: 8, actualHours: 4, actual: "measured", ratio: 0.5 }]);
+  });
+
+  it("reads a week as 40 hours, and says when the actual is estimated from commits", async () => {
+    // Commits every 30 minutes from 04:00 to 08:00: 4 h, estimated.
+    const github = fakeGitHub([{ number: 1, ready: 0, comments: [{ after: 1, body: "estimate: 1w" }] }], [pr(10, 1, [4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8])]);
+
+    assert.deepEqual(rows(await collect(github)), [{ ticket: "#1", estimateHours: 40, actualHours: 4, actual: "estimated", ratio: 0.1 }]);
+  });
+
+  it("leaves out, and counts, a ticket whose active time is unknown and one estimated after its first commit", async () => {
+    const github = fakeGitHub(
+      [
+        { number: 1, ready: 0, comments: [{ after: 1, body: "estimate: 2h" }] },
+        // One commit and no transcript: no active time.
+        { number: 2, ready: 0, comments: [{ after: 1, body: "estimate: 2h" }] },
+        // Estimated at 05:00, after its first commit at 04:00.
+        { number: 3, ready: 0, comments: [{ after: 5, body: "estimate: 2h" }] },
+      ],
+      [pr(10, 1, [4, 4.5]), pr(11, 2, [4]), pr(12, 3, [4, 4.5])],
+    );
+    const dataset = await collect(github);
+
+    assert.deepEqual(estimates(dataset).coverage, { tickets: 1, of: 3 });
+    assert.deepEqual(rows(dataset), [{ ticket: "#1", estimateHours: 2, actualHours: 0.5, actual: "estimated", ratio: 0.25 }]);
+    const { excludedLate, excludedUnknownActual } = estimates(dataset).value as EstimateValue;
+    assert.deepEqual({ excludedLate, excludedUnknownActual }, { excludedLate: 1, excludedUnknownActual: 1 });
+  });
+});

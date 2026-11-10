@@ -156,11 +156,11 @@ describe("report", () => {
   it("shows estimate vs actual beside each ticket's size proxies on its page", () => {
     assert.equal(
       onMetricPage("grimfeld/lifeline", "estimateVsActual", "estimateVsActual"),
-      "Summary Median actual / estimate: 0.31 . Left out because the estimate came after the first commit: 1.",
+      "Summary Median actual / estimate: 0.04 , the actual being the ticket's active time. Left out because the estimate came after the first commit: 1; because the active time is unknown: 0.",
     );
     assert.match(
       onMetricPage("grimfeld/lifeline", "estimateVsActual", "tickets"),
-      / Estimate Actual Actual \/ estimate Diff lines Files Sub-tickets #104 .* 4 h 11 h 2\.75 150 3 2 #105 .* 36 h 11 h 0\.31 150 3 0$/,
+      / Estimate Actual Actual is Actual \/ estimate Diff lines Files Sub-tickets #104 .* 4 h 30 min estimated 0\.13 150 3 2 #105 .* 12 h 30 min estimated 0\.04 150 3 0$/,
     );
     assert.equal(onMetricPage("grimfeld/agentic-metrics", "estimateVsActual", "estimateVsActual"), "Summary unknown");
   });

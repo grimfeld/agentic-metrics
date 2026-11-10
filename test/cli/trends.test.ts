@@ -179,7 +179,7 @@ describe("report: trends", () => {
   it("shows each metric's figure per month with its coverage on its page, and none on the repo page", () => {
     assert.match(textOf(page("humanMessagesPerTicket"), "data-section", "trend"), /Month Human messages per ticket \(p50\) Tickets Oct 2026 3 3 of 4 Nov 2026 2 1 of 1$/);
     assert.equal(trendRows(page("leadTime")), "Oct 2026 12 h 4 of 4 Nov 2026 10 h 1 of 1");
-    assert.equal(trendRows(page("estimateVsActual")), "Oct 2026 0.31 2 of 4 Nov 2026 unknown 0 of 1");
+    assert.equal(trendRows(page("estimateVsActual")), "Oct 2026 0.01 2 of 4 Nov 2026 unknown 0 of 1");
     for (const metric of METRICS) assert.match(page(metric.id), /data-section="trend"/, metric.id);
     assert.doesNotMatch(html, /data-trend=|data-section="trends"/);
   });

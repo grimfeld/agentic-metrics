@@ -101,7 +101,7 @@ function estimateReminder(payload: IssuesPayload, comments: IssueComment[]): Ope
   return [
     comment(
       payload,
-      `No estimate yet: reply \`estimate: 2d\` (h, d or w) before work starts, if you have one. ${ESTIMATE_MARKER}`,
+      `No estimate yet: reply \`estimate: 2d\` (h, d or w of working time: a day is 8 h, a week 5 days) before work starts, if you have one. ${ESTIMATE_MARKER}`,
     ),
   ];
 }

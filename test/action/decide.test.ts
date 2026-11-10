@@ -220,7 +220,7 @@ describe("Action: regression label from a caused-by line", () => {
 });
 
 const ESTIMATE_REMINDER =
-  "No estimate yet: reply `estimate: 2d` (h, d or w) before work starts, if you have one. <!-- agentic-metrics:estimate-reminder -->";
+  "No estimate yet: reply `estimate: 2d` (h, d or w of working time: a day is 8 h, a week 5 days) before work starts, if you have one. <!-- agentic-metrics:estimate-reminder -->";
 
 describe("Action: estimate reminder on the ready label", () => {
   it("reminds about an estimate when a ticket without one becomes ready", () => {

@@ -102,14 +102,11 @@ describe("a batch's commits credited to the tickets it delivers", () => {
     assert.equal(net.value.linesDeleted, 16);
   });
 
-  it("times a batch-delivered ticket from the first commit attributed to it", async () => {
-    // #18 is estimated at 1d; c05 was authored on Nov 3 09:00 and the batch merged on Nov 6 09:00.
+  it("leaves out an estimated ticket whose one credited commit says nothing of its active time", async () => {
+    // #18 is estimated at 1d, before c05, the only commit credited to it: one
+    // commit dates no work, so its actual is unknown, not the 72 h the batch took to land.
     const dataset = await collect();
-    const value = dataset.metrics["estimateVsActual"]?.value as { tickets: { ticket: string; actualHours: number; ratio: number }[] };
-    assert.deepEqual(
-      value.tickets.map(({ ticket, actualHours, ratio }) => ({ ticket, actualHours, ratio })),
-      [{ ticket: "#18", actualHours: 72, ratio: 3 }],
-    );
+    assert.deepEqual(dataset.metrics["estimateVsActual"], { value: "unknown", coverage: { tickets: 0, of: 5 } });
   });
 
   it("words throughput with correct plurals", async () => {

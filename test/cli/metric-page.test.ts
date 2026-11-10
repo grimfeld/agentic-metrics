@@ -175,7 +175,7 @@ describe("metric pages: part 2", () => {
     assert.equal(table("testRatio")[0], "Ticket Title Delivered Test lines Production lines Test / production");
     assert.deepEqual(table("netLinesRemoved").slice(0, 2), ["Ticket Title Delivered Added Deleted Net change", "#104 Lifeline issue title 104 2026-10-19 120 30 +90"]);
     assert.equal(table("size")[0], "Ticket Title Delivered Diff lines Files Sub-tickets");
-    assert.equal(table("estimateVsActual")[0], "Ticket Title Delivered Estimate Actual Actual / estimate Diff lines Files Sub-tickets");
+    assert.equal(table("estimateVsActual")[0], "Ticket Title Delivered Estimate Actual Actual is Actual / estimate Diff lines Files Sub-tickets");
     assert.equal(table("autonomy")[0], "Ticket Title Delivered Level Set");
     assert.equal(table("subAgents")[0], "Ticket Title Delivered Sub-agents Models");
     assert.equal(table("apiEquivalentCost")[0], "Ticket Title Delivered API equivalent");
