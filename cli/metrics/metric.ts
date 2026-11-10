@@ -2,7 +2,9 @@
 // everything about it end to end: how it is computed from linked work (its
 // dataset field), how the report shows it, and its Methodology entry. Adding a
 // metric means adding a file and listing it in `index.ts`.
+import type { DeliveredTicket } from "../dataset.ts";
 import type { LinkedWork } from "../linker.ts";
+import type { Chart, ChartInput } from "../report/charts.ts";
 
 /** A metric whose source is missing is unknown, never zero. */
 export const UNKNOWN = "unknown";
@@ -19,6 +21,12 @@ export interface MetricResult<V> {
   coverage: Coverage;
 }
 
+/** A repo's known value, with its coverage. */
+export interface Known<V> {
+  value: V;
+  coverage: Coverage;
+}
+
 export interface Figure<V> {
   /** What the number is, e.g. `p50`; shown beside the metric's name. */
   label: string;
@@ -31,6 +39,13 @@ export interface Figure<V> {
    * out of the comparison by autonomy level.
    */
   byAutonomy?: boolean;
+  /**
+   * True for a figure that reads the other way round from how it is shown:
+   * net lines changed keeps lines removed (positive when the code shrank) but
+   * shows lines changed. Charts and sparklines draw it negated, so that growth
+   * is up; `format` is still given the figure itself.
+   */
+  drawNegated?: boolean;
 }
 
 /**
@@ -57,12 +72,27 @@ export interface Metric<V> {
    */
   anonymize(value: V): V;
   /**
-   * A headline card at the top of the repo's section, for the few metrics
-   * that have one: `order` places it among the cards (lowest first), `card`
-   * renders its known value (HTML).
+   * Set by a repo-level metric (orchestration time), whose coverage is not the
+   * tickets it is computed over: it stays known over 0 tickets, and is unknown
+   * instead when `measured` says its value measured nothing. Any other
+   * metric's value or figure over 0 tickets is unknown. `compute` already
+   * returns unknown in both cases; the report reads a dataset written before
+   * it did the same way.
    */
-  headline?: { order: number; card(value: V): string };
-  /** A report section of its own (HTML), for metrics shown beyond a card. */
+  repoLevel?: { measured(value: V): boolean };
+  /**
+   * A headline card at the top of the repo's page and of the overview, for
+   * the few metrics that have one: `order` places it among the cards (lowest
+   * first), `card` renders its known value (HTML). `pool` gives the overview's
+   * value, pooled over the known results of the repos published `full`; it
+   * returns undefined when they give nothing to pool, and the card is unknown.
+   * Two medians can't be pooled into one: pool from per-ticket rows or counts.
+   */
+  headline?: { order: number; card(value: V): string; pool(known: readonly Known<V>[]): V | undefined };
+  /**
+   * A summary of its value in words (HTML), on its metric page: what its
+   * tiles and per-ticket table don't say. Given anonymized values too.
+   */
   section?(value: V): string;
   /**
    * One number summarising a value, for trends over time and the comparison
@@ -72,6 +102,20 @@ export interface Metric<V> {
    * one has no trend and no comparison.
    */
   figure?: Figure<V>;
+  /**
+   * A chart of its own (see `report/charts.ts`): the repo page's grid has a
+   * card for each metric that declares one, and its metric page draws it too.
+   * `draw` is only called on a known value, given as published (anonymized
+   * when the dataset is), with the metric's monthly trend and its figures by
+   * autonomy level; a card whose value is unknown says so instead.
+   */
+  chart?: { title: string; draw(input: ChartInput<V>): Chart };
+  /**
+   * Its per-ticket table, on its metric page (`report/ticket-table.ts`): the
+   * rows its value is computed from, so that any figure can be checked. Shown
+   * only for a dataset that keeps per-ticket data, never an anonymized one.
+   */
+  ticketTable?: TicketTable<V>;
   /**
    * A CV-ready sentence quoting a known value, plain text with no final
    * period; the report adds the coverage. Never called on an unknown value;
@@ -85,3 +129,38 @@ export interface Metric<V> {
     limits: string;
   };
 }
+
+/**
+ * The rows a metric's value is computed from: one per ticket, or per PR,
+ * batch or workflow when that is what the metric counts. The page shows them
+ * in the order given, and sorts them by any column on a heading's click.
+ */
+export interface TicketTable<V> {
+  /**
+   * What a row is, as the first column's heading, when rows are not tickets:
+   * `PR`, `Batch`, `Workflow`. Absent, each row is a delivered ticket keyed by
+   * its id (`#104`, `PR #136`), and the page adds its title, link and
+   * delivery date.
+   */
+  rowHeading?: string;
+  /** The value columns' headings, in order. */
+  columns: readonly string[];
+  /**
+   * The rows of a known value as published, given the dataset's delivered
+   * tickets in delivery order; undefined when the value holds none.
+   */
+  rows(value: V, delivered: readonly DeliveredTicket[]): TableRow[] | undefined;
+}
+
+export interface TableRow {
+  /** The row's key, plain text: a ticket's id, or a PR, batch or workflow. */
+  id: string;
+  /** One per value column. */
+  cells: TableCell[];
+}
+
+/**
+ * Plain text, sorted as text; or a number's text with the number it sorts by.
+ * `UNKNOWN` reads as unknown and sorts last, whichever the direction.
+ */
+export type TableCell = string | { text: string; sort: number };

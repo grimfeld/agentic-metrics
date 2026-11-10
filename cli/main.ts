@@ -14,7 +14,7 @@ import { loadGitHub } from "./github/load.ts";
 import { ghAdmin, init, type RepoAdmin } from "./init.ts";
 import { ghSource, type GitHubSource } from "./github/source.ts";
 import { link } from "./linker.ts";
-import { renderReport } from "./report.ts";
+import { writeSite } from "./report.ts";
 import { linkSessions } from "./transcripts/link.ts";
 import { loadSessions } from "./transcripts/load.ts";
 import { noTranscripts, transcriptCache, type TranscriptSource } from "./transcripts/source.ts";
@@ -75,9 +75,10 @@ const USAGE = `Usage:
       <case-studies>/<owner>/<name>/ (default: case-studies); an existing
       draft is never overwritten.
   agentic-metrics report [--datasets dir] [--out dir] [--case-studies dir]
-      Render every dataset in <dir> (default: datasets) as <out>/index.html
-      (default out: report), with the datasets copied alongside, and the
-      case studies marked \`approved: true\` of repos published \`full\`.
+      Render every dataset in <dir> (default: datasets) as a static site in
+      <out> (default: report): an overview (index.html), a page per repo, per
+      metric and per case study marked \`approved: true\` of a repo published
+      \`full\`, and methodology.html, with the datasets copied alongside.
 `;
 
 export async function main(argv: string[], deps: Dependencies): Promise<number> {
@@ -166,7 +167,7 @@ async function collect(args: string[], deps: Dependencies, stdout: (text: string
   }
   const local = resolve(deps.cwd, values.local);
   await writeJson(join(local, "datasets", datasetPath(dataset.repo)), dataset);
-  await writeFile(join(local, "index.html"), renderReport([dataset]));
+  await writeSite(local, [dataset]);
   stdout(`${dataset.repo} (publish: none): ${String(dataset.tickets)} tickets, ${String(dataset.pullRequests)} PRs -> ${join(local, "index.html")}\n`);
 }
 
@@ -238,7 +239,7 @@ async function report(args: string[], deps: Dependencies, stdout: (text: string)
   for (const dataset of datasets) {
     if (dataset.publish === "full") caseStudies.set(dataset.repo, await readApproved(join(caseStudiesDir, dataset.repo)));
   }
-  await writeFile(join(out, "index.html"), renderReport(datasets, caseStudies));
+  await writeSite(out, datasets, caseStudies);
   const summary = datasets.length === 0 ? `no dataset in ${datasetsDir} (run collect first); empty report` : `${String(datasets.length)} datasets`;
   stdout(`${summary} -> ${join(out, "index.html")}\n`);
 }

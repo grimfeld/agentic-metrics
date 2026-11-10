@@ -4,6 +4,7 @@ import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../../cli/main.ts";
+import { readMetricPages, readRepo } from "./report-pages.ts";
 import { fixtureSource } from "../../cli/github/source.ts";
 import { transcriptCache } from "../../cli/transcripts/source.ts";
 
@@ -130,14 +131,14 @@ describe("transcripts", () => {
     }
   });
 
-  it("fills the human messages headline card, and defines both metrics in Methodology", async () => {
+  it("fills the human messages headline tile, and defines both metrics in Methodology", async () => {
     await collect();
     await run(["report"]);
-    const html = readFileSync(join(cwd, "report/index.html"), "utf8");
+    const html = `${readRepo(join(cwd, "report"), "grimfeld/lifeline")}\n${readMetricPages(join(cwd, "report"), "grimfeld/lifeline", ["orchestrationTime"])}`;
     const text = (pattern: RegExp) => (pattern.exec(html)?.[1] ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 
-    assert.equal(text(/<article class="card" data-metric="humanMessagesPerTicket">([\s\S]*?)<\/article>/), "Human messages per ticket 2 p50 · 3 p90 4 of 5 tickets");
-    assert.equal(text(/data-section="orchestrationTime">([\s\S]*?)<\/section>/), "Orchestration time 0.5 h in 1 session on no ticket, with 2 human messages and 1 sub-agent.");
+    assert.equal(text(/<a class="tile[^"]*" href="[^"]*" data-metric="humanMessagesPerTicket">([\s\S]*?)<\/a>/), "Human messages per ticket 2 p50 · 3 p90 4 of 5 tickets");
+    assert.equal(text(/data-section="orchestrationTime">([\s\S]*?)<\/section>/), "Summary 0.5 h in 1 session on no ticket, with 2 human messages and 1 sub-agent.");
     assert.match(text(/data-methodology="humanMessagesPerTicket">([\s\S]*?)<\/article>/), /Coverage: grimfeld\/lifeline 4 of 5 tickets/);
     assert.match(text(/data-methodology="orchestrationTime">([\s\S]*?)<\/article>/), /^Orchestration time Active time/);
   });

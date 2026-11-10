@@ -43,7 +43,7 @@ Run it from a clone of the repo to measure. It reads GitHub through your `gh` lo
 
 ```
 npx agentic-metrics collect   # writes datasets/<owner>/<repo>.json
-npx agentic-metrics report    # renders datasets/ as report/index.html
+npx agentic-metrics report    # renders datasets/ as a site in report/ (open report/index.html)
 ```
 
 The first `collect` on a repo reads its whole history. Later runs read only the PRs and issues updated since the last run and merge them into a local cache of raw GitHub items, `~/.cache/agentic-metrics/github/<owner>/<repo>/` (or under `$AGENTIC_METRICS_CACHE_DIR`), so the dataset comes out the same as a full re-collection. `collect --full` reads everything again, for example after a metric definition changes. Editing a request's query also triggers a full read of that request on the next run.
@@ -105,11 +105,32 @@ npx agentic-metrics collect --repo owner/name --checkout ~/path/to/name   # writ
 npx agentic-metrics report --datasets datasets --case-studies case-studies --out _site
 ```
 
-`--checkout` points at the tracked repo's local clone, so its `.agentic-metrics.json` and its Claude Code transcripts are used. Commit `datasets/` (so every published number can be checked against its raw data, which each repo's section links) and the approved case studies, and publish `_site` with any static host. A GitHub Pages workflow for that repo only needs to run the `report` command above with `npx agentic-metrics@0` and deploy `_site`.
+`--checkout` points at the tracked repo's local clone, so its `.agentic-metrics.json` and its Claude Code transcripts are used. Commit `datasets/` (so every published number can be checked against its raw data, which each repo's page links) and the approved case studies, and publish `_site` with any static host. A GitHub Pages workflow for that repo only needs to run the `report` command above with `npx agentic-metrics@0` and deploy `_site`. Every link between pages is relative, so the site works under a sub-path and from `file://`.
 
-Each repo's section shows trends (every metric per month of delivery), a comparison by autonomy level (`full`, `assisted`, `manual`), and CV-ready sentences with a Copy button. A sentence quotes only known values, each with its coverage. All three come from the dataset (`trends`, `byAutonomy`), so an anonymized repo gets them too, from aggregates only, with any figure covering fewer than 3 tickets withheld (shown as —; `"suppressed"` in the dataset).
+The report is a static site of linked pages, each with a sidebar listing them all:
 
-Adding a metric: write one file in `cli/metrics/` holding its computation (its dataset field), how the report shows it, and its Methodology entry. Give it a `figure` (one number read off its value, computed again over each month's and each autonomy level's tickets) so it has a trend and a comparison, and a `sentence` for the CV sentences. Then list it in `cli/metrics/index.ts`. To give it a headline card, set its `headline` (`order` among the cards, and the card's HTML). Its tests go in `test/cli/`, fixtures in, dataset and HTML out. If it lists tickets, its `anonymize` must drop them.
+- `index.html`, the overview: the headline tiles pooled over the repos published `full` (each naming the repos it covers and those it is unknown for), a table comparing every repo, every repo's CV-ready sentences, and a card per repo.
+- `<owner>--<name>/index.html` (or `<alias>/index.html`), a repo: a number tile per metric with a sparkline of its monthly trend, a grid of charts, the CV-ready sentences with a Copy button, and its approved case studies.
+- `<owner>--<name>/<metric-id>.html`, a metric of a repo: its tiles (including its figure at each autonomy level, `full`, `assisted`, `manual`), its chart, its figure by month and by autonomy level, its summary, its per-ticket table (sortable by any column; never for an anonymized repo), its monthly trend as a table, and its definition.
+- `<owner>--<name>/case-studies/<N>.html`, an approved case study, titled by its opening heading.
+- `methodology.html`: every metric's definition and limits, with its coverage per repo, and links to the raw datasets, copied to `datasets/` beside the pages.
+
+A value that is unknown says so, never 0: a metric over no ticket (or orchestration time with no measured activity) is unknown, and a dataset written before `collect` recorded it so is read the same way. A CV sentence quotes only known values, each with its coverage. Trends and the comparison by autonomy level come from the dataset (`trends`, `byAutonomy`), so an anonymized repo gets them too, from aggregates only, with any figure covering fewer than 3 tickets withheld (shown as —; `"suppressed"` in the dataset).
+
+Adding a metric: write one file in `cli/metrics/` declaring a `Metric` (`cli/metrics/metric.ts` documents each field), then list it in `cli/metrics/index.ts`. The file holds:
+
+- `compute`: its value from the linked work, unknown (never 0) when its source is missing, with its coverage. `anonymize`: the value an anonymized dataset keeps; if the value lists tickets, it must drop them.
+- `figure`: one number read off its value, computed again over each month's and each autonomy level's tickets, so it has a trend, a sparkline and a comparison. `byAutonomy: false` for a repo-level figure no ticket owns; `drawNegated` for a figure shown the other way round (net lines changed keeps lines removed, and is drawn as lines changed). A repo-level metric whose coverage is not the tickets it is computed over sets `repoLevel.measured`, so that it stays known over 0 tickets but is unknown when it measured nothing.
+- `chart`: its own chart for the repo page's grid and its metric page (`cli/report/charts.ts` has the kinds; `perTicketChart` draws a dot per ticket, falling back to its trend line when an anonymized value keeps no rows).
+- `ticketTable`: the rows its value is computed from, on its metric page.
+- `section`: its summary in words, on its metric page: what its tiles and table don't say.
+- `sentence`: its CV-ready sentence.
+- `headline`, for a headline card on the repo page and the overview: `order` among the cards, `card` (its HTML) and `pool`, which pools the known values of the `full` repos into one value for the overview (from per-ticket rows or counts: two medians can't be pooled).
+- `methodology`: its definition and limits.
+
+Its tests go in `test/cli/`, fixtures in, dataset and HTML out.
+
+Adding a kind of page: write its renderer in `cli/report/` as a function of a `PageContext` (which turns any site path into a link relative to the page) returning `layout(...)` from `cli/report/shell.ts`, add its path to `PATHS` in `cli/report/site.ts`, list its pages in `renderSite` in `cli/report.ts`, and link it from the sidebar in `shell.ts` if it should be listed there.
 
 Reading something new from GitHub touches these places:
 
@@ -164,7 +185,7 @@ When an issue's description (on opening or editing) or a new comment has a line 
 - `plugin/`: the Claude Code plugin (manifest, hooks, `addenda/`, `skills/`). `.claude-plugin/marketplace.json` at the root points at it.
 - `action/`: the GitHub Action (`action.yml`; `decide.ts` is the pure decision function, `main.ts` the wrapper that calls GitHub).
 - `test/`: tests, one folder per deliverable, with fixtures under `test/fixtures/`.
-- `cli/`: the CLI. `npm run build` emits it as JavaScript into `dist/` for the npm package, because Node doesn't strip types under `node_modules`. `npm pack` runs the build.
+- `cli/`: the CLI. `cli/metrics/` holds one file per metric; `cli/report/` the report site (`site.ts` the site map, `shell.ts` the shared page layout and sidebar, a renderer per kind of page, `charts.ts` the inline SVG charts). `npm run build` emits it as JavaScript into `dist/` for the npm package, because Node doesn't strip types under `node_modules`. `npm pack` runs the build.
 
 TypeScript runs directly on Node 24 (type stripping), so source files use erasable syntax only and there is no build step for the plugin or the Action (its `runs.main` is `main.ts`, run by the runner's Node 24); `tsc` type-checks.
 

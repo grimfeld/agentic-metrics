@@ -1,7 +1,7 @@
 import type { Ticket } from "../linker.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
-import { formatPercent, percent, plural, share } from "./stats.ts";
+import { formatPercent, percent, plural, share, sum } from "./stats.ts";
 
 export interface RegressionRate {
   /** Share of delivered tickets with at least one regression traced to them, 0 to 1. */
@@ -68,22 +68,24 @@ export const regressionRate: Metric<RegressionRate> = {
   headline: {
     order: 4,
     card: ({ rate, regressions }) => `${formatPercent(percent(rate))} <small>${plural(regressions, "regression")}</small>`,
+    pool(known) {
+      const tickets = sum(known.map(({ coverage }) => coverage.tickets));
+      if (tickets === 0) return undefined;
+      const regressedTickets = sum(known.map(({ value }) => value.regressedTickets));
+      return { rate: share(regressedTickets, tickets), regressions: sum(known.map(({ value }) => value.regressions)), regressedTickets };
+    },
   },
 
-  section({ perTicket, untraced, regressions, regressedTickets }) {
-    if (!perTicket || !untraced) {
-      return `<p>${plural(regressions, "regression")} traced to ${plural(regressedTickets, "ticket")}.</p>`;
-    }
-    const rows = perTicket
-      .map((row) => `<tr><td>${row.ticket}</td><td>${row.bugs.map((bug) => `#${String(bug)}`).join(", ")}</td></tr>`)
-      .join("");
-    const table = perTicket.length
-      ? `<table><thead><tr><th>Ticket</th><th>Regressions</th></tr></thead><tbody>${rows}</tbody></table>`
-      : "<p>No regression traced to a delivered ticket.</p>";
-    const rest = untraced.length
-      ? `<p>Untraced: ${untraced.map((bug) => `#${String(bug)}`).join(", ")}</p>`
-      : "";
-    return table + rest;
+  section({ untraced, regressions, regressedTickets }) {
+    const traced = `<p><strong>${plural(regressions, "regression")}</strong> traced to ${plural(regressedTickets, "delivered ticket")}.</p>`;
+    if (!untraced?.length) return traced;
+    return `${traced}<p>Untraced, and left out of the rate: ${untraced.map((bug) => `#${String(bug)}`).join(", ")}.</p>`;
+  },
+
+  ticketTable: {
+    columns: ["Regressions", "Regression issues"],
+    rows: ({ perTicket }) =>
+      perTicket?.map((row) => ({ id: row.ticket, cells: [{ text: String(row.bugs.length), sort: row.bugs.length }, row.bugs.map((bug) => `#${String(bug)}`).join(", ")] })),
   },
 
   methodology: {

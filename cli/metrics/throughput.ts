@@ -1,3 +1,4 @@
+import { dayLabel } from "../report/charts.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
 import { plural } from "./stats.ts";
@@ -51,6 +52,21 @@ export const throughput: Metric<Throughput> = {
     format: String,
   },
 
+  chart: {
+    title: "Tickets per week",
+    draw: ({ value: { weeks } }) => {
+      const tickets = weeks.reduce((sum, week) => sum + week.tickets, 0);
+      const busiest = weeks.reduce((top, week) => (week.tickets > top.tickets ? week : top), weeks[0] ?? { week: "", tickets: 0, pullRequests: 0 });
+      return {
+        kind: "columns",
+        data: weeks.map((week) => ({ label: week.week, short: dayLabel(week.week), value: week.tickets, note: String(week.pullRequests) })),
+        format: String,
+        heads: ["Week of", "Tickets", "PRs"],
+        description: `Tickets delivered in each of ${plural(weeks.length, "week")}, ${String(tickets)} in all; the busiest, the week of ${busiest.week}, delivered ${String(busiest.tickets)}.`,
+      };
+    },
+  },
+
   sentence({ weeks }) {
     const tickets = weeks.reduce((sum, week) => sum + week.tickets, 0);
     const pullRequests = weeks.reduce((sum, week) => sum + week.pullRequests, 0);
@@ -60,15 +76,22 @@ export const throughput: Metric<Throughput> = {
   },
 
   section({ weeks }) {
-    const rows = weeks
-      .map((w) => `<tr><td>${w.week}</td><td>${String(w.tickets)}</td><td>${String(w.pullRequests)}</td></tr>`)
-      .join("");
-    return `<table><thead><tr><th>Week of</th><th>Tickets</th><th>PRs</th></tr></thead><tbody>${rows}</tbody></table>`;
+    const tickets = weeks.reduce((sum, week) => sum + week.tickets, 0);
+    const pullRequests = weeks.reduce((sum, week) => sum + week.pullRequests, 0);
+    const busiest = weeks.reduce((top, week) => (week.tickets > top.tickets ? week : top), weeks[0] ?? { week: "", tickets: 0, pullRequests: 0 });
+    const empty = weeks.filter((week) => week.tickets === 0).length;
+    return `<p><strong>${plural(tickets, "ticket")}</strong> in ${plural(pullRequests, "PR")} over ${plural(weeks.length, "week")}, ${plural(empty, "week")} with none. The busiest, the week of ${busiest.week}, delivered ${String(busiest.tickets)}.</p>`;
+  },
+
+  // Every delivered ticket, with the week it counts in.
+  ticketTable: {
+    columns: ["Week of"],
+    rows: (_value, delivered) => delivered.map((ticket) => ({ id: ticket.id, cells: [weekOf(new Date(ticket.doneAt))] })),
   },
 
   methodology: {
     definition:
-      "Tickets and pull requests delivered per week. A ticket is a GitHub issue with at least one PR delivered to the default branch; a delivered PR linked to no issue counts as a ticket of its own. A PR is linked by the first of: its closing references (<code>Closes #N</code> and manual links), the issue number in its branch name (per-repo pattern), <code>(#N)</code> in its commit subjects. Integration (batch) PRs, recognised by a per-repo branch prefix, are neither tickets nor counted PRs; they deliver the PRs merged into their branch and the issues they close. PRs from excluded authors or branches count nowhere. A ticket counts in the week its last PR reached the default branch; a PR in the week it merged. Weeks start on Monday (UTC).",
+      "Tickets and pull requests delivered per week. A ticket is a GitHub issue with at least one PR delivered to the default branch; a delivered PR linked to no issue counts as a ticket of its own. A PR is linked by the first of: its closing references (<code>Closes #N</code> and manual links), the issue number in its branch name (per-repo pattern), <code>(#N)</code> in its commit subjects. Integration (batch) PRs, recognised by a per-repo branch prefix, are neither tickets nor counted PRs; they deliver the PRs merged into their branch and the issues they close. PRs from excluded authors or branches count nowhere. A ticket counts in the week its last PR reached the default branch; a PR in the week it merged. Weeks start on Monday (UTC). Every issue a delivered PR closes counts as a ticket: a spec PR that closes a parent issue and its sub-issues counts each of them, the parent included.",
     limits:
       "An issue closed with no merged PR (work pushed straight to the default branch, or closed as done by hand) is not a delivered ticket and is not counted. A branch name or commit subject can name the wrong issue, and only numbers GitHub returns as issues of this repo are linked. A PR merged into an integration branch counts in the week it merged there, not the week the batch landed. PRs merged into any other branch are not counted.",
   },

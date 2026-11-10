@@ -4,6 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../../cli/main.ts";
+import { metricPage, readPages, readRepo } from "./report-pages.ts";
 import { fixtureSource } from "../../cli/github/source.ts";
 import { transcriptCache } from "../../cli/transcripts/source.ts";
 import { METRICS } from "../../cli/metrics/index.ts";
@@ -40,10 +41,10 @@ async function collect(cwd: string, config?: object) {
   assert.equal(status, 0, stderr);
 }
 
-async function report(cwd: string): Promise<string> {
+async function report(cwd: string, repo: string): Promise<string> {
   const status = await main(["report"], { cwd, github: fixtureSource(join(GITHUB, "empty")), now: () => NOW, stdout: () => undefined });
   assert.equal(status, 0);
-  return readFileSync(join(cwd, "report/index.html"), "utf8");
+  return readRepo(join(cwd, "report"), repo);
 }
 
 let full: string;
@@ -57,13 +58,20 @@ before(async () => {
   full = mkdtempSync(join(tmpdir(), "am-trends-"));
   await collect(full);
   dataset = JSON.parse(readFileSync(join(full, "datasets/grimfeld/lifeline.json"), "utf8")) as Dataset;
-  html = await report(full);
+  html = await report(full, "grimfeld/lifeline");
 
   anonymized = mkdtempSync(join(tmpdir(), "am-trends-anon-"));
   await collect(anonymized, { publish: "anonymized", alias: "side-project" });
   anonymizedDataset = JSON.parse(readFileSync(join(anonymized, "datasets/side-project.json"), "utf8")) as Dataset;
-  anonymizedHtml = await report(anonymized);
+  anonymizedHtml = await report(anonymized, "side-project");
 });
+
+/** A metric's page of the full repo's report, or of the anonymized one's. */
+function page(id: string, which: "full" | "anonymized" = "full"): string {
+  return which === "full"
+    ? readPages(join(full, "report"), [metricPage("grimfeld/lifeline", id)])
+    : readPages(join(anonymized, "report"), [metricPage("side-project", id)]);
+}
 
 after(() => {
   rmSync(full, { recursive: true, force: true });
@@ -162,29 +170,36 @@ function sentences(page: string): Map<string, string> {
   );
 }
 
+/** A metric page's monthly trend table, as text rows without its heading. */
+function trendRows(metricHtml: string): string {
+  return textOf(metricHtml, "data-section", "trend").replace(/^.*? Tickets /, "");
+}
+
 describe("report: trends", () => {
-  it("shows a row per metric, a column per month, each figure with its coverage", () => {
-    assert.equal(textOf(html, "data-trend", "periods"), "Metric 2026-10 4 tickets 2026-11 1 ticket");
-    assert.equal(textOf(html, "data-trend", "humanMessagesPerTicket"), "Human messages per ticket p50 3 3 of 4 2 1 of 1");
-    assert.equal(textOf(html, "data-trend", "leadTime"), "Lead time p50 12 h 4 of 4 10 h 1 of 1");
-    assert.equal(textOf(html, "data-trend", "estimateVsActual"), "Estimate vs actual p50 actual / estimate 0.31 2 of 4 unknown 0 of 1");
-    for (const metric of METRICS) assert.match(html, new RegExp(`data-trend="${metric.id}"`), metric.id);
+  it("shows each metric's figure per month with its coverage on its page, and none on the repo page", () => {
+    assert.match(textOf(page("humanMessagesPerTicket"), "data-section", "trend"), /Month Human messages per ticket \(p50\) Tickets Oct 2026 3 3 of 4 Nov 2026 2 1 of 1$/);
+    assert.equal(trendRows(page("leadTime")), "Oct 2026 12 h 4 of 4 Nov 2026 10 h 1 of 1");
+    assert.equal(trendRows(page("estimateVsActual")), "Oct 2026 0.31 2 of 4 Nov 2026 unknown 0 of 1");
+    for (const metric of METRICS) assert.match(page(metric.id), /data-section="trend"/, metric.id);
+    assert.doesNotMatch(html, /data-trend=|data-section="trends"/);
   });
 });
 
 describe("report: comparison by autonomy level", () => {
-  it("shows each metric's figure per level, with its coverage", () => {
-    assert.equal(textOf(html, "data-autonomy", "levels"), "Metric Full 3 tickets Assisted 1 ticket Manual 1 ticket");
-    assert.equal(textOf(html, "data-autonomy", "humanMessagesPerTicket"), "Human messages per ticket p50 2 3 of 3 3 1 of 1 unknown 0 of 1");
-    assert.equal(textOf(html, "data-autonomy", "regressionRate"), "Regression rate of tickets 33.3% 3 of 3 100% 1 of 1 100% 1 of 1");
-    assert.doesNotMatch(html, /data-autonomy="orchestrationTime"/);
+  it("shows each metric's figure per level, with its coverage, on its page", () => {
+    assert.match(textOf(page("netLinesRemoved"), "data-section", "tiles"), / Full \+45 3 of 3 tickets Assisted \+90 1 of 1 tickets Manual \+195 1 of 1 tickets$/);
+    assert.doesNotMatch(html, /data-autonomy=|data-section="by-autonomy"/);
+    assert.match(textOf(page("humanMessagesPerTicket"), "data-section", "tiles"), / Full 2 3 of 3 tickets Assisted 3 1 of 1 tickets Manual unknown 0 of 1 tickets$/);
+    assert.match(textOf(page("regressionRate"), "data-section", "tiles"), / Full 33\.3% 3 of 3 tickets Assisted 100% 1 of 1 tickets Manual 100% 1 of 1 tickets$/);
+    assert.match(page("regressionRate"), /<title id="autonomy-regressionRate-title">Regression rate by autonomy level<\/title>/);
+    assert.doesNotMatch(page("orchestrationTime"), /data-tile="full"|data-section="by-autonomy"/);
   });
 });
 
 describe("report: anonymized trends and comparison", () => {
   it("shows a figure over fewer than 3 tickets as a dash, and says why in Methodology", () => {
-    assert.equal(textOf(anonymizedHtml, "data-autonomy", "humanMessagesPerTicket"), "Human messages per ticket p50 2 3 of 3 — 1 of 1 unknown 0 of 1");
-    assert.equal(textOf(anonymizedHtml, "data-trend", "leadTime"), "Lead time p50 12 h 4 of 4 — 1 of 1");
+    assert.match(textOf(page("humanMessagesPerTicket", "anonymized"), "data-section", "tiles"), / Full 2 3 of 3 tickets Assisted — 1 of 1 tickets Manual unknown 0 of 1 tickets$/);
+    assert.equal(trendRows(page("leadTime", "anonymized")), "Oct 2026 12 h 4 of 4 Nov 2026 — 1 of 1");
     assert.match(textOf(anonymizedHtml, "id", "methodology"), /fewer than 3 tickets/);
     assert.doesNotMatch(html, /—/);
   });
@@ -229,7 +244,7 @@ describe("report: CV-ready sentences", () => {
     assert.equal(all.get("humanMessagesPerTicket:autonomy"), undefined, "the assisted figure covers 1 ticket");
     assert.equal(all.get("leadTime:trend"), undefined, "November's figure covers 1 ticket");
     assert.equal(sentences(anonymizedHtml).get("humanMessagesPerTicket"), "A median of 2 human messages per ticket (p90 3), over 4 of 5 tickets.");
-    assert.match(anonymizedHtml, /data-trend="leadTime"/);
-    assert.match(anonymizedHtml, /data-autonomy="leadTime"/);
+    assert.match(page("leadTime", "anonymized"), /data-section="trend"/);
+    assert.match(page("leadTime", "anonymized"), /data-tile="full"/);
   });
 });

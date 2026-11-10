@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../../cli/main.ts";
 import { fixtureSource } from "../../cli/github/source.ts";
+import { metricPage, readPages, repoPage } from "./report-pages.ts";
 
 const FIXTURES = join(import.meta.dirname, "../fixtures/github");
 const NOW = new Date("2026-11-09T12:00:00Z");
@@ -22,7 +23,8 @@ before(async () => {
   await run(["collect"], "lifeline");
   await run(["collect"], "empty");
   await run(["report"]);
-  html = readFileSync(join(cwd, "report/index.html"), "utf8");
+  // Each repo's page, then Methodology.
+  html = readPages(join(cwd, "report"), [repoPage("grimfeld/agentic-metrics"), repoPage("grimfeld/lifeline"), "methodology.html"]);
 });
 
 after(() => {
@@ -37,6 +39,14 @@ function textOf(attribute: string, value: string, repo?: string): string {
   return (match[2] ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
+/** The visible text of a section of a metric's page. */
+function onMetricPage(repo: string, id: string, section: string): string {
+  const page = readPages(join(cwd, "report"), [metricPage(repo, id)]);
+  const match = new RegExp(`<section [^>]*data-section="${section}"[^>]*>([\\s\\S]*?)</section>`).exec(page);
+  assert.ok(match, `no ${section} section on ${id}'s page`);
+  return (match[1] ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
 function section(repo: string): string {
   const match = new RegExp(`<section class="repo"[^>]* data-repo="${repo}">([\\s\\S]*?)</section><!-- /repo -->`).exec(html);
   assert.ok(match, `no section for ${repo}`);
@@ -44,9 +54,10 @@ function section(repo: string): string {
 }
 
 describe("report", () => {
-  it("shows the four headline cards for each repo, in order", () => {
-    const cards = [...section("grimfeld/lifeline").matchAll(/class="card" data-metric="(\w+)"/g)].map((m) => m[1]);
-    assert.deepEqual(cards, ["leadTime", "firstRunCiRate", "humanMessagesPerTicket", "regressionRate"]);
+  it("shows the four headline tiles first for each repo, in order", () => {
+    const tiles = [...section("grimfeld/lifeline").matchAll(/<a class="tile lg" [^>]*data-metric="(\w+)"/g)].map((m) => m[1]);
+    assert.deepEqual(tiles, ["leadTime", "firstRunCiRate", "humanMessagesPerTicket", "regressionRate"]);
+    assert.match(section("grimfeld/lifeline"), /^\s*<section class="tiles"[^>]*>\s*<a class="tile lg" [^>]*data-metric="leadTime"/);
   });
 
   it("shows lead time p50 and p90 with its coverage", () => {
@@ -62,10 +73,15 @@ describe("report", () => {
     assert.equal(textOf("data-metric", "regressionRate", "grimfeld/agentic-metrics"), "Regression rate unknown 0 of 0 tickets");
   });
 
-  it("lists regressions per ticket, and the untraced ones", () => {
+  it("lists regressions per ticket on its page, and the untraced ones", () => {
     assert.equal(
-      textOf("data-section", "regressionRate", "grimfeld/lifeline"),
-      "Regression rate Ticket Regressions #104 #141 PR #136 #142 #106 #140, #145 Untraced: #143, #144",
+      onMetricPage("grimfeld/lifeline", "regressionRate", "tickets"),
+      "Per ticket 3 rows · select a column heading to sort Ticket Title Delivered Regressions Regression issues " +
+        "#104 Lifeline issue title 104 2026-10-19 1 #141 PR #136 Lifeline PR title 136 2026-10-27 1 #142 #106 Lifeline issue title 106 2026-10-28 2 #140, #145",
+    );
+    assert.equal(
+      onMetricPage("grimfeld/lifeline", "regressionRate", "regressionRate"),
+      "Summary 4 regressions traced to 3 delivered tickets. Untraced, and left out of the rate: #143, #144.",
     );
   });
 
@@ -80,10 +96,11 @@ describe("report", () => {
     assert.equal(textOf("data-metric", "humanMessagesPerTicket", "grimfeld/lifeline"), "Human messages per ticket unknown 0 of 5 tickets");
   });
 
-  it("shows throughput per week", () => {
+  it("shows throughput per week on its page", () => {
+    assert.match(onMetricPage("grimfeld/lifeline", "throughput", "chart"), / Week of Tickets PRs 2026-10-19 2 2 2026-10-26 2 2 2026-11-02 0 0 2026-11-09 1 1$/);
     assert.equal(
-      textOf("data-section", "throughput", "grimfeld/lifeline"),
-      "Throughput Week of Tickets PRs 2026-10-19 2 2 2026-10-26 2 2 2026-11-02 0 0 2026-11-09 1 1",
+      onMetricPage("grimfeld/lifeline", "throughput", "throughput"),
+      "Summary 5 tickets in 5 PRs over 4 weeks, 1 week with none. The busiest, the week of 2026-10-19, delivered 2.",
     );
   });
 
@@ -94,16 +111,22 @@ describe("report", () => {
     assert.match(textOf("data-methodology", "throughput"), /^Throughput Tickets and pull requests delivered per week/);
   });
 
-  it("shows the test ratio and net lines removed, with each ticket's lines", () => {
+  it("shows the test ratio and net lines changed on their pages, with each ticket's lines", () => {
     assert.equal(
-      textOf("data-section", "testRatio", "grimfeld/lifeline"),
-      "Test lines per production line 0.59 test lines added per production line: 65 test lines for 110 production lines. " +
-        "Ticket Test lines Production lines #104 30 80 #105 30 80 #106 30 30 PR #137 5 0",
+      onMetricPage("grimfeld/lifeline", "testRatio", "testRatio"),
+      "Summary 0.59 test lines added per production line: 65 test lines for 110 production lines.",
+    );
+    assert.match(
+      onMetricPage("grimfeld/lifeline", "testRatio", "tickets"),
+      / Test lines Production lines Test \/ production #104 .* 30 80 0\.38 #105 .* 30 80 0\.38 #106 .* 30 30 1 PR #137 .* 5 0 unknown$/,
     );
     assert.equal(
-      textOf("data-section", "netLinesRemoved", "grimfeld/lifeline"),
-      "Net lines removed -240 net lines removed: 145 deleted, 385 added. Tickets removing more than they added: 1. " +
-        "Ticket Added Deleted Net removed #104 120 30 -90 #105 120 30 -90 PR #136 200 5 -195 #106 60 110 50 PR #137 5 0 -5",
+      onMetricPage("grimfeld/lifeline", "netLinesRemoved", "netLinesRemoved"),
+      "Summary +240 net lines changed: 385 added, 145 deleted. Tickets removing more than they added: 1.",
+    );
+    assert.match(
+      onMetricPage("grimfeld/lifeline", "netLinesRemoved", "tickets"),
+      / Added Deleted Net change #104 .* 120 30 \+90 #105 .* 120 30 \+90 PR #136 .* 200 5 \+195 #106 .* 60 110 −50 PR #137 .* 5 0 \+5$/,
     );
   });
 
@@ -111,52 +134,54 @@ describe("report", () => {
     for (const id of ["throughput", "leadTime"]) assert.match(textOf("data-methodology", id), /closed with no (merged )?PR/, id);
   });
 
-  it("shows each ticket's lead time", () => {
-    assert.equal(
-      textOf("data-section", "leadTime", "grimfeld/lifeline"),
-      "Lead time p50 12 h , p90 7.5 d . Ticket Lead time #104 12 h #105 20 h PR #136 6 h #106 7.5 d PR #137 10 h",
-    );
-  });
-
-  it("shows each ticket's size proxies", () => {
+  it("shows each ticket's lead time on its page", () => {
     assert.match(
-      textOf("data-section", "size", "grimfeld/lifeline"),
-      /^Ticket size Median ticket: 150 lines changed in 3 files\. Ticket Diff lines Files Sub-tickets #104 150 3 2 #105 150 3 0 PR #136 205 101 0 #106 170 3 0 PR #137 5 1 0$/,
+      onMetricPage("grimfeld/lifeline", "leadTime", "tickets"),
+      / Lead time #104 Lifeline issue title 104 2026-10-19 12 h #105 .* 20 h PR #136 .* 6 h #106 .* 7\.5 d PR #137 .* 10 h$/,
+    );
+    assert.equal(
+      onMetricPage("grimfeld/lifeline", "leadTime", "leadTime"),
+      "Summary Half the tickets took up to 12 h from ready to merged, and nine in ten up to 7.5 d .",
     );
   });
 
-  it("shows estimate vs actual beside each ticket's size proxies", () => {
-    assert.equal(
-      textOf("data-section", "estimateVsActual", "grimfeld/lifeline"),
-      "Estimate vs actual Median actual / estimate: 0.31 . Left out because the estimate came after the first commit: 1. " +
-        "Ticket Estimate Actual Actual / estimate Diff lines Files Sub-tickets #104 4 h 11 h 2.75 150 3 2 #105 36 h 11 h 0.31 150 3 0",
+  it("shows each ticket's size proxies on its page", () => {
+    assert.equal(onMetricPage("grimfeld/lifeline", "size", "size"), "Summary Median ticket: 150 lines changed in 3 files.");
+    assert.match(
+      onMetricPage("grimfeld/lifeline", "size", "tickets"),
+      / Diff lines Files Sub-tickets #104 .* 150 3 2 #105 .* 150 3 0 PR #136 .* 205 101 0 #106 .* 170 3 0 PR #137 .* 5 1 0$/,
     );
-    assert.equal(textOf("data-section", "estimateVsActual", "grimfeld/agentic-metrics"), "Estimate vs actual unknown");
+  });
+
+  it("shows estimate vs actual beside each ticket's size proxies on its page", () => {
+    assert.equal(
+      onMetricPage("grimfeld/lifeline", "estimateVsActual", "estimateVsActual"),
+      "Summary Median actual / estimate: 0.31 . Left out because the estimate came after the first commit: 1.",
+    );
+    assert.match(
+      onMetricPage("grimfeld/lifeline", "estimateVsActual", "tickets"),
+      / Estimate Actual Actual \/ estimate Diff lines Files Sub-tickets #104 .* 4 h 11 h 2\.75 150 3 2 #105 .* 36 h 11 h 0\.31 150 3 0$/,
+    );
+    assert.equal(onMetricPage("grimfeld/agentic-metrics", "estimateVsActual", "estimateVsActual"), "Summary unknown");
   });
 
   it("defines the diff and estimate metrics in Methodology", () => {
     assert.match(textOf("data-methodology", "testRatio"), /Lines added to test files divided by lines added to production files/);
-    assert.match(textOf("data-methodology", "netLinesRemoved"), /Lines deleted minus lines added/);
+    assert.match(textOf("data-methodology", "netLinesRemoved"), /Lines added minus lines deleted/);
     assert.match(textOf("data-methodology", "size"), /diff size .* files touched .* sub-tickets/);
     const estimate = textOf("data-methodology", "estimateVsActual");
     assert.match(estimate, /earliest comment on its issue/);
     assert.match(estimate, /Coverage: grimfeld\/agentic-metrics 0 of 0 tickets; grimfeld\/lifeline 2 of 5 tickets/);
   });
 
-  it("links each repo's raw dataset from its own section", () => {
-    assert.match(section("grimfeld/lifeline"), /<a href="datasets\/grimfeld\/lifeline\.json">/);
-    assert.match(section("grimfeld/agentic-metrics"), /<a href="datasets\/grimfeld\/agentic-metrics\.json">/);
-  });
-
-  it("lists every tracked repo at the top, linking to its section", () => {
-    const nav = textOf("id", "repos");
-    assert.equal(nav, "grimfeld/agentic-metrics grimfeld/lifeline");
-    assert.match(html, /<a href="#grimfeld\/lifeline">/);
-    assert.match(html, /<section class="repo" id="grimfeld\/lifeline" data-repo="grimfeld\/lifeline">/);
+  it("links each repo's raw dataset from its own page", () => {
+    const page = (repo: string) => readPages(join(cwd, "report"), [repoPage(repo)]);
+    assert.match(page("grimfeld/lifeline"), /<a class="chip" href="\.\.\/datasets\/grimfeld\/lifeline\.json">raw dataset<\/a>/);
+    assert.match(page("grimfeld/agentic-metrics"), /<a class="chip" href="\.\.\/datasets\/grimfeld\/agentic-metrics\.json">raw dataset<\/a>/);
   });
 
   it("links each raw dataset from Methodology, copied next to the report", () => {
-    assert.match(html, /<a href="datasets\/grimfeld\/lifeline\.json">/);
+    assert.match(readPages(join(cwd, "report"), ["methodology.html"]), /<a href="datasets\/grimfeld\/lifeline\.json">/);
     assert.equal(
       readFileSync(join(cwd, "report/datasets/grimfeld/lifeline.json"), "utf8"),
       readFileSync(join(cwd, "datasets/grimfeld/lifeline.json"), "utf8"),

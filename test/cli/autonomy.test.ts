@@ -4,6 +4,7 @@ import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../../cli/main.ts";
+import { readMetricPages, readRepo } from "./report-pages.ts";
 import { fixtureSource } from "../../cli/github/source.ts";
 import { transcriptCache } from "../../cli/transcripts/source.ts";
 
@@ -147,13 +148,17 @@ describe("autonomy", () => {
     });
   });
 
-  it("shows the levels and the overridden count in the report, and defines the rule in Methodology", async () => {
+  it("shows the levels, each ticket's and the overridden count on its page, and defines the rule in Methodology", async () => {
     await run(["collect"]);
     await run(["report"]);
-    const html = readFileSync(join(cwd, "report/index.html"), "utf8");
+    const html = `${readMetricPages(join(cwd, "report"), "grimfeld/lifeline", ["autonomy"])}\n${readRepo(join(cwd, "report"), "grimfeld/lifeline")}`;
     const text = (pattern: RegExp) => (pattern.exec(html)?.[1] ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 
-    assert.match(text(/data-section="autonomy">([\s\S]*?)<\/section>/), /^Autonomy level Full 3 Assisted 1 Manual 1 1 of 5 tickets overridden by an autonomy:\* label\./);
+    assert.equal(
+      text(/data-section="autonomy">([\s\S]*?)<\/section>/),
+      "Summary 3 of 5 tickets delivered at full autonomy (3 full, 1 assisted, 1 manual). 1 of 5 overridden by an autonomy:* label.",
+    );
+    assert.match(text(/data-section="tickets">([\s\S]*?)<\/section>/), / Level Set #104 .* Assisted computed #105 .* Full by label \(computed: Assisted\) PR #136 .* Manual computed/);
     assert.match(text(/data-methodology="autonomy">([\s\S]*?)<\/article>/), /Co-Authored-By/);
     assert.match(text(/data-methodology="autonomy">([\s\S]*?)<\/article>/), /Coverage: grimfeld\/lifeline 5 of 5 tickets/);
   });

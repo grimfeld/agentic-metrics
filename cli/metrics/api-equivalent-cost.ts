@@ -114,19 +114,44 @@ export const apiEquivalentCost: Metric<ApiEquivalentCost> = {
 
   figure: { label: "p50 per ticket", of: ({ perTicketUsd }) => perTicketUsd?.p50 ?? Number.NaN, format: usd },
 
+  // Unpriced models are unknown, never zero: drawn as such, after the priced ones.
+  chart: {
+    title: "Cost by model",
+    draw: ({ value: { byModel, priceTable, unpricedModels } }) => {
+      const rows = [...byModel].sort((a, b) =>
+        a.apiEquivalentUsd === UNKNOWN ? 1 : b.apiEquivalentUsd === UNKNOWN ? -1 : b.apiEquivalentUsd - a.apiEquivalentUsd,
+      );
+      const unpriced = unpricedModels.length ? ` Unpriced, so unknown: ${unpricedModels.join(", ")}.` : "";
+      return {
+        kind: "comparison",
+        data: rows.map((row) => ({ label: row.model, value: row.apiEquivalentUsd })),
+        format: usd,
+        heads: ["Model", "API equivalent"],
+        description: `API-equivalent cost of the tickets' sessions by model, at Anthropic API list prices of ${priceTable}: ${rows.map((row) => `${row.model} ${usdOrUnknown(row.apiEquivalentUsd)}`).join(", ")}.${unpriced}`,
+      };
+    },
+  },
+
   sentence: ({ priceTable, perTicketUsd }) =>
     perTicketUsd
       ? `A median of ${usd(perTicketUsd.p50)} per ticket in API-equivalent cost (p90 ${usd(perTicketUsd.p90)}), at Anthropic API list prices of ${priceTable}`
       : undefined,
 
-  section({ priceTable, apiEquivalentUsd, unpricedModels, perTicketUsd, byModel, orchestration, perTicket }) {
-    const spread = perTicketUsd ? ` (p50 ${usd(perTicketUsd.p50)}, p90 ${usd(perTicketUsd.p90)} per ticket)` : "";
+  // The tokens behind the cost, by model: what neither the chart nor the per-ticket table says.
+  section({ priceTable, apiEquivalentUsd, unpricedModels, perTicketUsd, byModel, orchestration }) {
+    const spread = perTicketUsd ? ` (p50 ${usd(perTicketUsd.p50)}, p90 ${usd(perTicketUsd.p90)} API equivalent per ticket)` : "";
     const unpriced = unpricedModels.length > 0 ? ` Not priced, so left out: ${unpricedModels.map(escapeHtml).join(", ")}.` : "";
     const summary = `<p><strong>${usd(apiEquivalentUsd)}</strong> API equivalent over the tickets with transcripts${spread}, and ${usdOrUnknown(orchestration.apiEquivalentUsd)} API equivalent on no ticket (orchestration), at Anthropic API list prices of ${escapeHtml(priceTable)}. Not what was billed.${unpriced}</p>`;
-    const tickets = perTicket
-      ? `<table><thead><tr><th>Ticket</th><th>API equivalent</th></tr></thead><tbody>${perTicket.map((row) => `<tr><td>${row.ticket}</td><td>${usdOrUnknown(row.apiEquivalentUsd)}</td></tr>`).join("")}</tbody></table>`
-      : "";
-    return `${summary}${modelTable(byModel)}${tickets}`;
+    return `${summary}${modelTable(byModel)}`;
+  },
+
+  ticketTable: {
+    columns: ["API equivalent"],
+    rows: ({ perTicket }) =>
+      perTicket?.map((row) => ({
+        id: row.ticket,
+        cells: [row.apiEquivalentUsd === UNKNOWN ? UNKNOWN : { text: usd(row.apiEquivalentUsd), sort: row.apiEquivalentUsd }],
+      })),
   },
 
   methodology: {

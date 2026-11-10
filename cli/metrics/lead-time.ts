@@ -1,7 +1,7 @@
-import { escapeHtml } from "./html.ts";
-import type { Metric } from "./metric.ts";
+import { perTicketChart, spanText } from "../report/charts.ts";
+import type { Figure, Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
-import { formatHours, hoursBetween, percentile, round } from "./stats.ts";
+import { formatHours, hoursBetween, percentile, plural, round } from "./stats.ts";
 
 export interface LeadTime {
   p50Hours: number;
@@ -9,6 +9,8 @@ export interface LeadTime {
   /** Each ticket's lead time, in delivery order, so the percentiles can be traced. Absent once anonymized. */
   tickets?: { ticket: string; hours: number }[];
 }
+
+const LEAD_TIME_FIGURE: Figure<LeadTime> = { label: "p50", of: ({ p50Hours }) => p50Hours, format: formatHours };
 
 export const leadTime: Metric<LeadTime> = {
   id: "leadTime",
@@ -34,27 +36,54 @@ export const leadTime: Metric<LeadTime> = {
   // Per-ticket rows name tickets: an anonymized dataset keeps the percentiles only.
   anonymize: ({ p50Hours, p90Hours }) => ({ p50Hours, p90Hours }),
 
-  figure: { label: "p50", of: ({ p50Hours }) => p50Hours, format: formatHours },
+  figure: LEAD_TIME_FIGURE,
 
   sentence: ({ p50Hours, p90Hours }) =>
     `Median lead time of ${formatHours(p50Hours)} from a ticket being ready to its last PR merging (p90 ${formatHours(p90Hours)})`,
 
+  // Each ticket's lead time; an anonymized dataset has none, so its p50 by month instead.
+  chart: {
+    title: "Lead time per ticket",
+    draw(input) {
+      const { p50Hours, p90Hours, tickets } = input.value;
+      return perTicketChart(input, LEAD_TIME_FIGURE, {
+        what: "Lead time",
+        rows: tickets?.map((t) => ({ ticket: t.ticket, value: t.hours })),
+        head: "Lead time",
+        markers: [
+          { label: "p50", value: p50Hours },
+          { label: "p90", value: p90Hours },
+        ],
+        format: formatHours,
+        description: (rows) =>
+          `Lead time of each of ${plural(rows.length, "ticket")}, ${spanText(rows, formatHours)}: p50 ${formatHours(p50Hours)}, p90 ${formatHours(p90Hours)}.`,
+      });
+    },
+  },
+
   headline: {
     order: 1,
     card: ({ p50Hours, p90Hours }) => `${formatHours(p50Hours)} <small>p50</small> · ${formatHours(p90Hours)} <small>p90</small>`,
+    // Percentiles over every repo's tickets: an anonymized repo, with no rows, never pools.
+    pool(known) {
+      const hours = known.flatMap(({ value }) => (value.tickets ?? []).map((row) => row.hours));
+      if (hours.length === 0) return undefined;
+      return { p50Hours: round(percentile(hours, 50), 1), p90Hours: round(percentile(hours, 90), 1) };
+    },
   },
 
-  section({ p50Hours, p90Hours, tickets }) {
-    const summary = `<p>p50 <strong>${formatHours(p50Hours)}</strong>, p90 <strong>${formatHours(p90Hours)}</strong>.</p>`;
-    if (!tickets?.length) return summary;
-    const rows = tickets.map((t) => `<tr><td>${escapeHtml(t.ticket)}</td><td>${formatHours(t.hours)}</td></tr>`).join("");
-    return `${summary}<table><thead><tr><th>Ticket</th><th>Lead time</th></tr></thead><tbody>${rows}</tbody></table>`;
+  section: ({ p50Hours, p90Hours }) =>
+    `<p>Half the tickets took up to <strong>${formatHours(p50Hours)}</strong> from ready to merged, and nine in ten up to <strong>${formatHours(p90Hours)}</strong>.</p>`,
+
+  ticketTable: {
+    columns: ["Lead time"],
+    rows: ({ tickets }) => tickets?.map((t) => ({ id: t.ticket, cells: [{ text: formatHours(t.hours), sort: t.hours }] })),
   },
 
   methodology: {
     definition:
-      "Time from a ticket becoming ready to its last PR merging into the default branch, as the median (p50) and the 90th percentile (p90, nearest rank). A ticket becomes ready when the repo's ready label is first added; a ticket never labelled ready before it was done starts at its creation. A PR linked to no issue starts when it was opened. Integration PRs and excluded PRs are not tickets.",
+      "Time from a ticket becoming ready to its last PR merging into the default branch, as the median (p50) and the 90th percentile (p90, nearest rank). A ticket becomes ready when the repo's ready label is first added; a ticket never labelled ready before it was done starts at its creation. A PR linked to no issue has no ready moment: it starts at the earlier of its opening and its first commit (authored date), since a PR can be opened only to merge it. Integration PRs and excluded PRs are not tickets.",
     limits:
-      "An issue closed with no merged PR (work pushed straight to the default branch, or closed as done by hand) is not a delivered ticket and is not counted. Tickets whose issue GitHub did not return have no start and are left out. Time waiting in a batch or integration branch counts, since the ticket is not delivered until its PR reaches the default branch: a PR merged into an integration branch is done when that branch's integration PR merges.",
+      "An issue closed with no merged PR (work pushed straight to the default branch, or closed as done by hand) is not a delivered ticket and is not counted. Tickets whose issue GitHub did not return have no start and are left out. So is a PR linked to no issue that was opened after its only commit: a lone commit is written once the work is done, so GitHub shows nothing from before the work ended, and its lead time is unknown rather than the minutes between that commit and the merge. For a PR with several commits, the first commit is a late bound on when the work began. Time waiting in a batch or integration branch counts, since the ticket is not delivered until its PR reaches the default branch: a PR merged into an integration branch is done when that branch's integration PR merges.",
   },
 };

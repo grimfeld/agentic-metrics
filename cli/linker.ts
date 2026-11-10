@@ -38,7 +38,11 @@ export interface Ticket {
   integrationPullRequests: PullRequest[];
   /** Commits of those integration PRs credited to it (`batch.ts`). Read through `ownCommits`. */
   batchCommits: Commit[];
-  /** When it became ready: the ready label, else creation. Undefined when unknown. */
+  /**
+   * When it became ready: the ready label, else the issue's creation; for a PR
+   * that is its own ticket, the earlier of its opening and its first commit.
+   * Undefined when unknown.
+   */
   readyAt: Date | undefined;
   /** When its last PR reached the default branch. */
   doneAt: Date;
@@ -95,7 +99,7 @@ export function link(data: GitHubData, config: Config): LinkedWork {
     const linked = linkedIssues(pr, issues, config);
     if (linked.length === 0) {
       const doneAt = deliveredAt.get(pr) ?? pr.mergedAt;
-      tickets.push({ id: `PR #${String(pr.number)}`, issue: undefined, pullRequests: [pr], integrationPullRequests: [], batchCommits: [], readyAt: pr.createdAt, doneAt, sessions: [] });
+      tickets.push({ id: `PR #${String(pr.number)}`, issue: undefined, pullRequests: [pr], integrationPullRequests: [], batchCommits: [], readyAt: prStart(pr), doneAt, sessions: [] });
     }
     for (const number of linked) issuePrs.set(number, [...(issuePrs.get(number) ?? []), pr]);
   }
@@ -188,6 +192,22 @@ function linkedIssues(pr: PullRequest, issues: Map<number, Issue>, config: Confi
 
 // `(#364)` in a commit subject, as squash merges and Lifeline's commits write it.
 const COMMIT_REFERENCE = /\(#(\d+)\)/g;
+
+/**
+ * When the work of a PR that is its own ticket started, as far as GitHub
+ * shows: the earlier of its opening and its first commit. A PR opened only to
+ * merge it (Lifeline's Claude Code cloud sessions open and merge within a
+ * minute) would otherwise start at its end. Unknown when that start is no
+ * earlier than its last commit (one commit, opened after it): a lone commit is
+ * written once the work is done, so nothing dates its start. With no commit
+ * dates from GitHub, its opening.
+ */
+function prStart(pr: PullRequest): Date | undefined {
+  const times = pr.commits.flatMap((commit) => (commit.authoredAt ? [commit.authoredAt.getTime()] : []));
+  if (times.length === 0) return pr.createdAt;
+  const start = Math.min(pr.createdAt.getTime(), ...times);
+  return start < Math.max(...times) ? new Date(start) : undefined;
+}
 
 /** The first time the ready label was added before the work was done, else the issue's creation. */
 function readyAt(issue: Issue, doneAt: Date, config: Config): Date {

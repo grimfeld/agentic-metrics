@@ -4,6 +4,7 @@ import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:f
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { main } from "../../cli/main.ts";
+import { readMetricPages, readRepo } from "./report-pages.ts";
 import { fixtureSource } from "../../cli/github/source.ts";
 
 const FIXTURES = join(import.meta.dirname, "../fixtures/github");
@@ -61,7 +62,18 @@ describe("first-run CI rate", () => {
     const { firstRunCiRate } = await collect();
     // Passed: #201, #204 (its cancelled run gave no result). Failed: #202, #203 (re-run).
     assert.deepEqual(firstRunCiRate, {
-      value: { rate: 0.5, passed: 2, pullRequests: 4, workflow: ".github/workflows/check.yml" },
+      value: {
+        rate: 0.5,
+        passed: 2,
+        pullRequests: 4,
+        workflow: ".github/workflows/check.yml",
+        perPullRequest: [
+          { pullRequest: 201, firstRun: "passed" },
+          { pullRequest: 202, firstRun: "failed" },
+          { pullRequest: 203, firstRun: "failed" },
+          { pullRequest: 204, firstRun: "passed" },
+        ],
+      },
       coverage: { tickets: 4, of: 8 },
     });
   });
@@ -73,6 +85,7 @@ describe("first-run CI rate", () => {
       passed: 4,
       pullRequests: 4,
       workflow: ".github/workflows/dependency-review.yml",
+      perPullRequest: [201, 202, 203, 204].map((pullRequest) => ({ pullRequest, firstRun: "passed" })),
     });
   });
 
@@ -199,12 +212,13 @@ describe("CI metrics in the report", () => {
     await collect();
     const status = await main(["report"], { cwd, stdout: () => undefined, stderr: () => undefined });
     assert.equal(status, 0);
-    return readFileSync(join(cwd, "report/index.html"), "utf8");
+    const site = join(cwd, "report");
+    return `${readRepo(site, "grimfeld/ci")}\n${readMetricPages(site, "grimfeld/ci", CI_METRICS)}`;
   }
 
-  it("fills the first-run CI rate headline card", async () => {
+  it("fills the first-run CI rate headline tile", async () => {
     const html = await report();
-    const card = /<article class="card" data-metric="firstRunCiRate">.*?<\/article>/s.exec(html)?.[0] ?? "";
+    const card = /<a class="tile[^"]*" href="[^"]*" data-metric="firstRunCiRate">.*?<\/a>/s.exec(html)?.[0] ?? "";
     assert.match(card, /50%/);
     assert.match(card, /4 of 8 tickets/);
   });
@@ -213,9 +227,9 @@ describe("CI metrics in the report", () => {
     const html = await report();
     for (const id of ["fixCycles", "scheduledFailures", "batchHealth"]) assert.match(html, new RegExp(`data-section="${id}"`));
     for (const id of CI_METRICS) {
-      const entry = new RegExp(`<article data-methodology="${id}">.*?</article>`, "s").exec(html)?.[0] ?? "";
+      const entry = new RegExp(`<article [^>]*data-methodology="${id}">.*?</article>`, "s").exec(html)?.[0] ?? "";
       assert.match(entry, /Coverage:<\/strong> grimfeld\/ci \d+ of 8 tickets/, id);
     }
-    assert.match(html, /<article data-methodology="firstRunCiRate">.*re-run.*<\/article>/s);
+    assert.match(html, /<article [^>]*data-methodology="firstRunCiRate">.*re-run.*<\/article>/s);
   });
 });

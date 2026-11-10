@@ -1,5 +1,4 @@
 import { verdict } from "../ci.ts";
-import { escapeHtml } from "./html.ts";
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
 import { formatPercent, percent } from "./stats.ts";
@@ -43,13 +42,23 @@ export const scheduledFailures: Metric<ScheduledFailures> = {
 
   sentence: ({ failed, runs }) => `${String(failed)} of ${String(runs)} scheduled CI runs on the default branch failed`,
 
-  section({ failed, runs, workflows }) {
-    const summary = `<p><strong>${String(failed)}</strong> of ${String(runs)} scheduled runs on the default branch failed.</p>`;
-    if (!workflows) return summary;
-    const rows = workflows
-      .map((row) => `<tr><td><code>${escapeHtml(row.workflow)}</code></td><td>${String(row.failed)}</td><td>${String(row.runs)}</td></tr>`)
-      .join("");
-    return `${summary}<table><thead><tr><th>Workflow</th><th>Failed</th><th>Runs</th></tr></thead><tbody>${rows}</tbody></table>`;
+  section: ({ failed, runs }) => `<p><strong>${String(failed)}</strong> of ${String(runs)} scheduled runs on the default branch failed.</p>`,
+
+  ticketTable: {
+    rowHeading: "Workflow",
+    columns: ["Failed", "Runs", "Failure rate"],
+    rows: ({ workflows }) =>
+      workflows?.map((row) => {
+        const rate = percent(row.failed / row.runs);
+        return {
+          id: row.workflow,
+          cells: [
+            { text: String(row.failed), sort: row.failed },
+            { text: String(row.runs), sort: row.runs },
+            { text: formatPercent(rate), sort: rate },
+          ],
+        };
+      }),
   },
 
   methodology: {

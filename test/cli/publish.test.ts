@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../../cli/main.ts";
 import { fixtureSource } from "../../cli/github/source.ts";
+import { metricPage, readAllPages, readPages, repoPage } from "./report-pages.ts";
 
 const FIXTURES = join(import.meta.dirname, "../fixtures/github");
 const NOW = new Date("2026-11-09T12:00:00Z");
@@ -43,9 +44,10 @@ async function collect(fixture: string) {
   assert.equal(await run(["collect"], fixture), 0, stderr);
 }
 
+/** Every page of the report. */
 async function report(): Promise<string> {
   assert.equal(await run(["report"], "empty"), 0, stderr);
-  return readFileSync(join(cwd, "report/index.html"), "utf8");
+  return readAllPages(join(cwd, "report"));
 }
 
 /** Every file under `dir`, relative to it. */
@@ -58,7 +60,7 @@ function read(path: string): string {
 }
 
 function assertNoLeak(text: string, where: string) {
-  text = text.replace(/<style>[\s\S]*?<\/style>/, ""); // CSS colours look like `#1d1d1f`
+  text = text.replace(/<style>[\s\S]*?<\/style>/g, ""); // CSS colours look like `#1d1d1f`
   for (const leak of LEAKS) assert.doesNotMatch(text, leak, `${where} leaks ${String(leak)}`);
 }
 
@@ -86,8 +88,9 @@ describe("publish: full", () => {
     });
 
     const html = await report();
-    assert.match(html, /<a href="https:\/\/github\.com\/grimfeld\/lifeline\/issues\/106">#106 Lifeline issue title 106<\/a>/);
-    assert.match(html, /<h2><a href="https:\/\/github\.com\/grimfeld\/lifeline">grimfeld\/lifeline<\/a><\/h2>/);
+    // Throughput's table lists every delivered ticket.
+    assert.match(html, /<td><a href="https:\/\/github\.com\/grimfeld\/lifeline\/issues\/106">#106<\/a><\/td><td>Lifeline issue title 106<\/td>/);
+    assert.match(html, /<h1>grimfeld\/lifeline<\/h1><div class="chips">.*<a class="chip" href="https:\/\/github\.com\/grimfeld\/lifeline">GitHub<\/a>/);
   });
 
   it("applies to a private repo when the config says so", async () => {
@@ -121,7 +124,8 @@ describe("publish: anonymized", () => {
     const html = await report();
     assertNoLeak(html, "the report");
     assert.match(html, /<section class="repo" id="client-a" data-repo="client-a">/);
-    assert.match(html, /<h2>client-a<\/h2>/);
+    assert.match(readPages(join(cwd, "report"), [repoPage("client-a")]), /<h1>client-a<\/h1>/);
+    assert.doesNotMatch(html, /class="chip" href="https/);
     for (const file of files(join(cwd, "report"))) assertNoLeak(file, "a report path");
   });
 
@@ -161,8 +165,9 @@ describe("publish: none", () => {
     await collect("private");
 
     assert.deepEqual(files(join(cwd, "datasets")), []);
-    const local = read(".agentic-metrics-local/index.html");
-    assert.match(local, /<a href="https:\/\/github\.com\/acme-corp\/payroll-engine\/issues\/106">#106 Payroll issue title 106<\/a>/);
+    const local = read(`.agentic-metrics-local/${repoPage("acme-corp/payroll-engine")}`);
+    const throughput = read(`.agentic-metrics-local/${metricPage("acme-corp/payroll-engine", "throughput")}`);
+    assert.match(throughput, /<td><a href="https:\/\/github\.com\/acme-corp\/payroll-engine\/issues\/106">#106<\/a><\/td><td>Payroll issue title 106<\/td>/);
     assert.match(local, /data-metric="leadTime"/);
   });
 
