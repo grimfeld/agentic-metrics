@@ -140,7 +140,7 @@ describe("repo page: chart grid", () => {
 
   it("gives every chart's numbers as text, with the coverage", () => {
     const lead = chartCard(full, "leadTime");
-    assert.deepEqual(numbers(lead), ["#104 12 h", "#105 20 h", "PR #136 6 h", "#106 7.5 d", "PR #137 10 h"]);
+    assert.deepEqual(numbers(lead), ["Queue 7.5% p50 1 h", "Work 75.9% p50 1.5 h", "Landing wait 16.7% p50 9 h"]);
     assert.match(text(lead), /5 of 5 tickets/);
     assert.deepEqual(numbers(chartCard(full, "throughput")), ["2026-10-19 2 2", "2026-10-26 2 2", "2026-11-02 0 0", "2026-11-09 1 1"]);
     assert.deepEqual(numbers(chartCard(full, "autonomy")), ["Full 3 60%", "Assisted 1 20%", "Manual 1 20%"]);
@@ -157,7 +157,7 @@ describe("repo page: chart grid", () => {
   it("says unknown, with no chart, when a metric has no data", () => {
     const card = chartCard(empty, "leadTime");
     assert.doesNotMatch(card, /<svg/);
-    assert.equal(text(card), "Lead time per ticket unknown 0 of 0 tickets");
+    assert.equal(text(card), "Lead time by phase unknown 0 of 0 tickets");
   });
 });
 
@@ -177,9 +177,11 @@ describe("repo page: anonymized", () => {
     const repo = /<section class="repo"[\s\S]*<\/section><!-- \/repo -->/.exec(anonymized)?.[0] ?? "";
     assert.ok(repo);
     assert.doesNotMatch(repo, /#10\d|PR #13\d/);
-    const lead = chartCard(anonymized, "leadTime");
-    assert.deepEqual(numbers(lead), ["Oct 2026 12 h 4 of 4", "Nov 2026 — 1 of 1"]);
-    assert.match(/<svg[\s\S]*<\/svg>/.exec(lead)?.[0] ?? "", /<text[^>]*>—<\/text>/);
+    // Lead time keeps its phases' aggregates; size keeps no ticket, so it draws its median by month.
+    assert.deepEqual(numbers(chartCard(anonymized, "leadTime")), ["Queue 7.5% p50 1 h", "Work 75.9% p50 1.5 h", "Landing wait 16.7% p50 9 h"]);
+    const size = chartCard(anonymized, "size");
+    assert.deepEqual(numbers(size), ["Oct 2026 150 4 of 4", "Nov 2026 — 1 of 1"]);
+    assert.match(/<svg[\s\S]*<\/svg>/.exec(size)?.[0] ?? "", /<text[^>]*>—<\/text>/);
   });
 
   it("has no case-study cards", () => {

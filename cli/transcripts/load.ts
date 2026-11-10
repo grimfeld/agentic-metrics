@@ -39,6 +39,13 @@ export interface Session {
   humanMessages: string[];
   /** Active time: the gaps between its lines, each capped at IDLE_CAP_MS. */
   activeMs: number;
+  /**
+   * The stretches it was active in, oldest first, as `[from, to]` epoch
+   * milliseconds: its lines' times, a gap over IDLE_CAP_MS ending a stretch
+   * that long after its last line. Their lengths add up to `activeMs`. Lets a
+   * ticket's sessions that ran at the same time count that time once.
+   */
+  activity: Stretch[];
   /** Its first line's time; undefined when no line carries one. Places orchestration in a trend's month. */
   startedAt: Date | undefined;
   /**
@@ -73,6 +80,9 @@ export interface AgentSpawn {
   /** The model Claude Code resolved for it (`toolUseResult.resolvedModel`), when written. */
   model: string | undefined;
 }
+
+/** A stretch of activity, `[from, to]` in epoch milliseconds. */
+export type Stretch = [from: number, to: number];
 
 /** A gap between two lines longer than this counts as this much: the rest is idle. */
 export const IDLE_CAP_MS = 5 * 60 * 1000;
@@ -116,8 +126,8 @@ export function loadSessions(files: TranscriptFile[]): Session[] {
     }
 
     times.sort((a, b) => a - b);
-    let activeMs = 0;
-    for (let i = 1; i < times.length; i++) activeMs += Math.min((times[i] ?? 0) - (times[i - 1] ?? 0), IDLE_CAP_MS);
+    const activity = stretches(times, IDLE_CAP_MS);
+    const activeMs = activity.reduce((sum, [from, to]) => sum + (to - from), 0);
 
     return {
       sessionId: sessionId ?? file.session,
@@ -127,11 +137,33 @@ export function loadSessions(files: TranscriptFile[]): Session[] {
       prLinks,
       humanMessages: [...new Set(humanMessages)],
       activeMs,
+      activity,
       startedAt: times[0] === undefined ? undefined : new Date(times[0]),
       responses: [...responses.values()],
       spawns: [...spawns.values()],
     };
   });
+}
+
+/**
+ * The stretches of activity `times` (sorted) show: consecutive times no more
+ * than `capMs` apart are one stretch, and a longer gap counts as `capMs` of
+ * activity after the time before it. The last time ends its stretch: nothing
+ * is known to follow it.
+ */
+export function stretches(times: readonly number[], capMs: number): Stretch[] {
+  const out: Stretch[] = [];
+  let current: Stretch | undefined;
+  for (const time of times) {
+    if (current && time - current[1] <= capMs) {
+      current[1] = time;
+      continue;
+    }
+    if (current) current[1] += capMs;
+    current = [time, time];
+    out.push(current);
+  }
+  return out;
 }
 
 /** A local placeholder (an error, an interrupted turn), not an API call. */

@@ -137,11 +137,11 @@ describe("report", () => {
   it("shows each ticket's lead time on its page", () => {
     assert.match(
       onMetricPage("grimfeld/lifeline", "leadTime", "tickets"),
-      / Lead time #104 Lifeline issue title 104 2026-10-19 12 h #105 .* 20 h PR #136 .* 6 h #106 .* 7\.5 d PR #137 .* 10 h$/,
+      / Landing wait #104 Lifeline issue title 104 2026-10-19 12 h 1 h 0\.5 h 10\.5 h #105 .* 20 h .* PR #136 .* 6 h .* #106 .* 7\.5 d 9 h 7 d 3 h PR #137 .* 10 h 1 h 0 h 9 h$/,
     );
     assert.equal(
       onMetricPage("grimfeld/lifeline", "leadTime", "leadTime"),
-      "Summary Half the tickets took up to 12 h from ready to merged, and nine in ten up to 7.5 d .",
+      "Summary Half the tickets took up to 12 h from ready to delivered, and nine in ten up to 7.5 d . Over the 5 tickets with dated activity, that time went to: Queue 9.2% (p50 1 h), Work 74.1% (p50 0.5 h), Landing wait 16.7% (p50 9 h). Queue and landing wait are idle; work can hold idle too (see active time).",
     );
   });
 

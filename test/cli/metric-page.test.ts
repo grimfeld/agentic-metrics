@@ -87,7 +87,7 @@ describe("metric page", () => {
       assert.match(element(html, "data-section", section), /<svg class="chart"[^>]* role="img" aria-labelledby="[\w-]+ [\w-]+"><title id="[\w-]+">[^<]+<\/title><desc/, section);
     }
     const titles = [...html.matchAll(/<title id="[\w-]+">([^<]+)<\/title>/g)].map((m) => m[1]);
-    assert.deepEqual(titles, ["Lead time per ticket", "Lead time by month", "Lead time by autonomy level"]);
+    assert.deepEqual(titles, ["Lead time by phase", "Lead time by month", "Lead time by autonomy level"]);
   });
 
   it("tabulates the monthly trend, with each month's coverage", () => {
@@ -104,12 +104,12 @@ describe("metric page", () => {
   it("lists every ticket in a table that sorts by its column headings, and reads in delivery order without JavaScript", () => {
     const table = element(page("grimfeld/lifeline", "leadTime"), "data-section", "tickets");
     assert.deepEqual(rows(table), [
-      "Ticket Title Delivered Lead time",
-      "#104 Lifeline issue title 104 2026-10-19 12 h",
-      "#105 Lifeline issue title 105 2026-10-19 20 h",
-      "PR #136 Lifeline PR title 136 2026-10-27 6 h",
-      "#106 Lifeline issue title 106 2026-10-28 7.5 d",
-      "PR #137 Lifeline PR title 137 2026-11-09 10 h",
+      "Ticket Title Delivered Lead time Queue Work Landing wait",
+      "#104 Lifeline issue title 104 2026-10-19 12 h 0 h 1.5 h 10.5 h",
+      "#105 Lifeline issue title 105 2026-10-19 20 h 8 h 1.5 h 10.5 h",
+      "PR #136 Lifeline PR title 136 2026-10-27 6 h 1 h 0 h 5 h",
+      "#106 Lifeline issue title 106 2026-10-28 7.5 d 8 h 7 d 3 h",
+      "PR #137 Lifeline PR title 137 2026-11-09 10 h 0 h 1 h 9 h",
     ]);
     assert.match(table, /<table class="sortable">/);
     assert.match(table, /<td><a href="https:\/\/github\.com\/grimfeld\/lifeline\/issues\/106">#106<\/a><\/td>/);

@@ -70,13 +70,22 @@ describe("collect", () => {
       value: {
         p50Hours: 12,
         p90Hours: 180,
-        // Per ticket, in delivery order: traceable in a `full` dataset.
+        // Where it went, over the 5 tickets' 228 h: 21 h of queue, 169 h of work, 38 h of landing wait.
+        phases: {
+          tickets: 5,
+          queue: { p50Hours: 1, share: 0.092 },
+          work: { p50Hours: 0.5, share: 0.741 },
+          landing: { p50Hours: 9, share: 0.167 },
+        },
+        // Per ticket, in delivery order: traceable in a `full` dataset. Its phases
+        // add up to its lead time: ready to first commit, to last commit, to merged.
         tickets: [
-          { ticket: "#104", hours: 12 },
-          { ticket: "#105", hours: 20 },
-          { ticket: "PR #136", hours: 6 },
-          { ticket: "#106", hours: 180 },
-          { ticket: "PR #137", hours: 10 },
+          { ticket: "#104", hours: 12, queueHours: 1, workHours: 0.5, landingHours: 10.5 },
+          { ticket: "#105", hours: 20, queueHours: 9, workHours: 0.5, landingHours: 10.5 },
+          { ticket: "PR #136", hours: 6, queueHours: 1, workHours: 0, landingHours: 5 },
+          // Its two PRs' commits are a week apart: the work phase holds that idle.
+          { ticket: "#106", hours: 180, queueHours: 9, workHours: 168, landingHours: 3 },
+          { ticket: "PR #137", hours: 10, queueHours: 1, workHours: 0, landingHours: 9 },
         ],
       },
       coverage: { tickets: 5, of: 5 },
