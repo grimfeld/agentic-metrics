@@ -22,7 +22,7 @@ Observed on 2026-11-10 in a Claude Code cloud session (Claude Code 2.1.322, perm
 - **Hooks tell a sub-agent from its parent.** A sub-agent's tool events carry `agent_id` and `agent_type` beside the parent's `session_id`; the main session's carry neither.
 - **A merge commit can carry the record.** `git merge` has no `--trailer`, but a second `-m` becomes a paragraph of its own, which git reads as trailers. This only holds when the merge already has a message: adding `-m` to one that has none would replace git's default message.
 - **The prompt hook also fires on text no person typed.** `UserPromptSubmit` fired for a sub-agent's hand-back (`<agent-message …>`). The recorder counts a prompt as a human message only when it does not start with `<`, `/` or `!`.
-- **Hooks added to `.claude/settings.json` mid-session took effect at once**, which is what made the prototype possible in one session.
+- **Hooks added to `.claude/settings.json` mid-session took effect at once**, which is what made the prototype possible in one session. After that folder was deleted and created again in the same session, hooks written to it were no longer picked up: the recorder as `init` installs it (with `$CLAUDE_PROJECT_DIR` in its command) was therefore run by hand and by tests, not by a live session.
 
 Not tested: the other permission modes (`default`, `acceptEdits`, `plan`), where a rewritten command may be shown to the person for approval; a local, non-cloud session; and Claude Code versions other than the one above.
 

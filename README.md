@@ -34,8 +34,31 @@ A repo overrides one by name: `.agentic-metrics/addenda/<skill>.md` at its root 
 - creates the `regression`, `autonomy:full`, `autonomy:assisted` and `autonomy:manual` labels that are missing;
 - installs `.github/workflows/agentic-metrics.yml` (see [GitHub Action](#github-action)), passing the config's ready label and branch pattern, with the Action pinned to a commit SHA;
 - reads the repo's Actions permissions and, when only selected actions are allowed and no pattern covers the Action, prints the pattern to add. It never changes those settings.
+- installs the recorder: `.agentic-metrics/recorder.mjs` and its hook entries in `.claude/settings.json`, beside whatever that file already holds (see [Session records](#session-records)).
 
-Re-running is safe: an existing config or workflow is kept as it is, and only missing labels are created. Addenda overrides go in `.agentic-metrics/addenda/` (see above). Review and commit the two files.
+Re-running is safe: an existing config or workflow is kept as it is, only missing labels are created, and the recorder script is replaced only when this version's differs. Addenda overrides go in `.agentic-metrics/addenda/` (see above). Review and commit the files it wrote.
+
+### Session records
+
+Transcripts stay on the device a session ran on, so work done on another machine, or in a Claude Code cloud session, has none. The recorder makes a session's counts travel with the repo instead: each commit a session makes carries a **session record** as a trailer.
+
+```
+Session-Record: v1 k=3fa9c1d2e4b7 active=754 human=3 agents=2 started=2026-11-10T18:00:00Z
+```
+
+- `k`: an opaque key for the session (a hash; a sub-agent has its own, and names its parent's as `parent=`).
+- `active`: seconds the session has been active so far: the gaps between its prompts and tool calls, each capped at 5 minutes.
+- `human`: the prompts a person typed so far. Slash commands, shell escapes and text written by the tooling or another agent don't count.
+- `agents`: the sub-agents it has spawned so far.
+- `started`: when it began.
+
+Counts only: no session id, path or text. The record is public wherever the repo's history is.
+
+The recorder is one script, `.agentic-metrics/recorder.mjs`, run by hooks in the repo's committed `.claude/settings.json` (on each prompt, each tool call, and at the end of a turn). It lives in the repo, not in the plugin, because a cloud session loads no plugin but does run the repo's own hooks. It needs Node 18 or later and git 2.32 or later, keeps its counters in `.git/agentic-metrics/` (never committed), and adds the trailer by rewriting the agent's `git commit` command, and `git merge` when it has a message. It grants no permission: the rewritten command goes through the session's usual permission flow. On any error it does nothing, so it never blocks a prompt, a tool call or a commit. A commit you type yourself in a terminal carries no record.
+
+To upgrade the recorder, run `init` again in the repo and commit the changed script. To remove it, delete the script and its entries from `.claude/settings.json`.
+
+Limits: what a session does after its last commit is not recorded, and a session that never commits leaves nothing. Where a transcript is cached for the same session, `collect` reads the transcript and ignores its records.
 
 ## CLI
 

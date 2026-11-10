@@ -10,6 +10,7 @@ import { promisify } from "node:util";
 import { DEFAULT_BRANCH_REGEX } from "./branch.ts";
 import { CONFIG_FILE, isAlias, readConfig, type PublishMode } from "./config.ts";
 import { ACTION_WORKFLOW, REGRESSION_LABEL } from "./conventions.ts";
+import { installRecorder } from "./recorder-install.ts";
 
 /** The GitHub calls `init` makes: the CLI's boundary to the repo's settings. */
 export interface RepoAdmin {
@@ -138,6 +139,7 @@ export async function init(cwd: string, admin: RepoAdmin, options: InitOptions):
     lines.push(`${WORKFLOW_FILE}: written (${ACTION} pinned to ${pin.sha}, ${pin.ref})`);
   }
   lines.push(...(await allowListing(admin, repo.fullName, pin ? undefined : readFileSync(workflowPath, "utf8"))));
+  lines.push(...installRecorder(cwd));
   return lines;
 }
 
