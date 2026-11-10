@@ -54,14 +54,14 @@ function section(repo: string): string {
 }
 
 describe("report", () => {
-  it("shows the four headline tiles first for each repo, in order", () => {
+  it("shows the headline tiles first for each repo, in order: active time, not lead time, leads", () => {
     const tiles = [...section("grimfeld/lifeline").matchAll(/<a class="tile lg" [^>]*data-metric="(\w+)"/g)].map((m) => m[1]);
-    assert.deepEqual(tiles, ["leadTime", "firstRunCiRate", "humanMessagesPerTicket", "regressionRate"]);
-    assert.match(section("grimfeld/lifeline"), /^\s*<section class="tiles"[^>]*>\s*<a class="tile lg" [^>]*data-metric="leadTime"/);
+    assert.deepEqual(tiles, ["activeTime", "estimatedActiveTime", "firstRunCiRate", "humanMessagesPerTicket", "regressionRate"]);
+    assert.match(section("grimfeld/lifeline"), /^\s*<section class="tiles"[^>]*>\s*<a class="tile lg" [^>]*data-metric="activeTime"/);
   });
 
-  it("shows lead time p50 and p90 with its coverage", () => {
-    assert.equal(textOf("data-metric", "leadTime", "grimfeld/lifeline"), "Lead time 12 h p50 · 7.5 d p90 5 of 5 tickets");
+  it("shows lead time as a supporting figure, with its coverage", () => {
+    assert.equal(textOf("data-metric", "leadTime", "grimfeld/lifeline"), "Lead time 12 h p50 5 of 5 tickets");
   });
 
   it("shows the first-run CI rate as unknown when no PR has a CI run", () => {
@@ -137,11 +137,11 @@ describe("report", () => {
   it("shows each ticket's lead time on its page", () => {
     assert.match(
       onMetricPage("grimfeld/lifeline", "leadTime", "tickets"),
-      / Lead time #104 Lifeline issue title 104 2026-10-19 12 h #105 .* 20 h PR #136 .* 6 h #106 .* 7\.5 d PR #137 .* 10 h$/,
+      / Landing wait #104 Lifeline issue title 104 2026-10-19 12 h 1 h 0\.5 h 10\.5 h #105 .* 20 h .* PR #136 .* 6 h .* #106 .* 7\.5 d 9 h 7 d 3 h PR #137 .* 10 h 1 h 0 h 9 h$/,
     );
     assert.equal(
       onMetricPage("grimfeld/lifeline", "leadTime", "leadTime"),
-      "Summary Half the tickets took up to 12 h from ready to merged, and nine in ten up to 7.5 d .",
+      "Summary Half the tickets took up to 12 h from ready to delivered, and nine in ten up to 7.5 d . Over the 5 tickets with dated activity, that time went to: Queue 9.2% (p50 1 h), Work 74.1% (p50 0.5 h), Landing wait 16.7% (p50 9 h). Queue and landing wait are idle; work can hold idle too (see active time).",
     );
   });
 
@@ -156,11 +156,11 @@ describe("report", () => {
   it("shows estimate vs actual beside each ticket's size proxies on its page", () => {
     assert.equal(
       onMetricPage("grimfeld/lifeline", "estimateVsActual", "estimateVsActual"),
-      "Summary Median actual / estimate: 0.31 . Left out because the estimate came after the first commit: 1.",
+      "Summary Median actual / estimate: 0.04 , the actual being the ticket's active time. Left out because the estimate came after the first commit: 1; because the active time is unknown: 0.",
     );
     assert.match(
       onMetricPage("grimfeld/lifeline", "estimateVsActual", "tickets"),
-      / Estimate Actual Actual \/ estimate Diff lines Files Sub-tickets #104 .* 4 h 11 h 2\.75 150 3 2 #105 .* 36 h 11 h 0\.31 150 3 0$/,
+      / Estimate Actual Actual is Actual \/ estimate Diff lines Files Sub-tickets #104 .* 4 h 30 min estimated 0\.13 150 3 2 #105 .* 12 h 30 min estimated 0\.04 150 3 0$/,
     );
     assert.equal(onMetricPage("grimfeld/agentic-metrics", "estimateVsActual", "estimateVsActual"), "Summary unknown");
   });

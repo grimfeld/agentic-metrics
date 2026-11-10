@@ -15,7 +15,8 @@ An issue comment on a line of its own:
 estimate: 2d
 ```
 
-- Format: a whole number followed by `h` (hours), `d` (days) or `w` (weeks).
+- Format: a number followed by `h` (hours), `d` (days) or `w` (weeks).
+- It is an estimate of working time, not of calendar time: a day is 8 hours and a week 5 days. It is compared with the ticket's active time, the time it was actually worked on, not with how long it took to be delivered.
 - Only the earliest matching comment counts. Later comments do not revise it.
 - It counts only if it was posted before the first commit of any of the ticket's PRs. An estimate written after work starts is ignored.
 - Never block on a missing estimate, and never add one on the human's behalf.

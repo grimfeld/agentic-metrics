@@ -12,6 +12,11 @@ export function formatHours(hours: number): string {
   return hours < 48 ? `${String(Math.round(hours * 10) / 10)} h` : `${String(Math.round((hours / 24) * 10) / 10)} d`;
 }
 
+/** `25 min` under an hour, then as `formatHours`: for durations that are often short. */
+export function formatDuration(hours: number): string {
+  return hours < 1 ? `${String(Math.round(hours * 60))} min` : formatHours(hours);
+}
+
 /** A share from 0 to 1 as a percentage, to one decimal: the figure of a rate metric. */
 export function percent(rate: number): number {
   return Math.round(rate * 1000) / 10;

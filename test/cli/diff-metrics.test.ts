@@ -103,17 +103,19 @@ describe("diff metrics", () => {
 
   // #104: `estimate: 4h` at 08:30, before PR #115's first commit (09:00); a
   // later `estimate: 1d` is ignored. #105: a bot's `estimate: 1w` and an
-  // `estimate:` mid-sentence are skipped; `Estimate: 1.5d` (36 h) counts.
-  // Both actually took 11 h, from that first commit to #115 merging at 20:00.
+  // `estimate:` mid-sentence are skipped; `Estimate: 1.5d` counts, as 12 h of
+  // work (a day is 8 h). The actual is their active time: with no transcript,
+  // the 30 minutes between PR #115's two commits, not the 11 h to its merge.
   // #106's estimate came after PR #116's first commit, so it is left out.
-  it("compares the earliest estimate with the actual time, when it predates the first commit", async () => {
+  it("compares the earliest estimate with the ticket's active time, when it predates the first commit", async () => {
     assert.deepEqual(await metric("estimateVsActual"), {
       value: {
-        p50Ratio: 0.31,
+        p50Ratio: 0.04,
         excludedLate: 1,
+        excludedUnknownActual: 0,
         tickets: [
-          { ticket: "#104", estimateHours: 4, actualHours: 11, ratio: 2.75, diffLines: 150, filesTouched: 3, subTickets: 2 },
-          { ticket: "#105", estimateHours: 36, actualHours: 11, ratio: 0.31, diffLines: 150, filesTouched: 3, subTickets: 0 },
+          { ticket: "#104", estimateHours: 4, actualHours: 0.5, actual: "estimated", ratio: 0.13, diffLines: 150, filesTouched: 3, subTickets: 2 },
+          { ticket: "#105", estimateHours: 12, actualHours: 0.5, actual: "estimated", ratio: 0.04, diffLines: 150, filesTouched: 3, subTickets: 0 },
         ],
       },
       coverage: { tickets: 2, of: 5 },

@@ -157,21 +157,23 @@ describe("report site", () => {
 });
 
 describe("overview page", () => {
-  it("pools its four headline tiles over the full repos only, naming them", () => {
+  it("pools its headline tiles over the full repos only, naming them", () => {
     const html = page("index.html");
     const tiles = [...html.matchAll(/<article class="tile" data-headline="(\w+)"/g)].map((match) => match[1]);
-    assert.deepEqual(tiles, ["leadTime", "firstRunCiRate", "humanMessagesPerTicket", "regressionRate"]);
-    // Lifeline's 5 tickets pool with agentic-metrics' 0, which the tile names as unknown; client-a's are left out.
+    assert.deepEqual(tiles, ["activeTime", "estimatedActiveTime", "firstRunCiRate", "humanMessagesPerTicket", "regressionRate"]);
+    // No transcript was read, so nothing is measured: active time is estimated, from the tickets with several commits.
+    assert.equal(text(element(html, "data-headline", "activeTime")), "Active time unknown 0 of 5 tickets No full repo has data");
+    // Lifeline's tickets pool with agentic-metrics' 0, which the tile names as unknown; client-a's are left out.
     assert.equal(
-      text(element(html, "data-headline", "leadTime")),
-      "Lead time 12 h p50 · 7.5 d p90 5 of 5 tickets Covers grimfeld/lifeline Unknown for grimfeld/agentic-metrics",
+      text(element(html, "data-headline", "estimatedActiveTime")),
+      "Active time, estimated 30 min p50 · 30 min p90 3 of 5 tickets Covers grimfeld/lifeline Unknown for grimfeld/agentic-metrics",
     );
     assert.equal(
       text(element(html, "data-headline", "regressionRate")),
       "Regression rate 60% 4 regressions 5 of 5 tickets Covers grimfeld/lifeline Unknown for grimfeld/agentic-metrics",
     );
     assert.equal(text(element(html, "data-headline", "firstRunCiRate")), "First-run CI rate unknown 0 of 5 tickets No full repo has data");
-    assert.match(text(element(html, "data-headline", "leadTime")), /^(?!.*client-a)/);
+    assert.match(text(element(html, "data-headline", "estimatedActiveTime")), /^(?!.*client-a)/);
   });
 
   it("compares every repo, anonymized ones included, in a table and a card each", () => {
@@ -182,7 +184,7 @@ describe("overview page", () => {
       ["client-a", "grimfeld/agentic-metrics", "grimfeld/lifeline"],
     );
     assert.match(element(table, "data-repo", "client-a"), /<a href="client-a\/index\.html">client-a<\/a>/);
-    assert.match(text(element(table, "data-repo", "client-a")), /^client-a anonymized 5 \d+ 12 h p50/);
+    assert.match(text(element(table, "data-repo", "client-a")), /^client-a anonymized 5 \d+ unknown 0 of 5 tickets 30 min p50 · 30 min p90 3 of 5 tickets/);
     const cards = element(html, "data-section", "repo-cards");
     assert.match(cards, /<a class="repo-card" href="grimfeld--lifeline\/index\.html"/);
     assert.match(cards, /<a class="repo-card" href="client-a\/index\.html"/);

@@ -1,5 +1,6 @@
 // Every metric the CLI computes, in report order.
 import type { Metric } from "./metric.ts";
+import { activeTime, estimatedActiveTime } from "./active-time.ts";
 import { autonomy } from "./autonomy.ts";
 import { batchHealth } from "./batch-health.ts";
 import { estimateVsActual } from "./estimate-vs-actual.ts";
@@ -18,6 +19,8 @@ import { testRatio } from "./test-ratio.ts";
 import { throughput } from "./throughput.ts";
 
 export const METRICS: readonly Metric<unknown>[] = [
+  activeTime,
+  estimatedActiveTime,
   leadTime,
   throughput,
   firstRunCiRate,
