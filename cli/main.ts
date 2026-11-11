@@ -12,7 +12,9 @@ import { CONFIG_FILE, configuredFields, readConfig, type Config } from "./config
 import { inferConventions, withInferred } from "./infer.ts";
 import { blameReady, blameRegressions, revertRegressions } from "./inferred-regressions.ts";
 import { buildDataset, datasetPath, SCHEMA_VERSION, type Dataset } from "./dataset.ts";
+import type { Kind } from "./conventions.ts";
 import { defaultClaudeDir, deviceGaps, formatDoctor, thisDevice } from "./doctor.ts";
+import { applyAccepted, enrichContext, ghWriter, type GitHubWriter } from "./enrich.ts";
 import { findGaps, inspectCheckout, type Gap } from "./gaps.ts";
 import { cachedSource, defaultCacheDir } from "./github/cache.ts";
 import { loadGitHub, type GitHubData } from "./github/load.ts";
@@ -47,6 +49,8 @@ export interface Dependencies {
   transcripts?: TranscriptSource;
   /** The `owner/name` of the GitHub repo cloned at `dir`, if any. Defaults to its git `origin` remote. */
   localRepo?: (dir: string) => Promise<string | undefined>;
+  /** Writes accepted enrichment proposals to GitHub. Defaults to the `gh` CLI. */
+  writer?: GitHubWriter;
   /** Claude Code's user folder, which `doctor` reads this device's settings from. Defaults to ~/.claude. */
   claudeDir?: string;
   /** The user's config folder, where the recorder keeps this device's id. Defaults to $XDG_CONFIG_HOME, else ~/.config. */
@@ -91,6 +95,14 @@ const USAGE = `Usage:
       plugin caches its transcripts, and how long Claude Code keeps them).
       Reads the repo as collect does and changes nothing: no dataset, no file
       in the repo, nothing on GitHub or in ~/.claude.
+  agentic-metrics enrich-context <N> [--repo owner/name [--checkout dir]]
+      Print, as JSON, what the enrich skill needs for ticket or PR #N: its
+      kind label, whether it is a bug fix, the causes reverts and blame found,
+      and its PRs that close no issue.
+  agentic-metrics enrich-apply <N> [--kind k] [--caused-by M] [--closes PR:ISSUE]
+      Write the accepted proposals for #N, and nothing else: a kind:<k> label,
+      a "caused-by: #M" comment (M must be a cause tracing found), a
+      "Closes #ISSUE" line in an unlinked PR's description.
   agentic-metrics import-transcripts <folder> [--checkout dir] [--name clone-folder]... [--dry-run]
       Bring another device's Claude Code transcripts of this repo into this
       device's transcript cache, so that collect reads them. <folder> is that
@@ -118,6 +130,12 @@ export async function main(argv: string[], deps: Dependencies): Promise<number> 
         return 0;
       case "report":
         await report(rest, deps, stdout);
+        return 0;
+      case "enrich-context":
+        await enrichContextCommand(rest, deps, stdout, stderr);
+        return 0;
+      case "enrich-apply":
+        await enrichApplyCommand(rest, deps, stdout, stderr);
         return 0;
       case "doctor":
         await doctor(rest, deps, stdout, stderr);
@@ -241,6 +259,43 @@ async function doctor(args: string[], deps: Dependencies, stdout: (text: string)
   const { values } = parseArgs({ args, options: { repo: { type: "string" }, checkout: { type: "string" } } });
   const { data, work, gaps } = await gather(values, deps, stderr);
   stdout(formatDoctor(data.repo.fullName, work.tickets.length, gaps, deviceGaps(deps.claudeDir ?? defaultClaudeDir()), thisDevice(deps.configDir)));
+}
+
+function ticketNumber(positionals: string[]): number {
+  const [raw, ...extra] = positionals;
+  const number = Number(/^#?(\d+)$/.exec(raw ?? "")?.[1]);
+  if (!Number.isSafeInteger(number) || number <= 0 || extra.length > 0) throw new Error("takes one ticket or PR number: #N");
+  return number;
+}
+
+/** Prints, as JSON, what the `enrich` skill needs to propose a ticket's missing conventions. */
+async function enrichContextCommand(args: string[], deps: Dependencies, stdout: (text: string) => void, stderr: (text: string) => void): Promise<void> {
+  const { values, positionals } = parseArgs({ args, allowPositionals: true, options: { repo: { type: "string" }, checkout: { type: "string" } } });
+  const { config, data, work } = await gather(values, deps, stderr);
+  stdout(`${JSON.stringify(enrichContext(work, data, config.bugLabel, ticketNumber(positionals)), null, 2)}\n`);
+}
+
+/** Writes the proposals a person accepted for one ticket, and nothing else. */
+async function enrichApplyCommand(args: string[], deps: Dependencies, stdout: (text: string) => void, stderr: (text: string) => void): Promise<void> {
+  const { values, positionals } = parseArgs({
+    args,
+    allowPositionals: true,
+    options: { repo: { type: "string" }, checkout: { type: "string" }, kind: { type: "string" }, "caused-by": { type: "string" }, closes: { type: "string" } },
+  });
+  const { config, data, work } = await gather(values, deps, stderr);
+  const context = enrichContext(work, data, config.bugLabel, ticketNumber(positionals));
+  const closes = values.closes === undefined ? undefined : /^#?(\d+):#?(\d+)$/.exec(values.closes);
+  if (values.closes !== undefined && !closes) throw new Error("--closes takes <PR>:<issue>, e.g. 136:104");
+  const lines = await applyAccepted(
+    context,
+    {
+      kind: values.kind as Kind | undefined,
+      causedBy: values["caused-by"] === undefined ? undefined : Number(values["caused-by"].replace(/^#/, "")),
+      closes: closes ? { pullRequest: Number(closes[1]), issue: Number(closes[2]) } : undefined,
+    },
+    deps.writer ?? ghWriter(deps.cwd),
+  );
+  stdout(`${lines.join("\n")}\n`);
 }
 
 async function initCommand(args: string[], deps: Dependencies, stdout: (text: string) => void): Promise<void> {

@@ -26,6 +26,10 @@ Addenda add the metrics conventions to third-party skills without forking them. 
 
 A repo overrides one by name: `.agentic-metrics/addenda/<skill>.md` at its root replaces the shipped addendum, adds one for a skill that has none, or, left empty, switches it off. A namespaced skill (`plugin:name`) matches on its full name first, then on `name`.
 
+### Enriching a ticket
+
+`/agentic-metrics:enrich #N` proposes the conventions ticket or PR #N is missing: a `kind:*` label, the `caused-by: #M` line of a bug fix (only a cause that reverts or blame found, see regressions below), and the `Closes #N` line of a PR linked to no issue. It shows them together and writes only those you accept, as the ordinary conventions on GitHub (`docs/adr/0002`), so they read as declared, on every device. It runs in your Claude Code session: no API key. Under it are two commands: `npx agentic-metrics enrich-context <N>` prints what is known of the ticket, and `npx agentic-metrics enrich-apply <N> [--kind k] [--caused-by M] [--closes PR:ISSUE]` writes exactly what was accepted, refusing a cause tracing did not find.
+
 ### Onboarding a repo
 
 `/agentic-metrics:init` (or `npx agentic-metrics init` from the repo root) onboards a repo in one step:
