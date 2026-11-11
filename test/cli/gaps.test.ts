@@ -241,14 +241,14 @@ describe("gaps: cloud sessions", () => {
 
     assert.ok(gap);
     assert.deepEqual(gap.ticketIds, ["#1", "#2"]);
-    assert.deepEqual(gap.fix, { kind: "command", command: "claude --teleport session_01ABC\nclaude --teleport session_02DEF" });
+    assert.deepEqual(gap.fix, { kind: "command", command: "claude --teleport  # in a clean worktree; pick https://claude.ai/code/session_01ABC\nclaude --teleport  # in a clean worktree; pick https://claude.ai/code/session_02DEF" });
   });
 
   it("reads the session id from the commit's Claude-Session trailer", async () => {
     // PR #137's one commit was made in cloud session session_01ABCDEF, and no transcript is read here.
     const gap = find(await gaps("lifeline"), "cloud-sessions");
 
-    assert.deepEqual(gap?.fix, { kind: "command", command: "claude --teleport session_01ABCDEF" });
+    assert.deepEqual(gap?.fix, { kind: "command", command: "claude --teleport  # in a clean worktree; pick https://claude.ai/code/session_01ABCDEF" });
     assert.deepEqual(gap.ticketIds, ["PR #137"]);
   });
 

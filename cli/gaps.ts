@@ -210,7 +210,8 @@ export function findGaps({ work, data, config, checkout, inferred, blame }: GapI
       metrics: ["humanMessagesPerTicket", "activeTime", "apiEquivalentCost", "autonomy"],
       tickets: ids.length,
       ticketIds: ids,
-      fix: { kind: "command", command: [...teleport.keys()].sort().map((id) => `claude --teleport ${id}`).join("\n") },
+      // ADR 0004: teleport from the picker, in a clean worktree; the trailer's id is not the one it takes.
+      fix: { kind: "command", command: [...teleport.keys()].sort().map((id) => `claude --teleport  # in a clean worktree; pick https://claude.ai/code/${id}`).join("\n") },
       teleport: [...teleport.keys()].sort(),
     });
   }
