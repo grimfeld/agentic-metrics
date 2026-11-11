@@ -10,6 +10,8 @@ export const CONFIG_FILE = ".agentic-metrics.json";
 export interface Config {
   /** The label that marks a ticket ready for work; lead time starts when it is added. */
   readyLabel: string;
+  /** The label that marks an issue as a bug. */
+  bugLabel: string;
   /** What `collect` may publish; unset means `full` for a public repo, `anonymized` for a private one. */
   publish?: PublishMode | undefined;
   /** The name an `anonymized` repo is published under, in place of `owner/name`. */
@@ -58,6 +60,7 @@ export function isAlias(alias: string): boolean {
 
 const DEFAULTS: Config = {
   readyLabel: "ready-for-agent",
+  bugLabel: "bug",
   branchRegex: DEFAULT_BRANCH_REGEX,
   integrationBranchPrefixes: ["integration/"],
   exclude: { authors: [], branches: [] },
@@ -77,6 +80,10 @@ export function readConfig(repoDir: string): Config {
   if ("readyLabel" in fields) {
     if (typeof fields["readyLabel"] !== "string") throw new Error(`${CONFIG_FILE}: readyLabel must be a string`);
     config.readyLabel = fields["readyLabel"];
+  }
+  if ("bugLabel" in fields) {
+    if (typeof fields["bugLabel"] !== "string" || fields["bugLabel"] === "") throw new Error(`${CONFIG_FILE}: bugLabel must be a non-empty string`);
+    config.bugLabel = fields["bugLabel"];
   }
   if ("ciWorkflow" in fields) {
     const workflow = fields["ciWorkflow"];
@@ -125,6 +132,14 @@ export function readConfig(repoDir: string): Config {
   }
   if ("autonomy" in fields) config.autonomy = autonomyThresholds(fields["autonomy"]);
   return config;
+}
+
+/** The fields `.agentic-metrics.json` at `repoDir` sets; none when there is no such file. */
+export function configuredFields(repoDir: string): Set<string> {
+  const path = join(repoDir, CONFIG_FILE);
+  if (!existsSync(path)) return new Set();
+  const raw = JSON.parse(readFileSync(path, "utf8")) as unknown;
+  return typeof raw === "object" && raw !== null && !Array.isArray(raw) ? new Set(Object.keys(raw)) : new Set();
 }
 
 function autonomyThresholds(value: unknown): AutonomyThresholds {

@@ -7,7 +7,8 @@ import { dirname, join, resolve } from "node:path";
 import { parseArgs, promisify } from "node:util";
 import { classifyAutonomy } from "./autonomy.ts";
 import { CASE_STUDIES_DIR, readApproved, writeDrafts, type CaseStudy } from "./case-studies.ts";
-import { CONFIG_FILE, readConfig, type Config } from "./config.ts";
+import { CONFIG_FILE, configuredFields, readConfig, type Config } from "./config.ts";
+import { inferConventions, withInferred } from "./infer.ts";
 import { buildDataset, datasetPath, SCHEMA_VERSION, type Dataset } from "./dataset.ts";
 import { defaultClaudeDir, deviceGaps, formatDoctor, thisDevice } from "./doctor.ts";
 import { findGaps, inspectCheckout, type Gap } from "./gaps.ts";
@@ -155,7 +156,8 @@ async function gather(
   const checkout =
     values.checkout ??
     (!values.repo || sameRepo(await (deps.localRepo ?? originRepo)(deps.cwd), values.repo) ? deps.cwd : undefined);
-  const config = readConfig(checkout === undefined ? deps.cwd : resolve(deps.cwd, checkout));
+  const configDir = checkout === undefined ? deps.cwd : resolve(deps.cwd, checkout);
+  const configured = readConfig(configDir);
   if (values.repo && checkout === undefined) {
     stderr(
       `agentic-metrics: ${values.repo} has no --checkout: reading ${CONFIG_FILE} from ${deps.cwd}, and its transcript metrics are unknown. Pass --checkout <its clone>.\n`,
@@ -166,6 +168,9 @@ async function gather(
   const cacheDir = deps.cacheDir ?? (deps.github ? undefined : defaultCacheDir());
   const github = cacheDir ? cachedSource(source, { dir: cacheDir, now, full: values.full ?? false }) : source;
   const data = await loadGitHub(github);
+  // The conventions the config doesn't set, inferred from the history (`infer.ts`).
+  const inferred = inferConventions(data, configuredFields(configDir));
+  const config = withInferred(configured, inferred);
   const transcripts =
     deps.transcripts ??
     (deps.github || checkout === undefined
@@ -173,7 +178,7 @@ async function gather(
       : transcriptCache({ dir: cacheDir ?? defaultCacheDir(), repoDir: resolve(deps.cwd, checkout), repo: data.repo.fullName }));
   const sessions = loadSessions(await transcripts.read());
   const work = classifyAutonomy(linkRecords(linkSessions(link(data, config), sessions, config, data.repo.fullName), sessions), config.autonomy);
-  const gaps = findGaps({ work, data, config, checkout: checkout === undefined ? undefined : inspectCheckout(resolve(deps.cwd, checkout)) });
+  const gaps = findGaps({ work, data, config, inferred, checkout: checkout === undefined ? undefined : inspectCheckout(resolve(deps.cwd, checkout)) });
   return { config, data, work, gaps };
 }
 
@@ -235,7 +240,13 @@ async function initCommand(args: string[], deps: Dependencies, stdout: (text: st
   if (publish !== undefined && publish !== "full" && publish !== "anonymized" && publish !== "none") {
     throw new Error("--publish must be one of full, anonymized, none");
   }
-  const lines = await init(deps.cwd, deps.admin ?? ghAdmin(deps.cwd), { alias: values.alias, publish, version: deps.version });
+  // The conventions to write are inferred from the repo's history, read as `collect` reads it. With an injected admin and no GitHub source (tests), none is.
+  const source = deps.github ?? (deps.admin ? undefined : ghSource({ cwd: deps.cwd }));
+  const cacheDir = deps.cacheDir ?? (deps.github ? undefined : defaultCacheDir());
+  const inferred = source
+    ? inferConventions(await loadGitHub(cacheDir ? cachedSource(source, { dir: cacheDir, now: deps.now ?? (() => new Date()), full: false }) : source), configuredFields(deps.cwd))
+    : undefined;
+  const lines = await init(deps.cwd, deps.admin ?? ghAdmin(deps.cwd), { alias: values.alias, publish, version: deps.version, inferred });
   stdout(lines.map((line) => `${line}\n`).join(""));
 }
 

@@ -36,7 +36,9 @@ A repo overrides one by name: `.agentic-metrics/addenda/<skill>.md` at its root 
 - reads the repo's Actions permissions and, when only selected actions are allowed and no pattern covers the Action, prints the pattern to add. It never changes those settings.
 - installs the recorder: `.agentic-metrics/recorder.mjs` and its hook entries in `.claude/settings.json`, beside whatever that file already holds (see [Session records](#session-records)).
 
-Re-running is safe: an existing config or workflow is kept as it is, only missing labels are created, and the recorder script is replaced only when this version's differs. Addenda overrides go in `.agentic-metrics/addenda/` (see above). Review and commit the files it wrote.
+The ready label, the branch pattern and the bug label are read from the repo's history when it has its own: the label most issues got before their first PR, a branch pattern that names the right issue for more PRs than the built-in one, a bug-like label when `bug` is unused. `init` writes what it found, and says so; otherwise the defaults. `collect` and `doctor` use the same inferred values for a field the config doesn't set, and list each as a gap whose fix is `init`. A field the config sets always wins.
+
+Re-running is safe: an existing config or workflow is kept as it is (a convention field it lacks gains its inferred value, and a field it sets is never changed), only missing labels are created, and the recorder script is replaced only when this version's differs. Addenda overrides go in `.agentic-metrics/addenda/` (see above). Review and commit the files it wrote.
 
 ### Session records
 
@@ -123,7 +125,7 @@ The first `collect` on a repo reads its whole history. Later runs read only the 
 `collect --repo owner/name` measures another repo; pass its clone as `--checkout dir` too, so that its config and transcripts are read (without it, `collect` warns that it reads the current folder's config and no transcripts). Per-repo settings live in `.agentic-metrics.json` at the repo root. All fields are optional:
 
 ```json
-{ "readyLabel": "ready-for-agent", "publish": "anonymized", "alias": "client-a" }
+{ "readyLabel": "ready-for-agent", "bugLabel": "bug", "publish": "anonymized", "alias": "client-a" }
 ```
 
 `publish` sets what a repo's dataset may show:

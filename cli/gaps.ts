@@ -13,6 +13,7 @@ import { CONFIG_FILE, type Config } from "./config.ts";
 import { ACTION_WORKFLOW, REGRESSION_LABEL } from "./conventions.ts";
 import type { GitHubData } from "./github/load.ts";
 import { ACTION_PATTERN } from "./init.ts";
+import type { Inferred } from "./infer.ts";
 import { ownCommits, type LinkedWork } from "./linker.ts";
 import { RECORDER_FILE, SETTINGS_FILE } from "./recorder-install.ts";
 
@@ -105,10 +106,12 @@ export interface GapInputs {
   config: Config;
   /** The measured repo's clone; undefined when `collect` ran with `--repo` and no `--checkout`. */
   checkout: CheckoutState | undefined;
+  /** The conventions inferred from history for the fields the config doesn't set (`infer.ts`). */
+  inferred?: Inferred | undefined;
 }
 
 /** The repo's gaps: repo-level ones first, then by the number of tickets affected. */
-export function findGaps({ work, data, config, checkout }: GapInputs): Gap[] {
+export function findGaps({ work, data, config, checkout, inferred }: GapInputs): Gap[] {
   const gaps: Gap[] = [];
   const perTicket = (gap: Omit<Gap, "tickets" | "ticketIds">, ids: string[]) => {
     if (ids.length > 0) gaps.push({ ...gap, tickets: ids.length, ticketIds: ids });
@@ -234,6 +237,26 @@ export function findGaps({ work, data, config, checkout }: GapInputs): Gap[] {
       cause: "The agentic-metrics workflow is installed but not committed, so it never runs.",
       metrics: ACTION_METRICS,
       fix: { kind: "command", command: COMMIT_ACTION },
+    });
+  }
+
+  // Conventions inferred from history: used, and shown so that `init` can keep them.
+  const keep = (field: string, value: string, what: string) =>
+    gaps.push({
+      id: `inferred-${field}`,
+      cause: `Inferred from the history: ${what} is ${value}. It is used until ${CONFIG_FILE} sets ${field}.`,
+      metrics: field === "readyLabel" ? ["leadTime"] : field === "bugLabel" ? ["regressionRate"] : ["throughput", "leadTime", "humanMessagesPerTicket", "autonomy"],
+      fix: { kind: "command", command: `${INIT} (writes "${field}": ${JSON.stringify(value)} to ${CONFIG_FILE})` },
+    });
+  if (inferred?.readyLabel !== undefined) keep("readyLabel", `"${inferred.readyLabel}"`, "the label that marks an issue ready");
+  if (inferred?.branchRegex !== undefined) keep("branchRegex", `/${inferred.branchRegex}/`, "the pattern that finds an issue number in a branch name");
+  if (inferred?.bugLabel !== undefined) keep("bugLabel", `"${inferred.bugLabel}"`, "the label that marks a bug");
+  if (inferred && !inferred.usesIssues && work.tickets.length > 0) {
+    gaps.push({
+      id: "no-issues",
+      cause: "No delivered PR closes an issue: every PR is its own ticket, and its lead time starts at its first commit or its opening.",
+      metrics: ["leadTime", "throughput", "estimateVsActual"],
+      fix: { kind: "convention", text: "Open an issue for each piece of work, and close it from its PR (\"Closes #N\" in the description, or the issue number in the branch name)." },
     });
   }
 
