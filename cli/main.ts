@@ -9,6 +9,7 @@ import { classifyAutonomy } from "./autonomy.ts";
 import { CASE_STUDIES_DIR, readApproved, writeDrafts, type CaseStudy } from "./case-studies.ts";
 import { CONFIG_FILE, readConfig } from "./config.ts";
 import { buildDataset, datasetPath, SCHEMA_VERSION, type Dataset } from "./dataset.ts";
+import { findGaps, inspectCheckout } from "./gaps.ts";
 import { cachedSource, defaultCacheDir } from "./github/cache.ts";
 import { loadGitHub } from "./github/load.ts";
 import { ghAdmin, init, type RepoAdmin } from "./init.ts";
@@ -159,7 +160,8 @@ async function collect(args: string[], deps: Dependencies, stdout: (text: string
     (deps.github || checkout === undefined ? noTranscripts : transcriptCache({ dir: cacheDir ?? defaultCacheDir(), repoDir: resolve(deps.cwd, checkout) }));
   const sessions = loadSessions(await transcripts.read());
   const work = classifyAutonomy(linkRecords(linkSessions(link(data, config), sessions, config, data.repo.fullName), sessions), config.autonomy);
-  const dataset = buildDataset(data.repo, work, now(), publish, config.alias);
+  const gaps = findGaps({ work, data, config, checkout: checkout === undefined ? undefined : inspectCheckout(resolve(deps.cwd, checkout)) });
+  const dataset = buildDataset(data.repo, work, now(), publish, config.alias, gaps);
 
   // Only this collect's dataset may stay in the datasets folder: a dataset left
   // by an earlier mode would publish what the current mode hides.

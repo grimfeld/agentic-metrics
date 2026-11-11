@@ -143,6 +143,15 @@ export interface GitHubData {
   regressions: RegressionIssue[];
   /** Actions runs, newest first, GitHub's own `dynamic` runs and the installed agentic-metrics workflow's left out. */
   workflowRuns: WorkflowRun[];
+  /** The installed agentic-metrics workflow's runs, newest first: whether the Action is installed and allowed to run. */
+  actionRuns: ActionRun[];
+}
+
+/** A run of the agentic-metrics workflow `init` installs. */
+export interface ActionRun {
+  createdAt: Date;
+  /** Undefined while it runs. `startup_failure` when the repo's settings would not let it start. */
+  conclusion: string | undefined;
 }
 
 interface RawRepo {
@@ -299,8 +308,12 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
     });
 
   const runPages = (await source.read("workflow-runs")) as { workflow_runs: RawRun[] }[];
-  const workflowRuns = runPages
-    .flatMap((page) => page.workflow_runs)
+  const rawRuns = runPages.flatMap((page) => page.workflow_runs);
+  const actionRuns = rawRuns
+    .filter((run) => run.path === ACTION_WORKFLOW)
+    .map((run): ActionRun => ({ createdAt: new Date(run.created_at), conclusion: run.status === "completed" ? (run.conclusion ?? undefined) : undefined }))
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  const workflowRuns = rawRuns
     // GitHub's own runs (CodeQL, Dependabot) and the Action `init` installs are not CI.
     .filter((run) => run.event !== "dynamic" && run.path !== ACTION_WORKFLOW)
     .map((run): WorkflowRun => {
@@ -320,7 +333,7 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
     })
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.id - a.id);
 
-  return { repo, pullRequests, issues, regressions, workflowRuns };
+  return { repo, pullRequests, issues, regressions, workflowRuns, actionRuns };
 }
 
 /** `#N` not inside a word or a path (so `owner/repo#N` and `ADR#N`-like tokens are skipped). */
