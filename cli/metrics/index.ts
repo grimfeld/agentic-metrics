@@ -6,6 +6,7 @@ import { batchHealth } from "./batch-health.ts";
 import { estimateVsActual } from "./estimate-vs-actual.ts";
 import { firstRunCiRate } from "./first-run-ci.ts";
 import { fixCycles } from "./fix-cycles.ts";
+import { friction } from "./friction.ts";
 import { humanMessagesPerTicket } from "./human-messages.ts";
 import { leadTime } from "./lead-time.ts";
 import { orchestrationTime } from "./orchestration-time.ts";
@@ -29,6 +30,7 @@ export const METRICS: readonly Metric<unknown>[] = [
   batchHealth,
   regressionRate,
   humanMessagesPerTicket,
+  friction,
   orchestrationTime,
   subAgents,
   apiEquivalentCost,

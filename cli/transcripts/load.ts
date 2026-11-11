@@ -57,6 +57,12 @@ export interface Session {
   /** Sub-agents it spawned with the Agent tool. Agent ids are never published. */
   spawns: AgentSpawn[];
   /**
+   * Where it met friction, each by the id of its line or tool use, so that a
+   * resumed session counts each once. Absent for a session read from records,
+   * whose friction is unknown.
+   */
+  friction?: Friction;
+  /**
    * Set for a session read from session records (`records.ts`), not from a
    * transcript: it has counts and activity but no API response, so its cost is
    * unknown, not zero. `parent` is its parent's id, for a sub-agent.
@@ -87,6 +93,17 @@ export interface ApiResponse {
   speed: string | undefined;
 }
 
+export interface Friction {
+  /** A person stopped a turn: `[Request interrupted by user]`. A refused tool call is a denial, not an interrupt. */
+  interrupts: string[];
+  /** Tool calls that failed, denials left out. */
+  toolErrors: string[];
+  /** Tool calls the person (or the permission mode) refused. */
+  denials: string[];
+  /** Times its context was compacted. */
+  compactions: string[];
+}
+
 export interface AgentSpawn {
   agentId: string;
   /** The model Claude Code resolved for it (`toolUseResult.resolvedModel`), when written. */
@@ -109,6 +126,7 @@ export function loadSessions(files: TranscriptFile[]): Session[] {
     const responses = new Map<string, ApiResponse>();
     const agentToolUses = new Set<string>();
     const spawns = new Map<string, AgentSpawn>();
+    const friction: Friction = { interrupts: [], toolErrors: [], denials: [], compactions: [] };
     let sessionId: string | undefined;
 
     for (const raw of file.lines) {
@@ -135,6 +153,7 @@ export function loadSessions(files: TranscriptFile[]): Session[] {
       }
       const spawn = agentSpawn(raw, agentToolUses);
       if (spawn) spawns.set(spawn.agentId, spawn);
+      if (uuid) frictionOf(raw, uuid, friction);
     }
 
     times.sort((a, b) => a - b);
@@ -153,8 +172,39 @@ export function loadSessions(files: TranscriptFile[]): Session[] {
       startedAt: times[0] === undefined ? undefined : new Date(times[0]),
       responses: [...responses.values()],
       spawns: [...spawns.values()],
+      friction: {
+        interrupts: [...new Set(friction.interrupts)],
+        toolErrors: [...new Set(friction.toolErrors)],
+        denials: [...new Set(friction.denials)],
+        compactions: [...new Set(friction.compactions)],
+      },
     };
   });
+}
+
+/** A refused tool call's result: refused by the person, or by the permission mode. */
+const DENIED = /^(The user doesn't want to proceed with this tool use|Permission to use \S+ (?:has been|was) denied)/;
+
+/** Adds what `line` shows of friction: an interrupt, failed or refused tool calls, a compaction. */
+function frictionOf(line: Record<string, unknown>, uuid: string, friction: Friction): void {
+  if (line["type"] === "system" && line["subtype"] === "compact_boundary") {
+    friction.compactions.push(uuid);
+    return;
+  }
+  if (line["type"] !== "user") return;
+  const message = line["message"];
+  const content = isRecord(message) ? message["content"] : undefined;
+  const blocks = Array.isArray(content) ? content : typeof content === "string" ? [{ type: "text", text: content }] : [];
+  for (const block of blocks) {
+    if (!isRecord(block)) continue;
+    if (block["type"] === "text" && /^\[Request interrupted by user\]/.test(str(block["text"]) ?? "")) friction.interrupts.push(uuid);
+    if (block["type"] === "tool_result" && block["is_error"] === true) {
+      const result = block["content"];
+      const text = typeof result === "string" ? result : Array.isArray(result) ? (result.map((part) => (isRecord(part) ? (str(part["text"]) ?? "") : "")).join("\n")) : "";
+      const id = str(block["tool_use_id"]) ?? uuid;
+      (DENIED.test(text) ? friction.denials : friction.toolErrors).push(id);
+    }
+  }
 }
 
 /**

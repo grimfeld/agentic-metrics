@@ -1,6 +1,7 @@
 import type { Metric } from "./metric.ts";
 import { UNKNOWN } from "./metric.ts";
 import { sessionSources } from "../records.ts";
+import { ticketFriction } from "./friction.ts";
 import { percentile, plural, round, sum } from "./stats.ts";
 
 export interface HumanMessages {
@@ -11,8 +12,10 @@ export interface HumanMessages {
   orchestration?: number;
   /** How many of its tickets were read from transcripts, and how many from session records. Absent from older datasets. */
   sources?: { transcripts: number; records: number };
-  /** The tickets with transcripts or session records, in delivery order. Absent once anonymized. */
-  perTicket?: { ticket: string; messages: number }[];
+  /** Interrupts (a person stopping a turn), over the tickets whose every session has a transcript. Absent from older datasets, and when none has. */
+  interrupts?: { p50: number; total: number; tickets: number };
+  /** The tickets with transcripts or session records, in delivery order; `interrupts` when known. Absent once anonymized. */
+  perTicket?: { ticket: string; messages: number; interrupts?: number }[];
 }
 
 export const humanMessagesPerTicket: Metric<HumanMessages> = {
@@ -23,17 +26,27 @@ export const humanMessagesPerTicket: Metric<HumanMessages> = {
     const perTicket = tickets.flatMap((ticket) => {
       if (ticket.sessions.length === 0) return [];
       const messages = new Set(ticket.sessions.flatMap((session) => session.humanMessages));
-      return [{ ticket: ticket.id, messages: messages.size }];
+      const found = ticketFriction(ticket);
+      return [{ ticket: ticket.id, messages: messages.size, ...(found && { interrupts: found.interrupts.length }) }];
     });
+    const interruptCounts = perTicket.flatMap((row) => (row.interrupts === undefined ? [] : [row.interrupts]));
     const coverage = { tickets: perTicket.length, of: tickets.length };
     if (perTicket.length === 0) return { value: UNKNOWN, coverage };
     const counts = perTicket.map((row) => row.messages);
     const mean = Math.round((counts.reduce((sum, count) => sum + count, 0) / counts.length) * 10) / 10;
     const orchestration = new Set(transcripts.orchestration.filter((session) => session.agentId === undefined).flatMap((session) => session.humanMessages)).size;
-    return { value: { p50: percentile(counts, 50), p90: percentile(counts, 90), mean, orchestration, sources: sessionSources(tickets), perTicket }, coverage };
+    const interrupts = interruptCounts.length ? { p50: percentile(interruptCounts, 50), total: sum(interruptCounts), tickets: interruptCounts.length } : undefined;
+    return { value: { p50: percentile(counts, 50), p90: percentile(counts, 90), mean, orchestration, sources: sessionSources(tickets), ...(interrupts && { interrupts }), perTicket }, coverage };
   },
 
-  anonymize: ({ p50, p90, mean, orchestration, sources }) => ({ p50, p90, mean, ...(orchestration !== undefined && { orchestration }), ...(sources && { sources }) }),
+  anonymize: ({ p50, p90, mean, orchestration, sources, interrupts }) => ({
+    p50,
+    p90,
+    mean,
+    ...(orchestration !== undefined && { orchestration }),
+    ...(sources && { sources }),
+    ...(interrupts && { interrupts }),
+  }),
 
   figure: { label: "p50", of: ({ p50 }) => p50, format: String },
 
@@ -50,19 +63,29 @@ export const humanMessagesPerTicket: Metric<HumanMessages> = {
     },
   },
 
-  section({ mean, orchestration, sources }) {
+  section({ mean, orchestration, sources, interrupts }) {
     const perTicket = `<p>Mean <strong>${String(mean)}</strong> human messages per ticket with transcripts or session records.</p>`;
     const beside =
       orchestration === undefined
         ? ""
         : `<p><strong>${plural(orchestration, "human message")}</strong> more went to orchestration: sessions on no ticket, which plan the work and steer the agents that do it. A ticket done by a sub-agent shows none of them.</p>`;
     const from = sources ? `<p>Read from transcripts: ${plural(sources.transcripts, "ticket")}; from session records: ${plural(sources.records, "ticket")}.</p>` : "";
-    return perTicket + beside + from;
+    const stopped = interrupts
+      ? `<p>Besides messages, a person interrupted a turn <strong>${plural(interrupts.total, "time")}</strong> (median ${String(interrupts.p50)} per ticket, over ${plural(interrupts.tickets, "ticket")} with transcripts). An interrupt is not a human message.</p>`
+      : "";
+    return perTicket + stopped + beside + from;
   },
 
   ticketTable: {
-    columns: ["Human messages"],
-    rows: ({ perTicket }) => perTicket?.map((row) => ({ id: row.ticket, cells: [{ text: String(row.messages), sort: row.messages }] })),
+    columns: ["Human messages", "Interrupts"],
+    rows: ({ perTicket }) =>
+      perTicket?.map((row) => ({
+        id: row.ticket,
+        cells: [
+          { text: String(row.messages), sort: row.messages },
+          row.interrupts === undefined ? { text: "unknown", sort: -1 } : { text: String(row.interrupts), sort: row.interrupts },
+        ],
+      })),
   },
 
   methodology: {

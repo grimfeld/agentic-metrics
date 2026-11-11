@@ -188,7 +188,7 @@ describe("session records: collect", () => {
     const github = fakeGitHub([1], [{ number: 10, head: "ticket-1", closes: [1], mergedAfter: 10, commits: [{ at: 5, oid: "c1", body: record(recordKey(sessionId), 300, 9) }] }]);
     const { dataset } = await collect(github, [{ session: sessionId, lines }]);
 
-    assert.deepEqual(human(dataset).perTicket, [{ ticket: "#1", messages: 1 }]);
+    assert.deepEqual(human(dataset).perTicket, [{ ticket: "#1", messages: 1, interrupts: 0 }]);
     assert.deepEqual(human(dataset).sources, { transcripts: 1, records: 0 });
     assert.deepEqual(activeRows(dataset), [{ ticket: "#1", hours: 1 }]);
   });

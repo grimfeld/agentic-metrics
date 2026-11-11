@@ -43,6 +43,8 @@ export interface AutonomyThresholds {
   fullMaxFollowUps: number;
   /** The share of its commits Claude must have co-authored, from 0 to 1. */
   fullMinClaudeCommitShare: number;
+  /** Interrupts allowed; unset, interrupts don't affect the level. */
+  fullMaxInterrupts?: number | undefined;
 }
 
 /**
@@ -169,6 +171,13 @@ function autonomyThresholds(value: unknown): AutonomyThresholds {
       throw new Error(`${CONFIG_FILE}: autonomy.fullMinClaudeCommitShare must be a number from 0 to 1`);
     }
     thresholds.fullMinClaudeCommitShare = share;
+  }
+  if ("fullMaxInterrupts" in fields) {
+    const interrupts = fields["fullMaxInterrupts"];
+    if (typeof interrupts !== "number" || !Number.isInteger(interrupts) || interrupts < 0) {
+      throw new Error(`${CONFIG_FILE}: autonomy.fullMaxInterrupts must be a whole number, 0 or more`);
+    }
+    thresholds.fullMaxInterrupts = interrupts;
   }
   return thresholds;
 }
