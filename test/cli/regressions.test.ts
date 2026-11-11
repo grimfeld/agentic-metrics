@@ -87,6 +87,7 @@ describe("regressions", () => {
           { ticket: "PR #136", bugs: [142] },
           { ticket: "#106", bugs: [140, 145] },
         ],
+        inferred: { rate: 0, regressions: 0, regressedTickets: 0, by: { revert: 0, blame: 0 }, perTicket: [] },
       },
       coverage: { tickets: 5, of: 5 },
     });

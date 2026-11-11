@@ -9,6 +9,7 @@ import { classifyAutonomy } from "./autonomy.ts";
 import { CASE_STUDIES_DIR, readApproved, writeDrafts, type CaseStudy } from "./case-studies.ts";
 import { CONFIG_FILE, configuredFields, readConfig, type Config } from "./config.ts";
 import { inferConventions, withInferred } from "./infer.ts";
+import { revertRegressions } from "./inferred-regressions.ts";
 import { buildDataset, datasetPath, SCHEMA_VERSION, type Dataset } from "./dataset.ts";
 import { defaultClaudeDir, deviceGaps, formatDoctor, thisDevice } from "./doctor.ts";
 import { findGaps, inspectCheckout, type Gap } from "./gaps.ts";
@@ -177,7 +178,8 @@ async function gather(
       ? noTranscripts
       : transcriptCache({ dir: cacheDir ?? defaultCacheDir(), repoDir: resolve(deps.cwd, checkout), repo: data.repo.fullName }));
   const sessions = loadSessions(await transcripts.read());
-  const work = classifyAutonomy(linkRecords(linkSessions(link(data, config), sessions, config, data.repo.fullName), sessions), config.autonomy);
+  const linked = classifyAutonomy(linkRecords(linkSessions(link(data, config), sessions, config, data.repo.fullName), sessions), config.autonomy);
+  const work = { ...linked, inferredRegressions: revertRegressions(linked) };
   const gaps = findGaps({ work, data, config, inferred, checkout: checkout === undefined ? undefined : inspectCheckout(resolve(deps.cwd, checkout)) });
   return { config, data, work, gaps };
 }

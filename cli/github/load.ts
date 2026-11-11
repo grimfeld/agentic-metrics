@@ -77,6 +77,8 @@ export interface Commit extends CommitTrailers {
   deletions: number;
   /** Undefined when GitHub could not say. */
   changedFiles: number | undefined;
+  /** For a revert (`git revert`), the commit it reverts: from its `This reverts commit <sha>.` line. */
+  reverts?: string | undefined;
 }
 
 /** One GitHub Actions workflow run, as the runs listing shows it. */
@@ -371,6 +373,7 @@ function commitOf(raw: RawCommit): Commit {
     changedFiles: raw.changedFilesIfAvailable ?? undefined,
     ...trailersOf(raw.messageBody ?? ""),
     records: parseRecords(raw.messageBody ?? ""),
+    reverts: /^This reverts commit ([0-9a-f]{7,40})\b/m.exec(raw.messageBody ?? "")?.[1],
   };
 }
 

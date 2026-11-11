@@ -25,6 +25,7 @@ import type { Config } from "./config.ts";
 import { mainWorkflow, type Ci } from "./ci.ts";
 import { issueNumberFromBranch } from "./branch.ts";
 import type { Commit, GitHubData, Issue, PullRequest, RegressionIssue } from "./github/load.ts";
+import type { InferredRegression } from "./inferred-regressions.ts";
 import type { Session } from "./transcripts/load.ts";
 
 export interface Ticket {
@@ -60,6 +61,8 @@ export interface LinkedWork {
   integrationPullRequests: PullRequest[];
   /** Issues labelled as regressions, whether or not their cause is delivered work. */
   regressions: RegressionIssue[];
+  /** Regressions deduced from traces (`inferred-regressions.ts`); never pooled with declared ones. Absent before they are read. */
+  inferredRegressions?: InferredRegression[];
   /** CI runs, and the repo's main check workflow. */
   ci: Ci;
   /** The repo's Claude Code transcripts (`transcripts/link.ts`). */

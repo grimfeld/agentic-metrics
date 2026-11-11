@@ -81,7 +81,7 @@ describe("report", () => {
     );
     assert.equal(
       onMetricPage("grimfeld/lifeline", "regressionRate", "regressionRate"),
-      "Summary 4 regressions traced to 3 delivered tickets. Untraced, and left out of the rate: #143, #144.",
+      "Summary 4 regressions declared and traced to 3 delivered tickets. Untraced, and left out of the rate: #143, #144. None inferred from the history.",
     );
   });
 

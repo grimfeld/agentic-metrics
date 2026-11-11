@@ -161,7 +161,7 @@ Each ticket gets an autonomy level. `full`: a transcript, or session records, wi
 { "autonomy": { "fullMaxFollowUps": 1, "fullMinClaudeCommitShare": 1 } }
 ```
 
-A regression is an issue labelled `regression` with a line starting `caused-by: #N` in its body or a comment; `#N` is the ticket or PR that caused it. The [GitHub Action](#github-action) adds the label when such a line is written.
+A regression is **declared** when an issue labelled `regression` has a line starting `caused-by: #N` in its body or a comment; `#N` is the ticket or PR that caused it. The [GitHub Action](#github-action) adds the label when such a line is written. A regression is **inferred** when a PR delivered to the default branch reverts an earlier one (GitHub's `Reverts owner/repo#N`, or a commit's `This reverts commit <sha>.`); reverting a revert is none. The regression rate shows the two apart and never adds them together; one both declared and inferred counts as declared.
 
 CI metrics (first-run CI rate, fix cycles, scheduled failures, batch health) read the repo's GitHub Actions runs. `ciWorkflow` names the main check workflow by path (`.github/workflows/check.yml`), file name or name; unset, it is the workflow that ran on the most PRs. The `agentic-metrics.yml` workflow `init` installs is never CI. A batch drops a PR it names (`#N` in its title or description) that merged only after it.
 
