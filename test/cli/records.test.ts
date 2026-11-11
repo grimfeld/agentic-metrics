@@ -135,7 +135,7 @@ describe("session records: parsing", () => {
   });
 
   it("ignores a line that is not a record, never failing on it", () => {
-    for (const body of ["", "Session-Record: v1", "Session-Record: v2 k=abc123 active=5", "Session-Record: v1 k=NOTHEX active=5", "Session-Record: v1 k=abc123 active=soon", "see Session-Record: v1 k=abc123 active=5"]) {
+    for (const body of ["", "Session-Record: v1", "Session-Record: v3 k=abc123 active=5", "Session-Record: v1 k=NOTHEX active=5", "Session-Record: v1 k=abc123 active=soon", "see Session-Record: v1 k=abc123 active=5"]) {
       assert.deepEqual(parseRecords(body), [], body);
     }
   });
@@ -289,5 +289,34 @@ describe("session records: collect", () => {
     const anonymized = await collect(github, [], { publish: "anonymized", alias: "client-a" });
     assert.doesNotMatch(anonymized.text, /aaaaaaaaaaaa|record:/);
     assert.deepEqual(anonymized.dataset.metrics["humanMessagesPerTicket"]?.value, { p50: 2, p90: 2, mean: 2, orchestration: 0, sources: { transcripts: 0, records: 1 } });
+  });
+});
+
+describe("session records: v2 tokens", () => {
+  it("reads a v2 record's skills and tokens", () => {
+    const [parsed] = parseRecords("Session-Record: v2 k=3fa9c1d2e4b7 active=60 human=1 agents=0 started=2026-11-10T18:00:00Z d=0a1b2c3d s=2 t=claude-opus-5-5:100/10/20/40/5");
+
+    assert.ok(parsed);
+    assert.equal(parsed.skills, 2);
+    assert.deepEqual([...(parsed.tokens ?? [])], [["claude-opus-5-5", [100, 10, 20, 40, 5]]]);
+  });
+
+  it("gives a ticket known only from v2 records a cost, counting each commit's added tokens once", async () => {
+    const tokens = (input: number) => ` s=0 t=claude-opus-5-5:${String(input)}/0/0/0/0`;
+    const body = (minutes: number, input: number) => record(A, minutes, 1).replace("v1", "v2") + tokens(input);
+    const github = fakeGitHub([1], [{ number: 10, head: "ticket-1", closes: [1], mergedAfter: 10, commits: [{ at: 4, oid: "c1", body: body(30, 1_000_000) }, { at: 5, oid: "c2", body: body(60, 3_000_000) }] }]);
+    const { dataset } = await collect(github, []);
+    const cost = dataset.metrics["apiEquivalentCost"] as { value: { apiEquivalentUsd: number }; coverage: { tickets: number } };
+
+    assert.equal(cost.coverage.tickets, 1);
+    // 3M input tokens of Opus 5.5 at $4 per million.
+    assert.equal(cost.value.apiEquivalentUsd, 12);
+  });
+
+  it("keeps a ticket known only from v1 records at an unknown cost", async () => {
+    const github = fakeGitHub([1], [{ number: 10, head: "ticket-1", closes: [1], mergedAfter: 10, commits: [{ at: 4, oid: "c1", body: record(A, 30, 1) }] }]);
+    const { dataset } = await collect(github, []);
+
+    assert.deepEqual(dataset.metrics["apiEquivalentCost"]?.value, "unknown");
   });
 });

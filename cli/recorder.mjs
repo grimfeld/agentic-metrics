@@ -15,7 +15,13 @@
 //   agents    the sub-agents it spawned (each has counters of its own).
 // When the agent runs `git commit`, or `git merge` with a message, it rewrites
 // the command to add the record as a trailer:
-//   Session-Record: v1 k=<key> active=<seconds> human=<n> agents=<n> started=<time> [parent=<key>] [d=<device>]
+//   Session-Record: v2 k=<key> active=<seconds> human=<n> agents=<n> started=<time> [parent=<key>] [d=<device>] [s=<n>] [t=<tokens>]
+// v2 adds `s`, the skills it invoked (a count, never their names), and `t`, its
+// token counts so far, per model: `<model>:<input>/<output>/<5-minute cache
+// writes>/<1-hour cache writes>/<cache reads>`, models separated by commas.
+// Hooks report no token usage, so `t` is read from the session's transcript
+// when the trailer is added, which can lack the current turn: the next commit
+// catches it up (docs/adr/0003). An unreadable transcript leaves `t` out.
 // Counts only: the key is a hash, and no session id, path or text is written.
 // The device is a random id this script creates once per device, in the user's
 // config folder (`~/.config/agentic-metrics/device`), so that `collect` can say
@@ -33,7 +39,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
 
-export const RECORDER_VERSION = 1;
+export const RECORDER_VERSION = 2;
 const TRAILER = "Session-Record";
 /** A gap between two events longer than this counts as this much: the rest is idle. */
 const IDLE_CAP_MS = 5 * 60 * 1000;
@@ -65,7 +71,7 @@ function readState(file) {
   try {
     const state = JSON.parse(readFileSync(file, "utf8"));
     if (typeof state.started === "number" && typeof state.last === "number" && typeof state.activeMs === "number") {
-      return { started: state.started, last: state.last, activeMs: state.activeMs, human: Number(state.human) || 0 };
+      return { started: state.started, last: state.last, activeMs: state.activeMs, human: Number(state.human) || 0, skills: Number(state.skills) || 0 };
     }
   } catch {
     // No state yet, or an unreadable one: the session starts now.
@@ -242,11 +248,12 @@ function record(event) {
   let state = readState(file);
   if (!state) {
     prune(dir, now);
-    state = { started: now, last: now, activeMs: 0, human: 0 };
+    state = { started: now, last: now, activeMs: 0, human: 0, skills: 0 };
   }
   state.activeMs += Math.min(Math.max(now - state.last, 0), IDLE_CAP_MS);
   state.last = Math.max(now, state.last);
   if (agentId === undefined && event.hook_event_name === "UserPromptSubmit" && isHumanPrompt(event.prompt)) state.human++;
+  if (event.hook_event_name === "PostToolUse" && event.tool_name === "Skill") state.skills++;
   writeState(file, state);
 
   const agents = agentId === undefined ? readdirSync(dir).filter((name) => name.startsWith(`${sessionKey}.`) && name.endsWith(".json") && name !== `${sessionKey}.json`).length : 0;
@@ -254,16 +261,62 @@ function record(event) {
   if (agentId !== undefined) parts.push(`parent=${sessionKey}`);
   const device = deviceId();
   if (device !== undefined) parts.push(`d=${device}`);
-  return `${TRAILER}: ${parts.join(" ")}`;
+  parts.push(`s=${String(state.skills)}`);
+  return { parts, agentId };
+}
+
+/**
+ * The tokens a session (or one of its sub-agents) has used so far, per model,
+ * from its transcript: each API response once, by its message id, its last
+ * line holding its final usage. Undefined when the transcript can't be read.
+ */
+export function tokensOf(transcriptPath, agentId) {
+  if (typeof transcriptPath !== "string" || transcriptPath === "") return undefined;
+  const path = agentId === undefined ? transcriptPath : join(transcriptPath.replace(/\.jsonl$/, ""), "subagents", `agent-${agentId}.jsonl`);
+  let text;
+  try {
+    text = readFileSync(path, "utf8");
+  } catch {
+    return undefined;
+  }
+  const responses = new Map();
+  for (const line of text.split("\n")) {
+    if (!line.includes('"usage"')) continue;
+    let parsed;
+    try {
+      parsed = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    const message = parsed?.message;
+    const usage = message?.usage;
+    if (parsed?.type !== "assistant" || typeof message?.id !== "string" || typeof message.model !== "string" || message.model === "<synthetic>" || !usage) continue;
+    responses.set(message.id, { model: message.model, usage });
+  }
+  const count = (value) => (typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0);
+  const byModel = new Map();
+  for (const { model, usage } of responses.values()) {
+    const writes = count(usage.cache_creation_input_tokens);
+    const split = usage.cache_creation;
+    const write1h = split ? count(split.ephemeral_1h_input_tokens) : 0;
+    const write5m = Math.max(split ? count(split.ephemeral_5m_input_tokens) : writes, writes - write1h);
+    const sums = byModel.get(model) ?? [0, 0, 0, 0, 0];
+    const add = [count(usage.input_tokens), count(usage.output_tokens), write5m, write1h, count(usage.cache_read_input_tokens)];
+    byModel.set(model, sums.map((value, index) => value + add[index]));
+  }
+  return [...byModel].sort(([a], [b]) => (a < b ? -1 : 1)).map(([model, sums]) => `${model}:${sums.join("/")}`).join(",");
 }
 
 function run(input) {
   const event = JSON.parse(input);
   if (event === null || typeof event !== "object") return;
-  const trailer = record(event);
-  if (!trailer || event.hook_event_name !== "PreToolUse" || event.tool_name !== "Bash") return;
+  const recorded = record(event);
+  if (!recorded || event.hook_event_name !== "PreToolUse" || event.tool_name !== "Bash") return;
   const command = event.tool_input?.command;
   if (typeof command !== "string" || !/\bgit\b/.test(command) || command.includes(`${TRAILER}:`)) return;
+  // Read only when the record is about to be written: a transcript can be large.
+  const tokens = tokensOf(event.transcript_path, recorded.agentId);
+  const trailer = `${TRAILER}: ${[...recorded.parts, ...(tokens ? [`t=${tokens}`] : [])].join(" ")}`;
   const rewritten = addTrailer(command, trailer);
   if (rewritten === command || !gitAddsTrailers()) return;
   process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", updatedInput: { ...event.tool_input, command: rewritten } } }));

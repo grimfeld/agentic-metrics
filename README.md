@@ -45,7 +45,7 @@ Re-running is safe: an existing config or workflow is kept as it is (a conventio
 Transcripts stay on the device a session ran on, so work done on another machine, or in a Claude Code cloud session, has none. The recorder makes a session's counts travel with the repo instead: each commit a session makes carries a **session record** as a trailer.
 
 ```
-Session-Record: v1 k=3fa9c1d2e4b7 active=754 human=3 agents=2 started=2026-11-10T18:00:00Z
+Session-Record: v2 k=3fa9c1d2e4b7 active=754 human=3 agents=2 started=2026-11-10T18:00:00Z d=0a1b2c3d s=1 t=claude-opus-5-5:1200/340/5000/0/88000
 ```
 
 - `k`: an opaque key for the session (a hash; a sub-agent has its own, and names its parent's as `parent=`).
@@ -54,6 +54,8 @@ Session-Record: v1 k=3fa9c1d2e4b7 active=754 human=3 agents=2 started=2026-11-10
 - `agents`: the sub-agents it has spawned so far.
 - `started`: when it began.
 - `d`: a random id of the device it ran on, created once per device in `~/.config/agentic-metrics/device` (or under `$XDG_CONFIG_HOME`), never derived from the device's or the user's name. `doctor` prints this device's id, and names the device whose sessions have only records where it runs.
+- `s`: the skills Claude invoked so far, a count; never their names.
+- `t`: its tokens so far, per model: `<model>:<input>/<output>/<5-minute cache writes>/<1-hour cache writes>/<cache reads>`, models separated by commas. Hooks report no token usage, so the recorder reads it from the session's transcript when it adds the record; that can lack the current turn, which the next commit catches up (`docs/adr/0003`).
 
 Counts only: no session id, path or text. The device id is random. The record is public wherever the repo's history is.
 
@@ -61,7 +63,7 @@ The recorder is one script, `.agentic-metrics/recorder.mjs`, run by hooks in the
 
 To upgrade the recorder, run `init` again in the repo and commit the changed script. To remove it, delete the script and its entries from `.claude/settings.json`.
 
-`collect` reads the records from the commits it already loads, so nothing changes in how you run it. A session's counters are cumulative and one session can work on several tickets, so what a commit adds is the difference from that session's previous commit, and it goes to the ticket the commit belongs to. What a merge commit adds, or a commit of no ticket, is orchestration. Human messages per ticket, autonomy, sub-agents per ticket, orchestration time, active time and lead time's phases all read records as they read transcripts; API-equivalent cost does not (a record has no token counts), so a ticket known only through records has an unknown cost.
+`collect` reads the records from the commits it already loads, so nothing changes in how you run it. A session's counters are cumulative and one session can work on several tickets, so what a commit adds is the difference from that session's previous commit, and it goes to the ticket the commit belongs to. What a merge commit adds, or a commit of no ticket, is orchestration. Human messages per ticket, autonomy, sub-agents per ticket, orchestration time, active time and lead time's phases all read records as they read transcripts; API-equivalent cost reads a v2 record's token counts too, priced as a transcript's would be; a ticket known only through v1 records (written before tokens were) has an unknown cost.
 
 Limits: what a session does after its last commit is not recorded, and a session that never commits leaves nothing. Where a transcript is cached for the same session, `collect` reads the transcript and ignores its records. A sub-agent known only through records has no model. Squashing commits before the PR is opened keeps the records (the trailers are in the squashed message), but a squash that rewrites the message by hand can drop them.
 

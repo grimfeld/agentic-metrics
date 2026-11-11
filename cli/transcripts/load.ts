@@ -75,6 +75,8 @@ export interface Session {
     device?: string | undefined;
     /** Its commits carry a `Claude-Session:` trailer: it ran in a cloud session, whose transcript no device holds. */
     cloud?: boolean;
+    /** Every record it was read from held token counts (v2), so its responses give its cost. */
+    tokens?: boolean;
   };
 }
 

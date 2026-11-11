@@ -32,15 +32,44 @@ export interface SessionRecord {
   parent: string | undefined;
   /** The random id of the device the session ran on (`d=`); undefined in records written before it. */
   device?: string | undefined;
+  /** v2: the skills it invoked so far (`s=`), a count. */
+  skills?: number | undefined;
+  /**
+   * v2: its tokens so far (`t=`), per model: input, output, 5-minute and
+   * 1-hour cache writes, cache reads. Undefined when the record holds none.
+   */
+  tokens?: Map<string, TokenCounts> | undefined;
 }
 
-const LINE = /^[ \t]*session-record:[ \t]*v1[ \t]+(.*)$/gim;
+export type TokenCounts = [input: number, output: number, cacheWrite5m: number, cacheWrite1h: number, cacheRead: number];
+
+/** `model:a/b/c/d/e,model2:…`; undefined when malformed. */
+function parseTokens(text: string | undefined): Map<string, TokenCounts> | undefined {
+  if (text === undefined) return undefined;
+  const tokens = new Map<string, TokenCounts>();
+  for (const part of text.split(",")) {
+    const match = /^([\w.@:-]+):(\d+)\/(\d+)\/(\d+)\/(\d+)\/(\d+)$/.exec(part);
+    if (!match?.[1]) return undefined;
+    tokens.set(match[1], [Number(match[2]), Number(match[3]), Number(match[4]), Number(match[5]), Number(match[6])]);
+  }
+  return tokens;
+}
+
+const LINE = /^[ \t]*session-record:[ \t]*v[12][ \t]+(.*)$/gim;
 
 /** The session records in a commit message's body: one per session, its highest counters when a session wrote several. */
 export function parseRecords(body: string): SessionRecord[] {
   const byKey = new Map<string, SessionRecord>();
   for (const [, rest = ""] of body.matchAll(LINE)) {
-    const fields = new Map(rest.trim().split(/\s+/).map((field) => field.split("=", 2) as [string, string | undefined]));
+    const fields = new Map(
+      rest
+        .trim()
+        .split(/\s+/)
+        .map((field) => {
+          const at = field.indexOf("=");
+          return (at < 0 ? [field, undefined] : [field.slice(0, at), field.slice(at + 1)]) as [string, string | undefined];
+        }),
+    );
     const key = fields.get("k");
     const count = (name: string) => (/^\d+$/.test(fields.get(name) ?? "") ? Number(fields.get(name)) : undefined);
     const active = count("active");
@@ -57,6 +86,8 @@ export function parseRecords(body: string): SessionRecord[] {
       startedAt: Number.isFinite(started) ? new Date(started) : undefined,
       parent: parent !== undefined && /^[0-9a-f]{6,64}$/.test(parent) ? parent : undefined,
       ...(device !== undefined && /^[0-9a-f]{8}$/.test(device) ? { device } : {}),
+      ...(count("s") !== undefined && { skills: count("s") }),
+      ...(parseTokens(fields.get("t")) && { tokens: parseTokens(fields.get("t")) }),
     };
     const seen = byKey.get(key);
     if (!seen || record.activeMs > seen.activeMs) byKey.set(key, record);
@@ -82,6 +113,8 @@ interface Step {
   agentsBefore: number;
   /** The session's previous commit, which the time this one added cannot precede. */
   after: number | undefined;
+  /** The tokens this commit added, per model; undefined when its record holds none. */
+  tokens: Map<string, TokenCounts> | undefined;
 }
 
 const ORCHESTRATION = "orchestration" as const;
@@ -129,6 +162,7 @@ export function linkRecords(work: LinkedWork, loaded: readonly Session[]): Linke
         humanBefore: before?.record.human ?? 0,
         agentsBefore: before?.record.agents ?? 0,
         after: before?.commit.authoredAt?.getTime(),
+        tokens: tokensAdded(entry.record.tokens, before?.record.tokens),
       };
       before = entry;
       const owned: Owner[] = owners.get(entry.commit.oid) ?? [ORCHESTRATION];
@@ -148,6 +182,17 @@ export function linkRecords(work: LinkedWork, loaded: readonly Session[]): Linke
     tickets,
     transcripts: { sessions: work.transcripts.sessions + added, orchestration: [...work.transcripts.orchestration, ...orchestration] },
   };
+}
+
+/** What one record's tokens add to the one before; undefined when it holds none. */
+function tokensAdded(now: Map<string, TokenCounts> | undefined, before: Map<string, TokenCounts> | undefined): Map<string, TokenCounts> | undefined {
+  if (!now) return undefined;
+  const added = new Map<string, TokenCounts>();
+  for (const [model, counts] of now) {
+    const earlier = before?.get(model);
+    added.set(model, counts.map((value, index) => Math.max(0, value - (earlier?.[index] ?? 0))) as TokenCounts);
+  }
+  return added;
 }
 
 /** What a session's commits added to one owner, as a session the metrics can read. */
@@ -172,6 +217,7 @@ function sessionOf(key: string, steps: readonly Step[]): Session {
       parent: record?.parent === undefined ? undefined : `record:${record.parent}`,
       device: steps.find((step) => step.record.device !== undefined)?.record.device,
       cloud: steps.some((step) => step.commit.cloudSession),
+      tokens: steps.length > 0 && steps.every((step) => step.tokens !== undefined),
     },
     branches: new Map(),
     cwds: [],
@@ -180,7 +226,27 @@ function sessionOf(key: string, steps: readonly Step[]): Session {
     activeMs: activity.reduce((sum, [from, to]) => sum + (to - from), 0),
     activity,
     startedAt: activity[0] ? new Date(activity[0][0]) : (record?.startedAt ?? steps[0]?.commit.authoredAt),
-    responses: [],
+    // Each commit's tokens as one response per model: its id names the commit, so a commit on two tickets counts once in totals.
+    responses: steps.flatMap((step) =>
+      [...(step.tokens ?? [])].flatMap(([model, [input, output, write5m, write1h, read]]) =>
+        input + output + write5m + write1h + read === 0
+          ? []
+          : [
+              {
+                id: `${id}:tokens:${step.commit.oid}:${model}`,
+                model,
+                inputTokens: input,
+                outputTokens: output,
+                cacheWrite5mTokens: write5m,
+                cacheWrite1hTokens: write1h,
+                cacheReadTokens: read,
+                webSearchRequests: 0,
+                inferenceGeo: undefined,
+                speed: undefined,
+              },
+            ],
+      ),
+    ),
     spawns,
   };
 }

@@ -76,8 +76,8 @@ export const apiEquivalentCost: Metric<ApiEquivalentCost> = {
   name: "API-equivalent cost",
 
   compute({ tickets, transcripts }) {
-    // A session read from session records has no API response: its cost is unknown, not $0.
-    const withTranscripts = tickets.filter((ticket) => ticket.sessions.some((session) => !session.recorded));
+    // A session read from v1 session records has no API response: its cost is unknown, not $0. A v2 record carries its tokens.
+    const withTranscripts = tickets.filter((ticket) => ticket.sessions.some((session) => !session.recorded || session.recorded.tokens === true));
     const coverage = { tickets: withTranscripts.length, of: tickets.length };
     if (withTranscripts.length === 0) return { value: UNKNOWN, coverage };
 

@@ -62,7 +62,7 @@ function rewritten(time: string, command: string, extra: Record<string, unknown>
   return parsed.hookSpecificOutput.updatedInput;
 }
 
-const record = (command: string | undefined) => /Session-Record: (v1 k=([0-9a-f]{12}) active=(\d+) human=(\d+) agents=(\d+) started=(\S+?)(?: parent=([0-9a-f]{12}))?(?: d=([0-9a-f]{8}))?)"/.exec(command ?? "");
+const record = (command: string | undefined) => /Session-Record: (v2 k=([0-9a-f]{12}) active=(\d+) human=(\d+) agents=(\d+) started=(\S+?)(?: parent=([0-9a-f]{12}))?(?: d=([0-9a-f]{8}))?(?: s=(\d+))?(?: t=(\S+))?)"/.exec(command ?? "");
 
 describe("recorder: counters", () => {
   it("records a session's human messages, active time and start on the commit it makes", () => {
@@ -187,8 +187,8 @@ describe("recorder: end to end", () => {
     assert.equal(commit.status, 0, commit.stderr);
 
     const body = git("log", "-1", "--format=%b").stdout;
-    assert.match(git("log", "-1", "--format=%(trailers:key=Session-Record)").stdout, /^Session-Record: v1 k=[0-9a-f]{12} active=240 human=1 agents=0 started=2026-11-10T18:00:00Z d=0a1b2c3d\n+$/);
-    assert.deepEqual(parseRecords(body), [{ key: recordKey(SESSION), activeMs: 240_000, human: 1, agents: 0, startedAt: new Date("2026-11-10T18:00:00Z"), parent: undefined, device: DEVICE }]);
+    assert.match(git("log", "-1", "--format=%(trailers:key=Session-Record)").stdout, /^Session-Record: v2 k=[0-9a-f]{12} active=240 human=1 agents=0 started=2026-11-10T18:00:00Z d=0a1b2c3d s=0\n+$/);
+    assert.deepEqual(parseRecords(body), [{ key: recordKey(SESSION), activeMs: 240_000, human: 1, agents: 0, startedAt: new Date("2026-11-10T18:00:00Z"), parent: undefined, device: DEVICE, skills: 0 }]);
     // The state it keeps is not something git would commit.
     assert.equal(git("status", "--porcelain").stdout, "");
   });
@@ -265,4 +265,37 @@ describe("recorder: rewriting the command", () => {
       assert.equal(addTrailer(command, T), command);
     });
   }
+});
+
+describe("recorder: v2 tokens and skills", () => {
+  /** A transcript with two responses of one model (one written twice) and one of another, and a local placeholder. */
+  function transcript(): string {
+    const path = join(configDir, "session.jsonl");
+    const usage = (input: number, output: number) => ({ input_tokens: input, output_tokens: output, cache_creation_input_tokens: 30, cache_creation: { ephemeral_5m_input_tokens: 10, ephemeral_1h_input_tokens: 20 }, cache_read_input_tokens: 5 });
+    const line = (id: string, model: string, input: number, output: number) => JSON.stringify({ type: "assistant", message: { id, model, usage: usage(input, output) } });
+    writeFileSync(path, [line("m1", "claude-opus-5-5", 100, 10), line("m1", "claude-opus-5-5", 100, 12), line("m2", "claude-opus-5-5", 50, 5), line("m3", "claude-haiku-5-5", 7, 1), line("m4", "<synthetic>", 9, 9)].join("\n"));
+    return path;
+  }
+
+  it("adds the session's tokens so far, per model, each response once", () => {
+    const out = rewritten("18:00", 'git commit -m "x"', { transcript_path: transcript() });
+
+    assert.equal(record(out?.command)?.[10], "claude-haiku-5-5:7/1/10/20/5,claude-opus-5-5:150/17/20/40/10");
+  });
+
+  it("leaves the tokens out when the transcript can't be read, and still writes the record", () => {
+    const out = rewritten("18:00", 'git commit -m "x"', { transcript_path: join(configDir, "missing.jsonl") });
+
+    assert.ok(record(out?.command));
+    assert.equal(record(out?.command)?.[10], undefined);
+  });
+
+  it("counts the skills Claude invoked, never their names", () => {
+    hook("18:00", { hook_event_name: "PostToolUse", tool_name: "Skill", tool_input: { skill: "secret-plan" } });
+    hook("18:01", { hook_event_name: "PostToolUse", tool_name: "Skill", tool_input: { skill: "grilling" } });
+    const out = rewritten("18:02", 'git commit -m "x"');
+
+    assert.equal(record(out?.command)?.[9], "2");
+    assert.doesNotMatch(out?.command ?? "", /secret-plan|grilling/);
+  });
 });

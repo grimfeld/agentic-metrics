@@ -322,9 +322,9 @@ describe("init", () => {
       // From a sub-folder, with the project folder given: the commit is rewritten.
       mkdirSync(join(cwd, "src"));
       const fromSubfolder = spawnSync("sh", ["-c", COMMAND], { cwd: join(cwd, "src"), input: event, encoding: "utf8", env: { PATH: process.env["PATH"] ?? "", CLAUDE_PROJECT_DIR: cwd } });
-      assert.match(fromSubfolder.stdout, /git commit --trailer \\"Session-Record: v1 /);
+      assert.match(fromSubfolder.stdout, /git commit --trailer \\"Session-Record: v2 /);
       // With no project folder in the environment, the current folder stands for it.
-      assert.match(run({}).stdout, /Session-Record: v1 /);
+      assert.match(run({}).stdout, /Session-Record: v2 /);
       // A script that is gone is silent, and exits 0.
       rmSync(join(cwd, SCRIPT));
       const gone = run({ CLAUDE_PROJECT_DIR: cwd });
