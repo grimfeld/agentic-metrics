@@ -62,6 +62,8 @@ export interface Session {
    * whose friction is unknown.
    */
   friction?: Friction;
+  /** The skills it used, each by the id of its line or tool use. Absent for a session read from records. */
+  skills?: SkillUse[];
   /**
    * Set for a session read from session records (`records.ts`), not from a
    * transcript: it has counts and activity but no API response, so its cost is
@@ -91,6 +93,15 @@ export interface ApiResponse {
   inferenceGeo: string | undefined;
   /** `usage.speed`, e.g. `standard` or `fast`. */
   speed: string | undefined;
+}
+
+export interface SkillUse {
+  /** The line or tool use that loaded it; never published. */
+  id: string;
+  /** The skill's name, as typed (`grill-with-docs`) or invoked (`plugin:name`). */
+  name: string;
+  /** Typed by a person as a slash command, else invoked by Claude with the Skill tool. */
+  typed: boolean;
 }
 
 export interface Friction {
@@ -127,6 +138,9 @@ export function loadSessions(files: TranscriptFile[]): Session[] {
     const agentToolUses = new Set<string>();
     const spawns = new Map<string, AgentSpawn>();
     const friction: Friction = { interrupts: [], toolErrors: [], denials: [], compactions: [] };
+    const skills = new Map<string, SkillUse>();
+    /** A slash command just typed: a skill if the next meta line loads one. */
+    let command: { name: string; id: string } | undefined;
     let sessionId: string | undefined;
 
     for (const raw of file.lines) {
@@ -154,6 +168,16 @@ export function loadSessions(files: TranscriptFile[]): Session[] {
       const spawn = agentSpawn(raw, agentToolUses);
       if (spawn) spawns.set(spawn.agentId, spawn);
       if (uuid) frictionOf(raw, uuid, friction);
+      for (const use of invokedSkills(raw)) skills.set(use.id, use);
+      if (raw["type"] === "user" && uuid) {
+        const text = lineText(raw);
+        const typed = /<command-name>\/([^<\s]+)<\/command-name>/.exec(text ?? "")?.[1];
+        if (typed !== undefined && raw["isMeta"] !== true) command = { name: typed, id: uuid };
+        else if (command && raw["isMeta"] === true && text?.startsWith("Base directory for this skill:")) {
+          skills.set(command.id, { id: command.id, name: command.name, typed: true });
+          command = undefined;
+        } else if (raw["isMeta"] !== true) command = undefined;
+      }
     }
 
     times.sort((a, b) => a - b);
@@ -172,6 +196,7 @@ export function loadSessions(files: TranscriptFile[]): Session[] {
       startedAt: times[0] === undefined ? undefined : new Date(times[0]),
       responses: [...responses.values()],
       spawns: [...spawns.values()],
+      skills: [...skills.values()],
       friction: {
         interrupts: [...new Set(friction.interrupts)],
         toolErrors: [...new Set(friction.toolErrors)],
@@ -180,6 +205,31 @@ export function loadSessions(files: TranscriptFile[]): Session[] {
       },
     };
   });
+}
+
+/** The skills a line of Claude's invokes with the Skill tool. */
+function invokedSkills(line: Record<string, unknown>): SkillUse[] {
+  if (line["type"] !== "assistant") return [];
+  const message = line["message"];
+  const content = isRecord(message) ? message["content"] : undefined;
+  if (!Array.isArray(content)) return [];
+  return content.flatMap((block) => {
+    if (!isRecord(block) || block["type"] !== "tool_use" || block["name"] !== "Skill") return [];
+    const input = block["input"];
+    const name = isRecord(input) ? str(input["skill"]) : undefined;
+    const id = str(block["id"]);
+    return name && id ? [{ id, name, typed: false }] : [];
+  });
+}
+
+/** A line's text: its content when a string, else its first text block. */
+function lineText(line: Record<string, unknown>): string | undefined {
+  const message = line["message"];
+  const content = isRecord(message) ? message["content"] : undefined;
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return undefined;
+  const text: unknown = (content as unknown[]).find((block) => isRecord(block) && block["type"] === "text");
+  return isRecord(text) ? str(text["text"]) : undefined;
 }
 
 /** A refused tool call's result: refused by the person, or by the permission mode. */

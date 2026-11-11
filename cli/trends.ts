@@ -7,6 +7,7 @@ import { AUTONOMY_LEVELS, type AutonomyLevel } from "./autonomy.ts";
 import type { LinkedWork, Ticket } from "./linker.ts";
 import type { FigureResult, Metric, MetricResult } from "./metrics/metric.ts";
 import { SUPPRESSED, UNKNOWN } from "./metrics/metric.ts";
+import { ticketSkills } from "./metrics/skills.ts";
 import type { PullRequest, WorkflowRun } from "./github/load.ts";
 import type { Session } from "./transcripts/load.ts";
 
@@ -117,4 +118,40 @@ export function byAutonomy(work: LinkedWork, metrics: readonly Metric<unknown>[]
         Object.fromEntries(slices.map(([level, slice]) => [level, figureOf(metric, metric.compute(slice), (value) => publish(metric, value))])),
       ]),
   ) as ByAutonomy;
+}
+
+/** A skill gets a comparison once this many tickets used it: fewer, and the comparison is noise. */
+export const MIN_SKILL_TICKETS = 5;
+
+/** Per skill used on MIN_SKILL_TICKETS tickets or more: each metric's figure over the tickets that used it, and over those with transcripts that didn't. */
+export type BySkill = Record<string, { tickets: number; metrics: Record<string, { with: FigureResult; without: FigureResult }> }>;
+
+export function bySkill(work: LinkedWork, metrics: readonly Metric<unknown>[], publish: Publish): BySkill {
+  const used = new Map<Ticket, Set<string>>();
+  for (const ticket of work.tickets) {
+    const uses = ticketSkills(ticket);
+    if (uses) used.set(ticket, new Set(uses.map((use) => use.name)));
+  }
+  const counts = new Map<string, number>();
+  for (const names of used.values()) for (const name of names) counts.set(name, (counts.get(name) ?? 0) + 1);
+  const compared = metrics.filter((metric) => metric.figure && metric.figure.byAutonomy !== false && metric.id !== "skills");
+  const out: BySkill = {};
+  for (const [name, tickets] of [...counts].sort(([a], [b]) => a.localeCompare(b))) {
+    if (tickets < MIN_SKILL_TICKETS) continue;
+    const withSkill = sliceWork(work, [...used].filter(([, names]) => names.has(name)).map(([ticket]) => ticket));
+    const without = sliceWork(work, [...used].filter(([, names]) => !names.has(name)).map(([ticket]) => ticket));
+    out[name] = {
+      tickets,
+      metrics: Object.fromEntries(
+        compared.map((metric) => [
+          metric.id,
+          {
+            with: figureOf(metric, metric.compute(withSkill), (value) => publish(metric, value)),
+            without: figureOf(metric, metric.compute(without), (value) => publish(metric, value)),
+          },
+        ]),
+      ),
+    };
+  }
+  return out;
 }

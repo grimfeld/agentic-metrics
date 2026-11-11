@@ -77,6 +77,29 @@ function charts(repo: SiteRepo, metric: Metric<unknown>): string[] {
     const title = `${metric.name} by autonomy level`;
     cards.push(card("by-autonomy", title, renderChart(comparison, { id: `autonomy-${metric.id}`, title })));
   }
+  const skills = Object.entries(dataset.bySkill ?? {}).flatMap(([name, { tickets, metrics }]) => {
+    const pair = metrics[metric.id];
+    return pair ? [{ name, tickets, ...pair }] : [];
+  });
+  if (skills.length > 0) {
+    const rows = skills
+      .map(
+        (row) =>
+          `<tr data-skill="${escapeHtml(row.name)}"><td>${escapeHtml(row.name)}</td><td>${figureValue(figure, row.with)} <small>${coverageText(row.with.coverage)}</small></td><td>${figureValue(figure, row.without)} <small>${coverageText(row.without.coverage)}</small></td></tr>`,
+      )
+      .join("\n");
+    cards.push(
+      card(
+        "by-skill",
+        `${metric.name} by skill`,
+        `<p class="coverage">${escapeHtml(figure.label)}, over the tickets that used each skill and the tickets with transcripts that didn't; skills used on 5 tickets or more.</p>
+<div class="scroll"><table><thead><tr><th>Skill</th><th>Used</th><th>Not used</th></tr></thead><tbody>
+${rows}
+</tbody></table></div>`,
+        true,
+      ),
+    );
+  }
   return cards;
 }
 

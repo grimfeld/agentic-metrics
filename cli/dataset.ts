@@ -10,7 +10,7 @@ import type { LinkedWork } from "./linker.ts";
 import { METRICS } from "./metrics/index.ts";
 import type { FigureResult, Metric, MetricResult } from "./metrics/metric.ts";
 import { UNKNOWN } from "./metrics/metric.ts";
-import { anonymizeByAutonomy, anonymizeTrends, byAutonomy, trends, type ByAutonomy, type Trends } from "./trends.ts";
+import { anonymizeByAutonomy, anonymizeTrends, byAutonomy, bySkill, trends, type ByAutonomy, type BySkill, type Trends } from "./trends.ts";
 
 export const SCHEMA_VERSION = 2;
 
@@ -41,6 +41,8 @@ export interface Dataset {
   trends?: Trends;
   /** Each metric's figure per autonomy level. Absent from datasets written before the comparison. */
   byAutonomy?: ByAutonomy;
+  /** Each metric's figure with and without each skill used on 5 tickets or more. Absent when anonymized, and from older datasets. */
+  bySkill?: BySkill;
   /** Data the metrics need that is missing, and how to fill it (`gaps.ts`). Absent from datasets written before gaps: read as none. */
   gaps?: Gap[];
   /** The repo's GitHub page. Absent when anonymized. */
@@ -92,6 +94,7 @@ export function buildDataset(repo: Repo, work: LinkedWork, now: Date, publish: P
       return { id: ticket.id, title: source?.title ?? "", url: source?.url ?? "", doneAt: ticket.doneAt.toISOString() };
     }),
     caseStudyCandidates: selectCandidates(work),
+    bySkill: bySkill(work, METRICS, publishValue),
   };
 }
 

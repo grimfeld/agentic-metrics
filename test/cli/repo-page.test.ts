@@ -121,6 +121,7 @@ describe("repo page: chart grid", () => {
       "friction",
       "orchestrationTime",
       "subAgents",
+      "skills",
       "apiEquivalentCost",
       "autonomy",
       "testRatio",
