@@ -62,6 +62,8 @@ export interface Session {
    * whose friction is unknown.
    */
   friction?: Friction;
+  /** A copy of a cloud session brought here by `claude --teleport` (a `remote_session_change` line): its records win over it (docs/adr/0004). */
+  teleported?: boolean;
   /** The skills it used, each by the id of its line or tool use. Absent for a session read from records. */
   skills?: SkillUse[];
   /**
@@ -144,6 +146,7 @@ export function loadSessions(files: TranscriptFile[]): Session[] {
     /** A slash command just typed: a skill if the next meta line loads one. */
     let command: { name: string; id: string } | undefined;
     let sessionId: string | undefined;
+    let teleported = false;
 
     for (const raw of file.lines) {
       if (!isRecord(raw)) continue;
@@ -170,6 +173,7 @@ export function loadSessions(files: TranscriptFile[]): Session[] {
       const spawn = agentSpawn(raw, agentToolUses);
       if (spawn) spawns.set(spawn.agentId, spawn);
       if (uuid) frictionOf(raw, uuid, friction);
+      if (raw["type"] === "attachment" && isRecord(raw["attachment"]) && raw["attachment"]["type"] === "remote_session_change") teleported = true;
       for (const use of invokedSkills(raw)) skills.set(use.id, use);
       if (raw["type"] === "user" && uuid) {
         const text = lineText(raw);
@@ -198,6 +202,7 @@ export function loadSessions(files: TranscriptFile[]): Session[] {
       startedAt: times[0] === undefined ? undefined : new Date(times[0]),
       responses: [...responses.values()],
       spawns: [...spawns.values()],
+      ...(teleported && { teleported }),
       skills: [...skills.values()],
       friction: {
         interrupts: [...new Set(friction.interrupts)],

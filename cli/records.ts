@@ -175,8 +175,14 @@ export function linkRecords(work: LinkedWork, loaded: readonly Session[]): Linke
 
   const recorded = (owner: Owner): Session[] => claimSpawns([...(shares.get(owner) ?? [])].map(([key, steps]) => sessionOf(key, steps)));
   const orchestration = recorded(ORCHESTRATION);
-  const tickets = work.tickets.map((ticket) => (shares.has(ticket) ? { ...ticket, sessions: [...ticket.sessions, ...recorded(ticket)] } : ticket));
-  const added = tickets.reduce((sum, ticket, index) => sum + ticket.sessions.length - (work.tickets[index]?.sessions.length ?? 0), 0) + orchestration.length;
+  // A teleported copy of a cloud session can't be matched to its records by key (docs/adr/0004): on a ticket with records from cloud commits, the records win.
+  const tickets = work.tickets.map((ticket) => {
+    if (!shares.has(ticket)) return ticket;
+    const fromRecords = recorded(ticket);
+    const cloud = fromRecords.some((session) => session.recorded?.cloud === true);
+    return { ...ticket, sessions: [...ticket.sessions.filter((session) => !(cloud && session.teleported)), ...fromRecords] };
+  });
+  const added = tickets.reduce((sum, ticket, index) => sum + Math.max(0, ticket.sessions.length - (work.tickets[index]?.sessions.length ?? 0)), 0) + orchestration.length;
   return {
     ...work,
     tickets,

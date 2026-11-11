@@ -320,3 +320,35 @@ describe("session records: v2 tokens", () => {
     assert.deepEqual(dataset.metrics["apiEquivalentCost"]?.value, "unknown");
   });
 });
+
+describe("session records: teleported copies", () => {
+  /** A teleported copy of a cloud session: a new local id, one human message, and its `remote_session_change` line. */
+  const teleported = (sessionId: string, marked = true) => [
+    ...(marked ? [{ type: "attachment", sessionId, uuid: "t0", timestamp: at(4), attachment: { type: "remote_session_change" } }] : []),
+    { type: "user", sessionId, uuid: "t1", timestamp: at(4), gitBranch: "ticket-1", cwd: "/Users/dev/repos/lifeline", message: { role: "user", content: "Implement the ticket" } },
+    { type: "assistant", sessionId, uuid: "t2", timestamp: at(4.5), gitBranch: "ticket-1", cwd: "/Users/dev/repos/lifeline" },
+  ];
+  const cloudCommit = { at: 5, oid: "c1", body: `${record(A, 300, 9)}\nClaude-Session: https://claude.ai/code/session_01ABC` };
+
+  it("reads the cloud session's records, not its teleported copy, when the ticket has both", async () => {
+    const github = fakeGitHub([1], [{ number: 10, head: "ticket-1", closes: [1], mergedAfter: 10, commits: [cloudCommit] }]);
+    const { dataset } = await collect(github, [{ session: "local-copy", lines: teleported("local-copy") }]);
+
+    assert.deepEqual(human(dataset).perTicket, [{ ticket: "#1", messages: 9 }]);
+    assert.deepEqual(human(dataset).sources, { transcripts: 0, records: 1 });
+  });
+
+  it("reads a teleported copy when no record covers the ticket", async () => {
+    const github = fakeGitHub([1], [{ number: 10, head: "ticket-1", closes: [1], mergedAfter: 10, commits: [{ at: 5, oid: "c1", body: "Claude-Session: https://claude.ai/code/session_01ABC" }] }]);
+    const { dataset } = await collect(github, [{ session: "local-copy", lines: teleported("local-copy") }]);
+
+    assert.deepEqual(human(dataset).perTicket, [{ ticket: "#1", messages: 1, interrupts: 0 }]);
+  });
+
+  it("keeps an ordinary transcript beside cloud records", async () => {
+    const github = fakeGitHub([1], [{ number: 10, head: "ticket-1", closes: [1], mergedAfter: 10, commits: [cloudCommit] }]);
+    const { dataset } = await collect(github, [{ session: "local", lines: teleported("local", false) }]);
+
+    assert.deepEqual(human(dataset).sources, { transcripts: 1, records: 0 });
+  });
+});
