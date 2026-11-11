@@ -183,6 +183,7 @@ The report is a static site of linked pages, each with a sidebar listing them al
 
 - `index.html`, the overview: the headline tiles pooled over the repos published `full` (each naming the repos it covers and those it is unknown for), a table comparing every repo, every repo's CV-ready sentences, and a card per repo.
 - `<owner>--<name>/index.html` (or `<alias>/index.html`), a repo: a number tile per metric with a sparkline of its monthly trend, a grid of charts, the CV-ready sentences with a Copy button, and its approved case studies.
+- `<owner>--<name>/coverage.html`, a repo's data coverage: each metric's coverage, the gaps that hold it back, and each gap with its fix (counts only for an anonymized repo).
 - `<owner>--<name>/<metric-id>.html`, a metric of a repo: its tiles (including its figure at each autonomy level, `full`, `assisted`, `manual`), its chart, its figure by month and by autonomy level, its summary, its per-ticket table (sortable by any column; never for an anonymized repo), its monthly trend as a table, and its definition.
 - `<owner>--<name>/case-studies/<N>.html`, an approved case study, titled by its opening heading.
 - `methodology.html`: every metric's definition and limits, with its coverage per repo, and links to the raw datasets, copied to `datasets/` beside the pages.

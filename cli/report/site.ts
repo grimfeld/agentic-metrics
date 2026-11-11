@@ -6,6 +6,7 @@
 //   index.html                              overview
 //   methodology.html                        Methodology
 //   <repo>/index.html                       a repo
+//   <repo>/coverage.html                    a repo's data coverage and gaps
 //   <repo>/<metric-id>.html                 a metric of a repo
 //   <repo>/case-studies/<n>.html            an approved case study (`full` repos only)
 //   datasets/<owner>/<name>.json            the raw datasets, copied beside the pages
@@ -59,6 +60,7 @@ export const PATHS = {
   overview: "index.html",
   methodology: "methodology.html",
   repo: (repo: SiteRepo) => `${repo.dir}/index.html`,
+  coverage: (repo: SiteRepo) => `${repo.dir}/coverage.html`,
   metric: (repo: SiteRepo, metric: Metric<unknown>) => `${repo.dir}/${metric.id}.html`,
   caseStudy: (repo: SiteRepo, study: SiteStudy) => `${repo.dir}/case-studies/${study.slug}.html`,
   dataset: (repo: SiteRepo) => `datasets/${datasetPath(repo.dataset.repo)}`,

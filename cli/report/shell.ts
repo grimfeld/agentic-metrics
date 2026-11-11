@@ -97,7 +97,7 @@ function repoNav(ctx: PageContext, repo: SiteRepo): string {
     : "";
   const what = repo.studies.length ? "Metrics and case studies" : "Metrics";
   return `${navLink(ctx, PATHS.repo(repo), escapeHtml(repo.dataset.repo), String(repo.dataset.tickets))}
-<details class="sub"${open ? " open" : ""}><summary>${what}</summary>${metrics}${studies}</details>`;
+<details class="sub"${open ? " open" : ""}><summary>${what}</summary>${navLink(ctx, PATHS.coverage(repo), "Data coverage", String(repo.dataset.gaps?.length ?? 0))}${metrics}${studies}</details>`;
 }
 
 function sidebar(ctx: PageContext): string {

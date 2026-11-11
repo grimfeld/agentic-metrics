@@ -91,6 +91,7 @@ export function repoPage(ctx: PageContext, repo: SiteRepo): string {
     chip(`collected ${escapeHtml(dataset.generatedAt.slice(0, 10))}`),
     dataset.url ? chip("GitHub", dataset.url) : "",
     chip("raw dataset", ctx.link(PATHS.dataset(repo))),
+    chip(`data coverage: ${String(dataset.gaps?.length ?? 0)} gaps`, ctx.link(PATHS.coverage(repo))),
   ].join("");
   const sentences = sentenceSection(dataset).replace(/^<section class="([^"]*)"/, '<section class="$1 card wide"');
   const studies = studyCards(ctx, repo);

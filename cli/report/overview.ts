@@ -61,12 +61,12 @@ function comparison(ctx: PageContext): string {
         return `<td>${headlineValue(metric, result)}${result ? `<br><small>${coverageText(result.coverage)}</small>` : ""}</td>`;
       }).join("");
       const name = escapeHtml(dataset.repo);
-      return `<tr data-repo="${name}"><td><a href="${escapeHtml(ctx.link(PATHS.repo(repo)))}">${name}</a></td><td>${dataset.publish}</td><td>${String(dataset.tickets)}</td><td>${String(dataset.pullRequests)}</td>${cells}</tr>`;
+      return `<tr data-repo="${name}"><td><a href="${escapeHtml(ctx.link(PATHS.repo(repo)))}">${name}</a></td><td>${dataset.publish}</td><td>${String(dataset.tickets)}</td><td>${String(dataset.pullRequests)}</td><td><a href="${escapeHtml(ctx.link(PATHS.coverage(repo)))}">${String(dataset.gaps?.length ?? 0)}</a></td>${cells}</tr>`;
     })
     .join("\n");
   return `<section class="card" data-section="repos"><h2>Repos</h2>
 <p class="coverage">Each repo's own figures. An anonymized repo is shown under its alias, with aggregates only.</p>
-<div class="scroll"><table><thead><tr><th>Repo</th><th>Published</th><th>Tickets</th><th>PRs</th>${head}</tr></thead><tbody>
+<div class="scroll"><table><thead><tr><th>Repo</th><th>Published</th><th>Tickets</th><th>PRs</th><th>Gaps</th>${head}</tr></thead><tbody>
 ${rows}
 </tbody></table></div></section>`;
 }
