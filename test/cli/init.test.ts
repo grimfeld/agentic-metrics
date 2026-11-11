@@ -154,13 +154,13 @@ describe("init", () => {
     assert.deepEqual(created, []);
   });
 
-  it("creates the regression and autonomy labels that are missing", async () => {
+  it("creates the regression, autonomy and kind labels that are missing", async () => {
     const { admin, created } = fakeGitHub({ labels: ["bug", "Regression"] });
     assert.equal(await init(admin), 0, stderr);
 
     assert.deepEqual(
       created.map((label) => label.name),
-      ["autonomy:full", "autonomy:assisted", "autonomy:manual"],
+      ["autonomy:full", "autonomy:assisted", "autonomy:manual", "kind:feature", "kind:fix", "kind:refactor", "kind:chore", "kind:docs", "kind:test"],
     );
     for (const label of created) assert.match(label.color, /^[0-9a-f]{6}$/);
   });

@@ -9,7 +9,7 @@ import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { DEFAULT_BRANCH_REGEX } from "./branch.ts";
 import { CONFIG_FILE, isAlias, readConfig, type PublishMode } from "./config.ts";
-import { ACTION_WORKFLOW, REGRESSION_LABEL } from "./conventions.ts";
+import { ACTION_WORKFLOW, KINDS, REGRESSION_LABEL } from "./conventions.ts";
 import type { Inferred } from "./infer.ts";
 import { installRecorder } from "./recorder-install.ts";
 
@@ -85,6 +85,7 @@ export const LABELS: readonly Label[] = [
   { name: "autonomy:full", color: "0e8a16", description: "agentic-metrics: override the computed autonomy level" },
   { name: "autonomy:assisted", color: "fbca04", description: "agentic-metrics: override the computed autonomy level" },
   { name: "autonomy:manual", color: "d93f0b", description: "agentic-metrics: override the computed autonomy level" },
+  ...KINDS.map((kind) => ({ name: `kind:${kind}`, color: "c5def5", description: "agentic-metrics: the kind of change a ticket made" })),
 ];
 
 /** Onboards the repo at `cwd`; returns the lines to report, one per step. */

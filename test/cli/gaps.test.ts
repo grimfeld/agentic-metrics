@@ -227,7 +227,7 @@ describe("gaps: devices", () => {
 
 describe("gaps: cloud sessions", () => {
   const commit = (cloudSessionId?: string, records: unknown[] = []) => ({ cloudSession: cloudSessionId !== undefined, cloudSessionId, records });
-  const ticket = (id: string, commits: unknown[], sessions: unknown[] = []) => ({ id, sessions, pullRequests: [{ commits }], batchCommits: [] });
+  const ticket = (id: string, commits: unknown[], sessions: unknown[] = []) => ({ id, sessions, pullRequests: [{ commits, labels: [] }], batchCommits: [] });
 
   function cloud(tickets: unknown[], publish: "full" | "anonymized" = "full") {
     const work = { tickets, transcripts: { sessions: 0, orchestration: [] }, ci: { mainWorkflow: "check.yml" } } as unknown as LinkedWork;

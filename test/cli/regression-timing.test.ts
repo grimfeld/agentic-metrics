@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 
 const day = (n: number) => new Date(Date.UTC(2026, 9, n));
 
-const ticket = (id: string, done: number, prs: Partial<PullRequest>[] = []) => ({ id, doneAt: day(done), sessions: [], batchCommits: [], pullRequests: prs.map((pr, index) => ({ number: 100 + index, filesComplete: true, commits: [], ...pr })) }) as unknown as Ticket;
+const ticket = (id: string, done: number, prs: Partial<PullRequest>[] = []) => ({ id, doneAt: day(done), sessions: [], batchCommits: [], pullRequests: prs.map((pr, index) => ({ number: 100 + index, filesComplete: true, commits: [], labels: [], ...pr })) }) as unknown as Ticket;
 
 function work(tickets: Ticket[], regressions: RegressionIssue[], inferredRegressions: InferredRegression[] = []): LinkedWork {
   return { tickets, regressions, inferredRegressions, transcripts: { sessions: 0, orchestration: [] }, ci: { mainWorkflow: "check.yml" } } as unknown as LinkedWork;

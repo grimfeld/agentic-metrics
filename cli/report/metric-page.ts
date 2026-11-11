@@ -9,7 +9,7 @@ import { escapeHtml } from "../metrics/html.ts";
 import type { Figure, FigureResult, Metric } from "../metrics/metric.ts";
 import { SUPPRESSED, UNKNOWN } from "../metrics/metric.ts";
 import { coverageText } from "../metrics/stats.ts";
-import { MIN_ANONYMIZED_TICKETS } from "../trends.ts";
+import { KIND_GROUPS, MIN_ANONYMIZED_TICKETS } from "../trends.ts";
 import { autonomyComparison, drawnValue, monthLabel, renderChart, sparkline, trendLine } from "./charts.ts";
 import { tileValue } from "./headline.ts";
 import { chartInput, metricChart } from "./metric-chart.ts";
@@ -76,6 +76,22 @@ function charts(repo: SiteRepo, metric: Metric<unknown>): string[] {
   if (comparison) {
     const title = `${metric.name} by autonomy level`;
     cards.push(card("by-autonomy", title, renderChart(comparison, { id: `autonomy-${metric.id}`, title })));
+  }
+  const kinds = dataset.byKind?.[metric.id];
+  if (kinds && KIND_GROUPS.some((group) => kinds[group].coverage.tickets > 0 && group !== "unknown")) {
+    const rows = KIND_GROUPS.map(
+      (group) => `<tr data-kind="${group}"><td>${group === "unknown" ? "no kind label" : group}</td><td>${figureValue(figure, kinds[group])}</td><td>${coverageText(kinds[group].coverage)}</td></tr>`,
+    ).join("\n");
+    cards.push(
+      card(
+        "by-kind",
+        `${metric.name} by kind of change`,
+        `<p class="coverage">${escapeHtml(figure.label)}, over the tickets of each kind (their <code>kind:*</code> label).</p>
+<div class="scroll"><table><thead><tr><th>Kind</th><th>${escapeHtml(figure.label)}</th><th>Coverage</th></tr></thead><tbody>
+${rows}
+</tbody></table></div>`,
+      ),
+    );
   }
   const skills = Object.entries(dataset.bySkill ?? {}).flatMap(([name, { tickets, metrics }]) => {
     const pair = metrics[metric.id];

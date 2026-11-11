@@ -15,6 +15,7 @@ import type { GitHubData } from "./github/load.ts";
 import { ACTION_PATTERN } from "./init.ts";
 import type { Inferred } from "./infer.ts";
 import { ownCommits, type LinkedWork } from "./linker.ts";
+import { ticketKind } from "./trends.ts";
 import { RECORDER_FILE, SETTINGS_FILE } from "./recorder-install.ts";
 
 /** How to fill a gap. */
@@ -283,6 +284,17 @@ export function findGaps({ work, data, config, checkout, inferred, blame }: GapI
       fix: { kind: "unfixable", reason: "GitHub's API lists at most 100 commits and 100 files of a pull request." },
     },
     work.tickets.filter((ticket) => ticket.pullRequests.some((pr) => !pr.filesComplete || pr.commitsComplete === false)).map((ticket) => ticket.id),
+  );
+
+  // Kinds of change: a ticket labelled with two counts under neither.
+  perTicket(
+    {
+      id: "conflicting-kinds",
+      cause: "Tickets labelled with two kinds of change: they count under neither.",
+      metrics: [],
+      fix: { kind: "convention", text: "Keep one kind:* label per ticket (on its issue, or on its PR when it has none)." },
+    },
+    work.tickets.filter((ticket) => ticketKind(ticket) === "conflicting").map((ticket) => ticket.id),
   );
 
   // Conventions.

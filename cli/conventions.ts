@@ -26,6 +26,31 @@ export function causedBy(texts: readonly (string | null | undefined)[]): number[
   return [...new Set(numbers)];
 }
 
+/** The kinds of change (GLOSSARY.md), each a label `kind:<kind>` that `init` creates. */
+export const KINDS = ["feature", "fix", "refactor", "chore", "docs", "test"] as const;
+export type Kind = (typeof KINDS)[number];
+
+/**
+ * A ticket's kind of change, from its `kind:*` labels: its issue's, else its
+ * PRs'. `unknown` when none says; `conflicting` when they name two kinds, which
+ * count under neither.
+ */
+export function kindOf(issueLabels: readonly string[] | undefined, prLabels: readonly string[]): Kind | "unknown" | "conflicting" {
+  const isKind = (name: string | undefined): name is Kind => name !== undefined && (KINDS as readonly string[]).includes(name);
+  const kinds = (labels: readonly string[]): Kind[] => [
+    ...new Set(
+      labels.flatMap((label) => {
+        const kind = /^kind:(\w+)$/i.exec(label.trim())?.[1]?.toLowerCase();
+        return isKind(kind) ? [kind] : [];
+      }),
+    ),
+  ];
+  const own = kinds(issueLabels ?? []);
+  const found = own.length > 0 ? own : kinds(prLabels);
+  if (found.length === 0) return "unknown";
+  return found.length === 1 && found[0] !== undefined ? found[0] : "conflicting";
+}
+
 /** `estimate: 2d` at the start of a line; decimals allowed; `h`, `d` or `w`. */
 const ESTIMATE = /^[ \t]*estimate:[ \t]*(\d+(?:\.\d+)?)[ \t]*([hdw])\b/im;
 // An estimate is of working time, as active time is: a day is 8 hours of work and a week 5 such days.

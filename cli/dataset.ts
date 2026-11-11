@@ -10,7 +10,19 @@ import type { LinkedWork } from "./linker.ts";
 import { METRICS } from "./metrics/index.ts";
 import type { FigureResult, Metric, MetricResult } from "./metrics/metric.ts";
 import { UNKNOWN } from "./metrics/metric.ts";
-import { anonymizeByAutonomy, anonymizeTrends, byAutonomy, bySkill, trends, type ByAutonomy, type BySkill, type Trends } from "./trends.ts";
+import {
+  anonymizeByAutonomy,
+  anonymizeByKind,
+  anonymizeTrends,
+  byAutonomy,
+  byKind,
+  bySkill,
+  trends,
+  type ByAutonomy,
+  type ByKind,
+  type BySkill,
+  type Trends,
+} from "./trends.ts";
 
 export const SCHEMA_VERSION = 2;
 
@@ -41,6 +53,8 @@ export interface Dataset {
   trends?: Trends;
   /** Each metric's figure per autonomy level. Absent from datasets written before the comparison. */
   byAutonomy?: ByAutonomy;
+  /** Each metric's figure per kind of change (`kind:*` labels). Absent from older datasets. */
+  byKind?: ByKind;
   /** Each metric's figure with and without each skill used on 5 tickets or more. Absent when anonymized, and from older datasets. */
   bySkill?: BySkill;
   /** Data the metrics need that is missing, and how to fill it (`gaps.ts`). Absent from datasets written before gaps: read as none. */
@@ -82,6 +96,7 @@ export function buildDataset(repo: Repo, work: LinkedWork, now: Date, publish: P
     metrics,
     trends: anonymized ? anonymizeTrends(monthly) : monthly,
     byAutonomy: anonymized ? anonymizeByAutonomy(byLevel) : byLevel,
+    byKind: anonymized ? anonymizeByKind(byKind(work, METRICS, publishValue)) : byKind(work, METRICS, publishValue),
     gaps: anonymized ? anonymizeGaps(gaps) : gaps,
   };
   if (anonymized) return dataset;
