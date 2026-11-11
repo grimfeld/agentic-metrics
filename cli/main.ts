@@ -89,12 +89,13 @@ const USAGE = `Usage:
       A repo published \`full\` gets a case-study draft per candidate in
       <case-studies>/<owner>/<name>/ (default: case-studies); an existing
       draft is never overwritten.
-  agentic-metrics doctor [--repo owner/name [--checkout dir]]
+  agentic-metrics doctor [--repo owner/name [--checkout dir]] [--all]
       Print the repo's gaps, largest first: data a metric needs that is
       missing, why, and the one fix for each; then this device's (whether the
       plugin caches its transcripts, and how long Claude Code keeps them).
       Reads the repo as collect does and changes nothing: no dataset, no file
-      in the repo, nothing on GitHub or in ~/.claude.
+      in the repo, nothing on GitHub or in ~/.claude. --all lists every
+      ticket and every command of a gap, not the first few.
   agentic-metrics enrich-context <N> [--repo owner/name [--checkout dir]]
       Print, as JSON, what the enrich skill needs for ticket or PR #N: its
       kind label, whether it is a bug fix, the causes reverts and blame found,
@@ -256,9 +257,9 @@ async function collect(args: string[], deps: Dependencies, stdout: (text: string
 }
 
 async function doctor(args: string[], deps: Dependencies, stdout: (text: string) => void, stderr: (text: string) => void): Promise<void> {
-  const { values } = parseArgs({ args, options: { repo: { type: "string" }, checkout: { type: "string" } } });
+  const { values } = parseArgs({ args, options: { repo: { type: "string" }, checkout: { type: "string" }, all: { type: "boolean", default: false } } });
   const { data, work, gaps } = await gather(values, deps, stderr);
-  stdout(formatDoctor(data.repo.fullName, work.tickets.length, gaps, deviceGaps(deps.claudeDir ?? defaultClaudeDir()), thisDevice(deps.configDir)));
+  stdout(formatDoctor(data.repo.fullName, work.tickets.length, gaps, deviceGaps(deps.claudeDir ?? defaultClaudeDir()), thisDevice(deps.configDir), values.all));
 }
 
 function ticketNumber(positionals: string[]): number {
