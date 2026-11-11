@@ -267,3 +267,34 @@ describe("gaps: cloud sessions", () => {
     assert.doesNotMatch(JSON.stringify(gap), /session_01ABC|#1/);
   });
 });
+
+describe("gaps: tickets to enrich", () => {
+  it("lists each ticket enrichment would help, with its command", async () => {
+    const gap = find(await gaps("lifeline"), "enrichable");
+
+    // No lifeline ticket has a kind label; PR #136 and PR #137 close no issue.
+    assert.ok(gap);
+    assert.deepEqual(gap.ticketIds, ["#104", "#105", "PR #136", "#106", "PR #137"]);
+    assert.match(JSON.stringify(gap.fix), /\/agentic-metrics:enrich #136/);
+  });
+
+  it("does not list a ticket with every convention set", async () => {
+    const fixture = join(cwd, "fixture");
+    cpSync(join(FIXTURES, "lifeline"), fixture, { recursive: true });
+    const issues = JSON.parse(readFileSync(join(fixture, "issues.json"), "utf8")) as { data: { repository: { issues: { nodes: { number: number; labels?: { nodes: { name: string }[] } }[] } } } }[];
+    for (const node of issues.flatMap((page) => page.data.repository.issues.nodes)) {
+      if (node.number === 104) node.labels = { nodes: [...(node.labels?.nodes ?? []), { name: "kind:feature" }] };
+    }
+    writeFileSync(join(fixture, "issues.json"), JSON.stringify(issues));
+
+    assert.ok(!find(await gaps(fixture), "enrichable")?.ticketIds?.includes("#104"));
+  });
+
+  it("keeps an anonymized dataset's count only", async () => {
+    writeFileSync(join(cwd, ".agentic-metrics.json"), JSON.stringify({ publish: "anonymized", alias: "client-a" }));
+    const gap = find(await gaps("lifeline", "datasets/client-a.json"), "enrichable");
+
+    assert.equal(gap?.tickets, 5);
+    assert.doesNotMatch(JSON.stringify(gap), /#\d/);
+  });
+});

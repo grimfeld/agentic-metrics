@@ -286,6 +286,26 @@ export function findGaps({ work, data, config, checkout, inferred, blame }: GapI
     work.tickets.filter((ticket) => ticket.pullRequests.some((pr) => !pr.filesComplete || pr.commitsComplete === false)).map((ticket) => ticket.id),
   );
 
+  // Tickets enrichment would help: no kind, a fix with a traced cause but no caused-by, a PR linked to no issue.
+  const declaredFor = new Set(data.regressions.map((bug) => bug.number));
+  const tracedFixes = new Set((work.inferredRegressions ?? []).flatMap(({ by }) => work.tickets.filter((ticket) => ticket.pullRequests.includes(by))));
+  const enrichable = work.tickets.filter(
+    (ticket) =>
+      ticketKind(ticket) === "unknown" ||
+      (tracedFixes.has(ticket) && ticket.issue !== undefined && !declaredFor.has(ticket.issue.number)) ||
+      (ticket.issue === undefined && ticket.pullRequests.some((pr) => pr.closes.length === 0)),
+  );
+  if (enrichable.length > 0) {
+    gaps.push({
+      id: "enrichable",
+      cause: "Tickets missing a convention enrichment can propose: a kind:* label, the caused-by line of a fix whose cause tracing found, or the issue a PR delivers.",
+      metrics: ["regressionRate", "leadTime", "throughput"],
+      tickets: enrichable.length,
+      ticketIds: enrichable.map((ticket) => ticket.id),
+      fix: { kind: "command", command: enrichable.map((ticket) => `/agentic-metrics:enrich ${ticket.id.replace(/^PR /, "")}`).join("\n") },
+    });
+  }
+
   // Kinds of change: a ticket labelled with two counts under neither.
   perTicket(
     {
@@ -359,6 +379,7 @@ export function anonymizeGaps(gaps: Gap[]): Gap[] {
     delete kept.ticketIds;
     delete kept.teleport;
     // A cloud session's id is no ticket, but it is a link into the account that ran it.
+    if (kept.id === "enrichable") kept.fix = { kind: "command", command: "/agentic-metrics:enrich #N, in Claude Code, for each ticket doctor lists" };
     if (kept.id === "cloud-sessions") kept.fix = { kind: "command", command: "claude --teleport <session id>, for each of the repo's cloud sessions (run doctor where the repo is not anonymized)" };
     return kept;
   });
