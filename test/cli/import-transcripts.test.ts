@@ -126,3 +126,64 @@ describe("import-transcripts", () => {
     assert.match(stderr, /takes one folder/);
   });
 });
+
+describe("the cache under the repo's GitHub name", () => {
+  /** The dataset's human messages and sub-agents, read from `cache` for a clone at `repoDir`. */
+  async function figures(repoDir: string, repo?: string) {
+    const out = join(root, "out");
+    rmSync(out, { recursive: true, force: true });
+    const status = await main(["collect", "--datasets", out], {
+      cwd: clone,
+      github: fixtureSource(GITHUB),
+      transcripts: transcriptCache({ dir: cache, repoDir, repo }),
+      now: () => NOW,
+      stdout: () => {},
+    });
+    assert.equal(status, 0);
+    const dataset = JSON.parse(readFileSync(join(out, "grimfeld/lifeline.json"), "utf8")) as { metrics: Record<string, unknown> };
+    return { messages: dataset.metrics["humanMessagesPerTicket"], agents: dataset.metrics["subAgents"] };
+  }
+
+  /** The other device's project folders of the clone at /Users/dev/repos/lifeline (`-old` is another clone). */
+  const OURS = ["-Users-dev-repos-lifeline", "-Users-dev-repos-lifeline--claude-worktrees-ticket-137"];
+  const ourTranscripts = () => OURS.reduce((total, project) => total + transcriptsIn(join(OTHER_DEVICE, project)), 0);
+
+  /** Those sessions, flattened into `<cache>/repos/grimfeld/lifeline` as the plugin caches them. */
+  function cacheByRepo(into = cache) {
+    for (const project of OURS) cpSync(join(OTHER_DEVICE, project), join(into, "repos", "grimfeld", "lifeline"), { recursive: true });
+  }
+
+  it("is read for any clone's path, as the project folders are for theirs", async () => {
+    cpSync(OTHER_DEVICE, cache, { recursive: true });
+    const byProject = await figures("/Users/dev/repos/lifeline");
+    rmSync(cache, { recursive: true });
+    cacheByRepo();
+
+    assert.deepEqual(await figures(clone, "Grimfeld/Lifeline"), byProject);
+  });
+
+  it("counts a transcript cached in both layouts once", async () => {
+    cpSync(OTHER_DEVICE, cache, { recursive: true });
+    const once = await figures("/Users/dev/repos/lifeline");
+    cacheByRepo();
+
+    assert.deepEqual(await figures("/Users/dev/repos/lifeline", "grimfeld/lifeline"), once);
+  });
+
+  it("is where import-transcripts copies to when the clone is a clone of a GitHub repo", async () => {
+    const status = await main(["import-transcripts", source], { cwd: clone, cacheDir: cache, localRepo: () => Promise.resolve("grimfeld/lifeline"), stdout: () => {} });
+
+    assert.equal(status, 0);
+    assert.deepEqual(cached(), ["repos"]);
+    assert.equal(transcriptsIn(join(cache, "repos/grimfeld/lifeline")), ourTranscripts());
+  });
+
+  it("is taken as it is from another device's cache that already uses it", async () => {
+    rmSync(source, { recursive: true });
+    cacheByRepo(source);
+    const status = await main(["import-transcripts", source], { cwd: clone, cacheDir: cache, localRepo: () => Promise.resolve("grimfeld/lifeline"), stdout: () => {} });
+
+    assert.equal(status, 0);
+    assert.equal(transcriptsIn(join(cache, "repos/grimfeld/lifeline")), ourTranscripts());
+  });
+});

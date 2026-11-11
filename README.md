@@ -12,7 +12,7 @@ This repo is also the plugin's marketplace. Install it once and it covers every 
 
 It needs Node 24 or later on your `PATH`.
 
-At the end of every session the plugin copies the session's full transcript, and its sub-agent transcripts, into `~/.cache/agentic-metrics/<project>/` so they survive Claude Code's cleanup. Set `AGENTIC_METRICS_CACHE_DIR` to use another folder. The hook only copies files: it makes no network calls and never fails the session end.
+At the end of every session the plugin copies the session's full transcript, and its sub-agent transcripts, into `~/.cache/agentic-metrics/repos/<owner>/<name>/`, named after the GitHub repo the session's folder is a clone of, so they survive Claude Code's cleanup. Every clone of a repo, wherever it sits and on whichever device, caches into the same folder. A folder that is no clone of a GitHub repo caches under Claude Code's own name for it, `~/.cache/agentic-metrics/<project>/`, as caches written before did; `collect` reads both. Set `AGENTIC_METRICS_CACHE_DIR` to use another folder. The hook only copies files: it makes no network calls and never fails the session end.
 
 ### Skill addenda
 
@@ -74,6 +74,8 @@ A repo worked on from a laptop, a desktop and cloud sessions leaves its traces i
 
 From then on every session, on any device or in the cloud, leaves a [session record](#session-records) on its commits, and `collect` reads it from GitHub wherever you run it. Nothing needs copying between devices. To check it works, make a commit from a Claude Code session and look for a `Session-Record:` trailer in `git log -1`.
 
+**Sync the transcript cache.** Point `AGENTIC_METRICS_CACHE_DIR` at the same synced folder (iCloud Drive, Dropbox, Syncthing…) on every device with the plugin. The plugin caches each repo's transcripts under the repo's GitHub name, not the clone's path, so the device that runs `collect` reads every device's sessions with no import. A device without the plugin still needs the import below.
+
 **For past work: import each device's transcripts.** A session that ran before the recorder was installed is only known through its transcript, which stays on the device it ran on:
 
 | Where the session ran | What is left of it | Where |
@@ -92,7 +94,7 @@ Pick one device to run `collect` on, and for each other device:
    npx agentic-metrics import-transcripts ~/from-laptop
    ```
 
-   It finds the project folders named after the clone and copies them into this device's cache under the local clone's name, worktrees and sub-agents included. Claude Code names a transcript folder after the clone's path, which differs between devices; that is why a plain copy is not enough. If the clone's folder is called something else on the other device, pass it: `--name life`. From outside the clone, add `--checkout ~/path/to/clone`.
+   It finds the project folders named after the clone and copies them into this device's cache under the repo's GitHub name (or, for a clone with no GitHub remote, under the local clone's name), worktrees and sub-agents included. A cache that already holds the repo under its GitHub name is copied as it is. Claude Code names a transcript folder after the clone's path, which differs between devices; that is why a plain copy is not enough. If the clone's folder is called something else on the other device, pass it: `--name life`. From outside the clone, add `--checkout ~/path/to/clone`.
 3. Repeat for each repo (run it from each repo's clone) and each device. Importing twice is safe: a transcript already there is kept, unless the imported one is longer.
 4. Run `collect` again for each repo.
 

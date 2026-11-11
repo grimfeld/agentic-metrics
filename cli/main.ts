@@ -166,7 +166,9 @@ async function gather(
   const data = await loadGitHub(github);
   const transcripts =
     deps.transcripts ??
-    (deps.github || checkout === undefined ? noTranscripts : transcriptCache({ dir: cacheDir ?? defaultCacheDir(), repoDir: resolve(deps.cwd, checkout) }));
+    (deps.github || checkout === undefined
+      ? noTranscripts
+      : transcriptCache({ dir: cacheDir ?? defaultCacheDir(), repoDir: resolve(deps.cwd, checkout), repo: data.repo.fullName }));
   const sessions = loadSessions(await transcripts.read());
   const work = classifyAutonomy(linkRecords(linkSessions(link(data, config), sessions, config, data.repo.fullName), sessions), config.autonomy);
   const gaps = findGaps({ work, data, config, checkout: checkout === undefined ? undefined : inspectCheckout(resolve(deps.cwd, checkout)) });
@@ -259,9 +261,11 @@ async function importCommand(args: string[], deps: Dependencies, stdout: (text: 
   });
   const [source, ...extra] = positionals;
   if (source === undefined || extra.length > 0) throw new Error("import-transcripts takes one folder: the other device's ~/.cache/agentic-metrics or ~/.claude/projects, copied here");
+  const checkout = resolve(deps.cwd, values.checkout ?? ".");
   const lines = await importTranscripts({
     source: resolve(deps.cwd, source),
-    checkout: resolve(deps.cwd, values.checkout ?? "."),
+    checkout,
+    repo: await (deps.localRepo ?? originRepo)(checkout),
     cacheDir: deps.cacheDir ?? defaultCacheDir(),
     names: values.name,
     dryRun: values["dry-run"],

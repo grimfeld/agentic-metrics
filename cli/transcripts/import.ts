@@ -8,11 +8,17 @@
 //
 // The source is a folder of project folders, as copied from the other device:
 // its `~/.cache/agentic-metrics` (where the plugin caches transcripts) or its
-// `~/.claude/projects` (where Claude Code keeps them until its cleanup).
+// `~/.claude/projects` (where Claude Code keeps them until its cleanup). A
+// cache that already holds the repo under its GitHub name
+// (`repos/<owner>/<name>/`) is taken as it is.
+//
+// When the local clone is a clone of a GitHub repo, transcripts are copied to
+// the cache's folder for that repo (`source.ts`); otherwise under the local
+// clone's project folder name, as Claude Code names it.
 import { existsSync, statSync } from "node:fs";
 import { cp, mkdir, readdir, realpath } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-import { projectKey } from "./source.ts";
+import { projectKey, repoCacheDir } from "./source.ts";
 
 const WORKTREES = "--claude-worktrees-";
 
@@ -21,6 +27,8 @@ export interface ImportOptions {
   source: string;
   /** The local clone the transcripts are for. */
   checkout: string;
+  /** The GitHub repo (`owner/name`) the local clone is a clone of, if any. */
+  repo?: string | undefined;
   /** This device's transcript cache. */
   cacheDir: string;
   /** What the clone's folder is called on the other device; the local clone's name when empty. */
@@ -37,9 +45,11 @@ export async function importTranscripts(options: ImportOptions): Promise<string[
   const names = (options.names.length > 0 ? options.names : [basename(checkout)]).map((name) => projectKey(name));
 
   // A project folder is the repo's when its name ends with the clone's folder name; a worktree of it carries the suffix.
+  // Under the repo's GitHub name, every project folder's sessions go to one folder: session ids are unique.
   const target = (project: string): string | undefined => {
     const [clone = "", worktree] = project.split(WORKTREES, 2);
     if (!names.some((name) => clone === name || clone.endsWith(`-${name}`))) return undefined;
+    if (options.repo) return repoCacheDir(".", options.repo);
     return worktree === undefined ? localKey : `${localKey}${WORKTREES}${worktree}`;
   };
 
@@ -48,6 +58,11 @@ export async function importTranscripts(options: ImportOptions): Promise<string[
     const to = target(project);
     return to === undefined ? [] : [{ project, to }];
   });
+  // The other device's cache may already hold the repo under its GitHub name.
+  if (options.repo) {
+    const named = repoCacheDir(".", options.repo);
+    if (existsSync(join(options.source, named))) matched.unshift({ project: named, to: named });
+  }
   if (matched.length === 0) {
     const found = projects.length > 0 ? `Project folders found: ${projects.join(", ")}.` : "It holds no project folder.";
     throw new Error(

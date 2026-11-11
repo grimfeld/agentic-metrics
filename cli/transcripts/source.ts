@@ -1,13 +1,22 @@
 // The transcript source: the CLI's swappable boundary to Claude Code's
 // transcripts, as the plugin's SessionEnd hook caches them:
 //
-//   <cache>/<project>/<session>.jsonl                      a session
-//   <cache>/<project>/<session>/subagents/**/agent-<id>.jsonl   its sub-agents
+//   <cache>/repos/<owner>/<name>/<session>.jsonl                      a session
+//   <cache>/repos/<owner>/<name>/<session>/subagents/**/agent-<id>.jsonl   its sub-agents
+//
+// <owner>/<name> is the GitHub repo, lower-cased, whatever the clone's path, so
+// that one cache folder synced between devices holds every device's sessions.
+//
+// Caches written before, and sessions in a folder that is no clone of a GitHub
+// repo, use Claude Code's own project folder name instead:
+//
+//   <cache>/<project>/<session>.jsonl, and its sub-agents likewise
 //
 // <project> is Claude Code's name for the folder the session started in: its
 // path with every character other than a letter or digit replaced by `-`. A
-// repo's sessions are those of its clone's folder and of the worktrees under
-// it (`<clone>/.claude/worktrees/<name>`).
+// repo's sessions there are those of its clone's folder and of the worktrees
+// under it (`<clone>/.claude/worktrees/<name>`). Both layouts are read; a
+// transcript found in both counts once, the longer copy.
 //
 // The source only reads files and parses their JSON lines. Nothing it returns
 // may reach the dataset as is: `load.ts` keeps derived numbers and the few
@@ -36,8 +45,17 @@ export function projectKey(dir: string): string {
   return dir.replace(/[^a-zA-Z0-9]/g, "-");
 }
 
-/** The transcripts of the clone at `repoDir`, read from the cache at `dir`. */
-export function transcriptCache(options: { dir: string; repoDir: string }): TranscriptSource {
+/** The folder of the cache at `cacheDir` holding the transcripts of the GitHub repo `owner/name`. */
+export function repoCacheDir(cacheDir: string, repo: string): string {
+  return join(cacheDir, "repos", ...repo.toLowerCase().split("/").map((part) => basename(part)));
+}
+
+/**
+ * The transcripts of the clone at `repoDir`, read from the cache at `dir`:
+ * those cached under its GitHub repo `repo` (when given), and those under the
+ * clone's project folders.
+ */
+export function transcriptCache(options: { dir: string; repoDir: string; repo?: string | undefined }): TranscriptSource {
   return {
     async read() {
       const repoDir = await realpath(options.repoDir).catch(() => options.repoDir);
@@ -45,17 +63,23 @@ export function transcriptCache(options: { dir: string; repoDir: string }): Tran
       const ours = (project: string) => [...keys].some((key) => project === key || project.startsWith(`${key}--claude-worktrees-`));
 
       const projects = await readdir(options.dir, { withFileTypes: true }).catch(() => []);
-      const files: TranscriptFile[] = [];
-      for (const project of projects) {
-        if (!project.isDirectory() || !ours(project.name)) continue;
-        const projectDir = join(options.dir, project.name);
-        const paths = (await readdir(projectDir, { recursive: true })).filter((path) => path.endsWith(".jsonl")).sort();
+      const folders = projects.filter((project) => project.isDirectory() && ours(project.name)).map((project) => join(options.dir, project.name));
+      if (options.repo) folders.unshift(repoCacheDir(options.dir, options.repo));
+
+      // By session and sub-agent: the same transcript cached in both layouts counts once, its longer copy.
+      const files = new Map<string, TranscriptFile>();
+      for (const folder of folders) {
+        const paths = (await readdir(folder, { recursive: true }).catch(() => [] as string[])).filter((path) => path.endsWith(".jsonl")).sort();
         for (const path of paths) {
-          const file = transcriptFile(path);
-          if (file) files.push({ ...file, lines: parseLines(await readFile(join(projectDir, path), "utf8")) });
+          const found = transcriptFile(path);
+          if (!found) continue;
+          const file = { ...found, lines: parseLines(await readFile(join(folder, path), "utf8")) };
+          const key = `${file.session}\u0000${file.agentId ?? ""}`;
+          const known = files.get(key);
+          if (!known || file.lines.length > known.lines.length) files.set(key, file);
         }
       }
-      return files;
+      return [...files.values()];
     },
   };
 }
