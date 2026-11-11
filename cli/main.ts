@@ -7,14 +7,15 @@ import { dirname, join, resolve } from "node:path";
 import { parseArgs, promisify } from "node:util";
 import { classifyAutonomy } from "./autonomy.ts";
 import { CASE_STUDIES_DIR, readApproved, writeDrafts, type CaseStudy } from "./case-studies.ts";
-import { CONFIG_FILE, readConfig } from "./config.ts";
+import { CONFIG_FILE, readConfig, type Config } from "./config.ts";
 import { buildDataset, datasetPath, SCHEMA_VERSION, type Dataset } from "./dataset.ts";
-import { findGaps, inspectCheckout } from "./gaps.ts";
+import { defaultClaudeDir, deviceGaps, formatDoctor } from "./doctor.ts";
+import { findGaps, inspectCheckout, type Gap } from "./gaps.ts";
 import { cachedSource, defaultCacheDir } from "./github/cache.ts";
-import { loadGitHub } from "./github/load.ts";
+import { loadGitHub, type GitHubData } from "./github/load.ts";
 import { ghAdmin, init, type RepoAdmin } from "./init.ts";
 import { ghSource, type GitHubSource } from "./github/source.ts";
-import { link } from "./linker.ts";
+import { link, type LinkedWork } from "./linker.ts";
 import { linkRecords } from "./records.ts";
 import { writeSite } from "./report.ts";
 import { importTranscripts } from "./transcripts/import.ts";
@@ -43,6 +44,8 @@ export interface Dependencies {
   transcripts?: TranscriptSource;
   /** The `owner/name` of the GitHub repo cloned at `dir`, if any. Defaults to its git `origin` remote. */
   localRepo?: (dir: string) => Promise<string | undefined>;
+  /** Claude Code's user folder, which `doctor` reads this device's settings from. Defaults to ~/.claude. */
+  claudeDir?: string;
   now?: () => Date;
   stdout?: (text: string) => void;
   stderr?: (text: string) => void;
@@ -77,6 +80,12 @@ const USAGE = `Usage:
       A repo published \`full\` gets a case-study draft per candidate in
       <case-studies>/<owner>/<name>/ (default: case-studies); an existing
       draft is never overwritten.
+  agentic-metrics doctor [--repo owner/name [--checkout dir]]
+      Print the repo's gaps, largest first: data a metric needs that is
+      missing, why, and the one fix for each; then this device's (whether the
+      plugin caches its transcripts, and how long Claude Code keeps them).
+      Reads the repo as collect does and changes nothing: no dataset, no file
+      in the repo, nothing on GitHub or in ~/.claude.
   agentic-metrics import-transcripts <folder> [--checkout dir] [--name clone-folder]... [--dry-run]
       Bring another device's Claude Code transcripts of this repo into this
       device's transcript cache, so that collect reads them. <folder> is that
@@ -105,6 +114,9 @@ export async function main(argv: string[], deps: Dependencies): Promise<number> 
       case "report":
         await report(rest, deps, stdout);
         return 0;
+      case "doctor":
+        await doctor(rest, deps, stdout, stderr);
+        return 0;
       case "init":
         await initCommand(rest, deps, stdout);
         return 0;
@@ -121,20 +133,23 @@ export async function main(argv: string[], deps: Dependencies): Promise<number> 
   }
 }
 
-async function collect(args: string[], deps: Dependencies, stdout: (text: string) => void, stderr: (text: string) => void): Promise<void> {
-  const { values } = parseArgs({
-    args,
-    options: {
-      repo: { type: "string" },
-      datasets: { type: "string", default: "datasets" },
-      local: { type: "string", default: LOCAL_DIR },
-      full: { type: "boolean", default: false },
-      checkout: { type: "string" },
-      "case-studies": { type: "string", default: CASE_STUDIES_DIR },
-    },
-  });
-  // The measured repo's clone holds its config and names its transcripts: the
-  // current folder, unless --repo names another repo and --checkout is not given.
+interface Gathered {
+  config: Config;
+  data: GitHubData;
+  work: LinkedWork;
+  gaps: Gap[];
+}
+
+/**
+ * Reads and links a repo as `collect` and `doctor` both do: its config and
+ * transcripts from its clone (the current folder, unless --repo names another
+ * repo and --checkout is not given), and GitHub through the cache.
+ */
+async function gather(
+  values: { repo?: string | undefined; checkout?: string | undefined; full?: boolean | undefined },
+  deps: Dependencies,
+  stderr: (text: string) => void,
+): Promise<Gathered> {
   const checkout =
     values.checkout ??
     (!values.repo || sameRepo(await (deps.localRepo ?? originRepo)(deps.cwd), values.repo) ? deps.cwd : undefined);
@@ -147,20 +162,37 @@ async function collect(args: string[], deps: Dependencies, stdout: (text: string
   const now = deps.now ?? (() => new Date());
   const source = deps.github ?? ghSource({ cwd: deps.cwd, repo: values.repo });
   const cacheDir = deps.cacheDir ?? (deps.github ? undefined : defaultCacheDir());
-  const github = cacheDir ? cachedSource(source, { dir: cacheDir, now, full: values.full }) : source;
+  const github = cacheDir ? cachedSource(source, { dir: cacheDir, now, full: values.full ?? false }) : source;
   const data = await loadGitHub(github);
-  const publish = config.publish ?? (data.repo.private ? "anonymized" : "full");
-  if (publish === "anonymized" && !config.alias) {
-    throw new Error(
-      `${data.repo.fullName} is published anonymized${config.publish ? "" : " (it is private)"}: set "alias" in ${CONFIG_FILE}, or set "publish"`,
-    );
-  }
   const transcripts =
     deps.transcripts ??
     (deps.github || checkout === undefined ? noTranscripts : transcriptCache({ dir: cacheDir ?? defaultCacheDir(), repoDir: resolve(deps.cwd, checkout) }));
   const sessions = loadSessions(await transcripts.read());
   const work = classifyAutonomy(linkRecords(linkSessions(link(data, config), sessions, config, data.repo.fullName), sessions), config.autonomy);
   const gaps = findGaps({ work, data, config, checkout: checkout === undefined ? undefined : inspectCheckout(resolve(deps.cwd, checkout)) });
+  return { config, data, work, gaps };
+}
+
+async function collect(args: string[], deps: Dependencies, stdout: (text: string) => void, stderr: (text: string) => void): Promise<void> {
+  const { values } = parseArgs({
+    args,
+    options: {
+      repo: { type: "string" },
+      datasets: { type: "string", default: "datasets" },
+      local: { type: "string", default: LOCAL_DIR },
+      full: { type: "boolean", default: false },
+      checkout: { type: "string" },
+      "case-studies": { type: "string", default: CASE_STUDIES_DIR },
+    },
+  });
+  const { config, data, work, gaps } = await gather(values, deps, stderr);
+  const now = deps.now ?? (() => new Date());
+  const publish = config.publish ?? (data.repo.private ? "anonymized" : "full");
+  if (publish === "anonymized" && !config.alias) {
+    throw new Error(
+      `${data.repo.fullName} is published anonymized${config.publish ? "" : " (it is private)"}: set "alias" in ${CONFIG_FILE}, or set "publish"`,
+    );
+  }
   const dataset = buildDataset(data.repo, work, now(), publish, config.alias, gaps);
 
   // Only this collect's dataset may stay in the datasets folder: a dataset left
@@ -185,6 +217,12 @@ async function collect(args: string[], deps: Dependencies, stdout: (text: string
   await writeJson(join(local, "datasets", datasetPath(dataset.repo)), dataset);
   await writeSite(local, [dataset]);
   stdout(`${dataset.repo} (publish: none): ${String(dataset.tickets)} tickets, ${String(dataset.pullRequests)} PRs -> ${join(local, "index.html")}\n`);
+}
+
+async function doctor(args: string[], deps: Dependencies, stdout: (text: string) => void, stderr: (text: string) => void): Promise<void> {
+  const { values } = parseArgs({ args, options: { repo: { type: "string" }, checkout: { type: "string" } } });
+  const { data, work, gaps } = await gather(values, deps, stderr);
+  stdout(formatDoctor(data.repo.fullName, work.tickets.length, gaps, deviceGaps(deps.claudeDir ?? defaultClaudeDir())));
 }
 
 async function initCommand(args: string[], deps: Dependencies, stdout: (text: string) => void): Promise<void> {
