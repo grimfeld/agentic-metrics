@@ -155,6 +155,22 @@ export interface GitHubData {
   workflowRuns: WorkflowRun[];
   /** The installed agentic-metrics workflow's runs, newest first: whether the Action is installed and allowed to run. */
   actionRuns: ActionRun[];
+  /** PRs closed without merging. */
+  abandonedPullRequests: AbandonedPullRequest[];
+}
+
+/** A PR closed without being merged (GLOSSARY.md). */
+export interface AbandonedPullRequest {
+  number: number;
+  createdAt: Date;
+  closedAt: Date;
+  baseRefName: string;
+  headRefName: string;
+  /** Issue numbers in this repo it would have closed. */
+  closes: number[];
+  author: string | undefined;
+  /** First line of each of its commits (first 100). */
+  commitSubjects: string[];
 }
 
 /** A run of the agentic-metrics workflow `init` installs. */
@@ -169,6 +185,17 @@ interface RawRepo {
   default_branch: string;
   private?: boolean;
   html_url: string;
+}
+
+interface RawClosedPullRequest {
+  number: number;
+  createdAt: string;
+  closedAt: string | null;
+  baseRefName: string;
+  headRefName: string;
+  author: { login: string } | null;
+  closingIssuesReferences: { nodes: { number: number; repository: { nameWithOwner: string } }[] };
+  commits?: { nodes: { commit: { messageHeadline?: string } }[] };
 }
 
 interface RawPullRequest {
@@ -345,7 +372,25 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
     })
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.id - a.id);
 
-  return { repo, pullRequests, issues, regressions, workflowRuns, actionRuns };
+  const closedPages = (await source.read("closed-pull-requests")) as Pages<"pullRequests", RawClosedPullRequest>;
+  const abandonedPullRequests = closedPages
+    .flatMap((page) => page.data.repository.pullRequests.nodes)
+    .filter((pr) => pr.closedAt !== null)
+    .map(
+      (pr): AbandonedPullRequest => ({
+        number: pr.number,
+        createdAt: new Date(pr.createdAt),
+        closedAt: new Date(pr.closedAt ?? pr.createdAt),
+        baseRefName: pr.baseRefName,
+        headRefName: pr.headRefName,
+        closes: pr.closingIssuesReferences.nodes.filter((node) => node.repository.nameWithOwner.toLowerCase() === repo.fullName.toLowerCase()).map((node) => node.number),
+        author: pr.author?.login.replace(/\[bot\]$/, ""),
+        commitSubjects: (pr.commits?.nodes ?? []).flatMap((node) => (node.commit.messageHeadline === undefined ? [] : [node.commit.messageHeadline])),
+      }),
+    )
+    .sort((a, b) => a.number - b.number);
+
+  return { repo, pullRequests, issues, regressions, workflowRuns, actionRuns, abandonedPullRequests };
 }
 
 /** `#N` not inside a word or a path (so `owner/repo#N` and `ADR#N`-like tokens are skipped). */

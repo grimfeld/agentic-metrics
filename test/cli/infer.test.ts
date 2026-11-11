@@ -98,7 +98,7 @@ describe("inferred conventions: gaps and init", () => {
   /** The lifeline fixture with every PR that closes an issue on a `story_N` branch, which the default pattern misses. */
   function storyBranches(): string {
     const fixture = mkdtempSync(join(tmpdir(), "am-infer-fixture-"));
-    for (const file of ["repo", "issues", "regressions", "workflow-runs"]) writeFileSync(join(fixture, `${file}.json`), readFileSync(join(FIXTURES, "lifeline", `${file}.json`)));
+    for (const file of ["repo", "issues", "regressions", "workflow-runs", "closed-pull-requests"]) writeFileSync(join(fixture, `${file}.json`), readFileSync(join(FIXTURES, "lifeline", `${file}.json`)));
     const prs = JSON.parse(readFileSync(join(FIXTURES, "lifeline", "pull-requests.json"), "utf8")) as { data: { repository: { pullRequests: { nodes: { headRefName: string; closingIssuesReferences: { nodes: { number: number }[] } }[] } } } }[];
     for (const page of prs) {
       for (const node of page.data.repository.pullRequests.nodes) {

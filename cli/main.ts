@@ -5,6 +5,7 @@ import { existsSync } from "node:fs";
 import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { parseArgs, promisify } from "node:util";
+import { linkAbandoned } from "./attempts.ts";
 import { classifyAutonomy } from "./autonomy.ts";
 import { CASE_STUDIES_DIR, readApproved, writeDrafts, type CaseStudy } from "./case-studies.ts";
 import { CONFIG_FILE, configuredFields, readConfig, type Config } from "./config.ts";
@@ -178,7 +179,7 @@ async function gather(
       ? noTranscripts
       : transcriptCache({ dir: cacheDir ?? defaultCacheDir(), repoDir: resolve(deps.cwd, checkout), repo: data.repo.fullName }));
   const sessions = loadSessions(await transcripts.read());
-  const linked = classifyAutonomy(linkRecords(linkSessions(link(data, config), sessions, config, data.repo.fullName), sessions), config.autonomy);
+  const linked = linkAbandoned(classifyAutonomy(linkRecords(linkSessions(link(data, config), sessions, config, data.repo.fullName), sessions), config.autonomy), data, config);
   // Blame tracing needs the repo's full history: the clone's, when there is one.
   const blame = checkout === undefined ? "no-clone" : blameReady(resolve(deps.cwd, checkout));
   const blamed =

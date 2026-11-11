@@ -18,7 +18,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { REGRESSION_LABEL } from "../conventions.ts";
 
-export type GitHubRequest = "repo" | "pull-requests" | "issues" | "regressions" | "workflow-runs";
+export type GitHubRequest = "repo" | "pull-requests" | "closed-pull-requests" | "issues" | "regressions" | "workflow-runs";
 
 export interface ReadOptions {
   /**
@@ -70,6 +70,23 @@ query($owner: String!, $name: String!, $endCursor: String) {
         labels(first: 20) { nodes { name } }
         files(first: 100) { totalCount nodes { path additions deletions } }
         reviews(first: 100, states: [CHANGES_REQUESTED]) { nodes { submittedAt } }
+      }
+    }
+  }
+}`;
+
+// PRs closed without merging: abandoned attempts. Read only for linking and
+// counting; their text never reaches the dataset.
+const CLOSED_PULL_REQUESTS_QUERY = `
+query($owner: String!, $name: String!, $endCursor: String) {
+  repository(owner: $owner, name: $name) {
+    pullRequests(first: 50, after: $endCursor, states: [CLOSED], orderBy: {field: UPDATED_AT, direction: DESC}) {
+      pageInfo { hasNextPage endCursor }
+      nodes {
+        number createdAt updatedAt closedAt baseRefName headRefName
+        author { login __typename }
+        closingIssuesReferences(first: 50) { nodes { number repository { nameWithOwner } } }
+        commits(first: 100) { nodes { commit { messageHeadline } } }
       }
     }
   }
@@ -132,6 +149,7 @@ function graphqlConnection(connection: string, query: string): GraphQLRequest {
 
 const GRAPHQL_REQUESTS = {
   "pull-requests": graphqlConnection("pullRequests", PULL_REQUESTS_QUERY),
+  "closed-pull-requests": graphqlConnection("pullRequests", CLOSED_PULL_REQUESTS_QUERY),
   issues: graphqlConnection("issues", ISSUES_QUERY),
 };
 
@@ -260,6 +278,7 @@ export function ghSource(options: { cwd: string; repo?: string | undefined }): G
         case "repo":
           return gh(["repos/{owner}/{repo}"]);
         case "pull-requests":
+        case "closed-pull-requests":
         case "issues":
           return graphql(GRAPHQL_REQUESTS[request], readOptions?.since);
         case "regressions":

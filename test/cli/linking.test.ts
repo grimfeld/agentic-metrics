@@ -77,6 +77,7 @@ function fakeGitHub(issues: number[], prs: FakePr[]): GitHubSource {
         },
       },
     ],
+    "closed-pull-requests": [{ data: { repository: { pullRequests: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } } } }],
     "workflow-runs": [{ total_count: 0, workflow_runs: [] }],
   };
   return {

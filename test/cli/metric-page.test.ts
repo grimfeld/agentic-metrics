@@ -27,7 +27,7 @@ const CI = new Set(["firstRunCiRate", "fixCycles", "scheduledFailures", "batchHe
  */
 const ESTIMATED = "estimatedActiveTime";
 const PART_1 = ["activeTime", "estimatedActiveTime", "leadTime", "throughput", "firstRunCiRate", "fixCycles", "scheduledFailures", "batchHealth", "regressionRate", "humanMessagesPerTicket"];
-const PART_2 = ["friction", "orchestrationTime", "subAgents", "skills", "apiEquivalentCost", "autonomy", "testRatio", "netLinesRemoved", "size", "estimateVsActual"];
+const PART_2 = ["attempts", "friction", "orchestrationTime", "subAgents", "skills", "apiEquivalentCost", "autonomy", "testRatio", "netLinesRemoved", "size", "estimateVsActual"];
 /** Repo-level metrics: no ticket owns them, so they have no per-ticket table. */
 const REPO_LEVEL = new Set(["orchestrationTime"]);
 

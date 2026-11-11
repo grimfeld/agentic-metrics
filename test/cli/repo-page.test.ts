@@ -118,6 +118,7 @@ describe("repo page: chart grid", () => {
       "estimatedActiveTime",
       "leadTime",
       "throughput",
+      "attempts",
       "friction",
       "orchestrationTime",
       "subAgents",
