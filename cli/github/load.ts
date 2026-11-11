@@ -54,6 +54,12 @@ export interface CommitTrailers {
   claudeCoAuthor: boolean;
   /** A `Claude-Session:` trailer: made in a Claude Code cloud session, which leaves no local transcript. */
   cloudSession: boolean;
+  /**
+   * That cloud session's id (`session_…`), from the trailer's link
+   * (`https://claude.ai/code/session_…`); undefined when it names none. Read
+   * only to suggest `claude --teleport`; never published.
+   */
+  cloudSessionId?: string | undefined;
 }
 
 /** One commit of a PR, as its commit listing shows it. */
@@ -351,7 +357,8 @@ function labelNames(labels: RawLabels | undefined): string[] {
 
 /** `Co-Authored-By: Name <email>` at the start of a line, any case. */
 const CO_AUTHOR = /^[ \t]*co-authored-by:[ \t]*(.*?)[ \t]*<([^>]*)>/gim;
-const CLOUD_SESSION = /^[ \t]*claude-session:/im;
+const CLOUD_SESSION = /^[ \t]*claude-session:[ \t]*(.*)$/im;
+const CLOUD_SESSION_ID = /\b(session_[A-Za-z0-9]+)\b/;
 
 function commitOf(raw: RawCommit): Commit {
   return {
@@ -371,7 +378,8 @@ function trailersOf(body: string): CommitTrailers {
   const claudeCoAuthor = [...body.matchAll(CO_AUTHOR)].some(
     ([, name = "", email = ""]) => /^claude\b/i.test(name) || /@anthropic\.com$/i.test(email),
   );
-  return { claudeCoAuthor, cloudSession: CLOUD_SESSION.test(body) };
+  const cloud = CLOUD_SESSION.exec(body);
+  return { claudeCoAuthor, cloudSession: cloud !== null, cloudSessionId: cloud ? CLOUD_SESSION_ID.exec(cloud[1] ?? "")?.[1] : undefined };
 }
 
 /** A PR's diff stats and first commit. Missing fields read as an empty, incomplete diff. */

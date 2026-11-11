@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { main } from "../../cli/main.ts";
 import { fixtureSource } from "../../cli/github/source.ts";
 import { readConfig } from "../../cli/config.ts";
-import { findGaps, type Gap } from "../../cli/gaps.ts";
+import { anonymizeGaps, findGaps, type Gap } from "../../cli/gaps.ts";
 import type { GitHubData } from "../../cli/github/load.ts";
 import type { LinkedWork } from "../../cli/linker.ts";
 import type { Session } from "../../cli/transcripts/load.ts";
@@ -222,5 +222,48 @@ describe("gaps: devices", () => {
 
   it("leaves cloud sessions out: no device holds their transcript", () => {
     assert.deepEqual(devices([{ id: "#1", sessions: [recorded("aa", "0a1b2c3d", true)] }]), []);
+  });
+});
+
+describe("gaps: cloud sessions", () => {
+  const commit = (cloudSessionId?: string, records: unknown[] = []) => ({ cloudSession: cloudSessionId !== undefined, cloudSessionId, records });
+  const ticket = (id: string, commits: unknown[], sessions: unknown[] = []) => ({ id, sessions, pullRequests: [{ commits }], batchCommits: [] });
+
+  function cloud(tickets: unknown[], publish: "full" | "anonymized" = "full") {
+    const work = { tickets, transcripts: { sessions: 0, orchestration: [] }, ci: { mainWorkflow: "check.yml" } } as unknown as LinkedWork;
+    const data = { actionRuns: [{ createdAt: new Date(), conclusion: "success" }], regressions: [{}] } as unknown as GitHubData;
+    const gaps = findGaps({ work, data, config: readConfig(cwd), checkout: undefined });
+    return (publish === "anonymized" ? anonymizeGaps(gaps) : gaps).find((gap) => gap.id === "cloud-sessions");
+  }
+
+  it("gives the teleport command of each cloud session with neither a record nor a transcript", () => {
+    const gap = cloud([ticket("#1", [commit("session_01ABC"), commit("session_01ABC")]), ticket("#2", [commit("session_02DEF"), commit()])]);
+
+    assert.ok(gap);
+    assert.deepEqual(gap.ticketIds, ["#1", "#2"]);
+    assert.deepEqual(gap.fix, { kind: "command", command: "claude --teleport session_01ABC\nclaude --teleport session_02DEF" });
+  });
+
+  it("reads the session id from the commit's Claude-Session trailer", async () => {
+    // PR #137's one commit was made in cloud session session_01ABCDEF, and no transcript is read here.
+    const gap = find(await gaps("lifeline"), "cloud-sessions");
+
+    assert.deepEqual(gap?.fix, { kind: "command", command: "claude --teleport session_01ABCDEF" });
+    assert.deepEqual(gap.ticketIds, ["PR #137"]);
+  });
+
+  it("suggests nothing for a cloud commit that carries a session record", () => {
+    assert.equal(cloud([ticket("#1", [commit("session_01ABC", [{ key: "aa" }])])]), undefined);
+  });
+
+  it("suggests nothing for a ticket whose sessions are already known", () => {
+    assert.equal(cloud([ticket("#1", [commit("session_01ABC")], [{ sessionId: "s" }])]), undefined);
+  });
+
+  it("names no session in an anonymized dataset", () => {
+    const gap = cloud([ticket("#1", [commit("session_01ABC")])], "anonymized");
+
+    assert.ok(gap);
+    assert.doesNotMatch(JSON.stringify(gap), /session_01ABC|#1/);
   });
 });

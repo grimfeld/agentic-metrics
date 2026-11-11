@@ -13,7 +13,7 @@ import { CONFIG_FILE, type Config } from "./config.ts";
 import { ACTION_WORKFLOW, REGRESSION_LABEL } from "./conventions.ts";
 import type { GitHubData } from "./github/load.ts";
 import { ACTION_PATTERN } from "./init.ts";
-import type { LinkedWork } from "./linker.ts";
+import { ownCommits, type LinkedWork } from "./linker.ts";
 import { RECORDER_FILE, SETTINGS_FILE } from "./recorder-install.ts";
 
 /** How to fill a gap. */
@@ -40,6 +40,8 @@ export interface Gap {
   ticketIds?: string[];
   /** For a gap of one device's sessions: that device's random id, or `unknown` for records that don't name one. */
   device?: string;
+  /** For the cloud sessions gap: the sessions to teleport. Absent from an anonymized dataset. */
+  teleport?: string[];
   fix: Fix;
 }
 
@@ -184,6 +186,29 @@ export function findGaps({ work, data, config, checkout }: GapInputs): Gap[] {
     });
   }
 
+  // Cloud sessions that left neither a record nor a transcript: their commits are all that is left, until teleported here.
+  const teleport = new Map<string, Set<string>>();
+  for (const ticket of work.tickets) {
+    if (ticket.sessions.length > 0) continue;
+    for (const commit of ownCommits(ticket)) {
+      if (!commit.cloudSessionId || commit.records.length > 0) continue;
+      teleport.set(commit.cloudSessionId, (teleport.get(commit.cloudSessionId) ?? new Set<string>()).add(ticket.id));
+    }
+  }
+  if (teleport.size > 0) {
+    const tickets = new Set([...teleport.values()].flatMap((ids) => [...ids]));
+    const ids = work.tickets.filter((ticket) => tickets.has(ticket.id)).map((ticket) => ticket.id);
+    gaps.push({
+      id: "cloud-sessions",
+      cause: `${String(teleport.size)} cloud session${teleport.size === 1 ? "" : "s"} left neither a session record nor a transcript: only their commits are known. Teleporting one brings its transcript to this device (its compacted part excepted).`,
+      metrics: ["humanMessagesPerTicket", "activeTime", "apiEquivalentCost", "autonomy"],
+      tickets: ids.length,
+      ticketIds: ids,
+      fix: { kind: "command", command: [...teleport.keys()].sort().map((id) => `claude --teleport ${id}`).join("\n") },
+      teleport: [...teleport.keys()].sort(),
+    });
+  }
+
   // The Action.
   const [lastActionRun] = data.actionRuns;
   if (lastActionRun?.conclusion === "startup_failure") {
@@ -272,6 +297,9 @@ export function anonymizeGaps(gaps: Gap[]): Gap[] {
   return gaps.map((gap) => {
     const kept = { ...gap };
     delete kept.ticketIds;
+    delete kept.teleport;
+    // A cloud session's id is no ticket, but it is a link into the account that ran it.
+    if (kept.id === "cloud-sessions") kept.fix = { kind: "command", command: "claude --teleport <session id>, for each of the repo's cloud sessions (run doctor where the repo is not anonymized)" };
     return kept;
   });
 }
