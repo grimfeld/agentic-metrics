@@ -38,6 +38,8 @@ export interface Gap {
   tickets?: number;
   /** Those tickets (`#104`, `PR #136`), in delivery order. Absent from an anonymized dataset. */
   ticketIds?: string[];
+  /** For a gap of one device's sessions: that device's random id, or `unknown` for records that don't name one. */
+  device?: string;
   fix: Fix;
 }
 
@@ -148,15 +150,39 @@ export function findGaps({ work, data, config, checkout }: GapInputs): Gap[] {
     },
     work.tickets.filter((ticket) => ticket.sessions.length === 0).map((ticket) => ticket.id),
   );
-  perTicket(
-    {
-      id: "records-only",
-      cause: "Tickets known only through session records: a record holds no token counts, so their cost is unknown.",
-      metrics: ["apiEquivalentCost"],
-      fix: { kind: "command", command: IMPORT },
-    },
-    work.tickets.filter((ticket) => ticket.sessions.length > 0 && ticket.sessions.every((session) => session.recorded)).map((ticket) => ticket.id),
-  );
+  // Sessions known only through their records, by the device holding their transcripts. A cloud session's transcript is on no device.
+  const byDevice = new Map<string, { sessions: Set<string>; tickets: Set<string> }>();
+  const note = (session: (typeof work.tickets)[number]["sessions"][number], ticket: string | undefined) => {
+    if (!session.recorded || session.recorded.cloud) return;
+    const device = session.recorded.device ?? "unknown";
+    const entry = byDevice.get(device) ?? { sessions: new Set<string>(), tickets: new Set<string>() };
+    entry.sessions.add(session.agentId ?? session.sessionId);
+    if (ticket !== undefined) entry.tickets.add(ticket);
+    byDevice.set(device, entry);
+  };
+  for (const ticket of work.tickets) for (const session of ticket.sessions) note(session, ticket.id);
+  for (const session of work.transcripts.orchestration) note(session, undefined);
+  for (const [device, { sessions, tickets }] of [...byDevice].sort(([a], [b]) => (a === "unknown" ? 1 : b === "unknown" ? -1 : a.localeCompare(b)))) {
+    const ids = work.tickets.filter((ticket) => tickets.has(ticket.id)).map((ticket) => ticket.id);
+    const count = `${String(sessions.size)} session${sessions.size === 1 ? "" : "s"}`;
+    gaps.push({
+      id: "device-transcripts",
+      device,
+      cause:
+        device === "unknown"
+          ? `${count} known only through session records that name no device (written before records did) have no transcript here.`
+          : `${count} from device ${device} have no transcript here: only their session records were read, which hold no token counts.`,
+      metrics: ["apiEquivalentCost", "subAgents"],
+      fix: {
+        kind: "command",
+        command:
+          device === "unknown"
+            ? IMPORT
+            : `npx agentic-metrics import-transcripts <device ${device}'s ~/.cache/agentic-metrics>, or share one synced AGENTIC_METRICS_CACHE_DIR between devices`,
+      },
+      ...(ids.length > 0 ? { tickets: ids.length, ticketIds: ids } : {}),
+    });
+  }
 
   // The Action.
   const [lastActionRun] = data.actionRuns;

@@ -109,3 +109,23 @@ describe("doctor", () => {
     assert.match(out, /No gap: every metric has the data it needs/);
   });
 });
+
+describe("doctor: this device", () => {
+  it("prints this device's id, read from the recorder's config file, and creates none", async () => {
+    const configDir = mkdtempSync(join(tmpdir(), "am-doctor-config-"));
+    try {
+      const run = async () => {
+        let out = "";
+        await main(["doctor"], { cwd, claudeDir, configDir, github: fixtureSource(join(FIXTURES, "lifeline")), stdout: (text) => (out += text) });
+        return out;
+      };
+      assert.match(await run(), /This device: no id yet/);
+      assert.equal(existsSync(join(configDir, "agentic-metrics")), false);
+      mkdirSync(join(configDir, "agentic-metrics"));
+      writeFileSync(join(configDir, "agentic-metrics", "device"), "0a1b2c3d\n");
+      assert.match(await run(), /This device: 0a1b2c3d/);
+    } finally {
+      rmSync(configDir, { recursive: true, force: true });
+    }
+  });
+});

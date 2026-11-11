@@ -55,20 +55,31 @@ function readSettings(path: string): Record<string, unknown> {
   }
 }
 
+/** The id the recorder gave this device (`recorder.mjs`), read and never created; undefined before its first record. */
+export function thisDevice(configDir = process.env["XDG_CONFIG_HOME"] || join(homedir(), ".config")): string | undefined {
+  try {
+    const id = readFileSync(join(configDir, "agentic-metrics", "device"), "utf8").trim();
+    return /^[0-9a-f]{8}$/.test(id) ? id : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** What `doctor` prints: the repo's gaps, largest first, then this device's. */
-export function formatDoctor(repo: string, tickets: number, gaps: Gap[], device: Gap[]): string {
+export function formatDoctor(repo: string, tickets: number, gaps: Gap[], device: Gap[], deviceId?: string): string {
   const lines = [`${repo}: ${String(tickets)} delivered tickets`];
   if (gaps.length === 0) lines.push("", "No gap: every metric has the data it needs.");
-  for (const gap of gaps) lines.push("", ...formatGap(gap));
-  lines.push("", "This device:");
+  for (const gap of gaps) lines.push("", ...formatGap(gap, deviceId));
+  lines.push("", `This device: ${deviceId === undefined ? "no id yet (the recorder gives it one on its first record)" : deviceId}`);
   if (device.length === 0) lines.push("", "The plugin caches this device's transcripts.");
   for (const gap of device) lines.push("", ...formatGap(gap));
   return `${lines.join("\n")}\n`;
 }
 
-function formatGap(gap: Gap): string[] {
+function formatGap(gap: Gap, deviceId?: string): string[] {
   const scope = gap.tickets === undefined ? "repo" : `${String(gap.tickets)} ticket${gap.tickets === 1 ? "" : "s"}`;
-  const lines = [`[${scope}] ${gap.cause}`, `  affects: ${gap.metrics.join(", ")}`];
+  const mine = gap.device !== undefined && gap.device === deviceId ? " This is this device: its transcripts were not cached, or have expired." : "";
+  const lines = [`[${scope}] ${gap.cause}${mine}`, `  affects: ${gap.metrics.join(", ")}`];
   if (gap.ticketIds) lines.push(`  tickets: ${abbreviate(gap.ticketIds)}`);
   lines.push(`  fix: ${fixText(gap.fix)}`);
   return lines;

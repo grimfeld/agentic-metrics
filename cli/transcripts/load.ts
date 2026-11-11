@@ -61,7 +61,13 @@ export interface Session {
    * transcript: it has counts and activity but no API response, so its cost is
    * unknown, not zero. `parent` is its parent's id, for a sub-agent.
    */
-  recorded?: { parent: string | undefined };
+  recorded?: {
+    parent: string | undefined;
+    /** The device it ran on, from its records' `d=`; undefined when they don't say. */
+    device?: string | undefined;
+    /** Its commits carry a `Claude-Session:` trailer: it ran in a cloud session, whose transcript no device holds. */
+    cloud?: boolean;
+  };
 }
 
 export interface ApiResponse {

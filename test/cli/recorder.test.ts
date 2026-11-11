@@ -11,16 +11,24 @@ const RECORDER = join(import.meta.dirname, "../../cli/recorder.mjs");
 const SESSION = "7a63028a-8016-5e56-9126-f53d22b0bd7d";
 const T = 'Session-Record: v1 k=abc active=1 human=0 agents=0 started=2026-11-10T18:00:00Z';
 
+/** This test device's id, as the recorder finds it in its config folder. */
+const DEVICE = "0a1b2c3d";
+
 let repo: string;
+let configDir: string;
 
 beforeEach(() => {
   repo = mkdtempSync(join(tmpdir(), "am-recorder-"));
   mkdirSync(join(repo, ".git"));
+  configDir = mkdtempSync(join(tmpdir(), "am-recorder-config-"));
+  mkdirSync(join(configDir, "agentic-metrics"));
+  writeFileSync(join(configDir, "agentic-metrics", "device"), `${DEVICE}\n`);
 });
 
 afterEach(() => {
   chmodSync(repo, 0o755);
   rmSync(repo, { recursive: true, force: true });
+  rmSync(configDir, { recursive: true, force: true });
 });
 
 /** `HH:MM` on the test day, as the recorder's clock. */
@@ -33,7 +41,7 @@ function hook(time: string, event: Record<string, unknown>, env: Record<string, 
   const result = spawnSync("node", [RECORDER], {
     input: JSON.stringify({ session_id: SESSION, cwd: repo, ...event }),
     encoding: "utf8",
-    env: { PATH: process.env["PATH"] ?? "", CLAUDE_PROJECT_DIR: repo, AGENTIC_METRICS_NOW: at(time), ...env },
+    env: { PATH: process.env["PATH"] ?? "", CLAUDE_PROJECT_DIR: repo, AGENTIC_METRICS_NOW: at(time), XDG_CONFIG_HOME: configDir, ...env },
   });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stderr, "");
@@ -54,7 +62,7 @@ function rewritten(time: string, command: string, extra: Record<string, unknown>
   return parsed.hookSpecificOutput.updatedInput;
 }
 
-const record = (command: string | undefined) => /Session-Record: (v1 k=([0-9a-f]{12}) active=(\d+) human=(\d+) agents=(\d+) started=(\S+?)(?: parent=([0-9a-f]{12}))?)"/.exec(command ?? "");
+const record = (command: string | undefined) => /Session-Record: (v1 k=([0-9a-f]{12}) active=(\d+) human=(\d+) agents=(\d+) started=(\S+?)(?: parent=([0-9a-f]{12}))?(?: d=([0-9a-f]{8}))?)"/.exec(command ?? "");
 
 describe("recorder: counters", () => {
   it("records a session's human messages, active time and start on the commit it makes", () => {
@@ -134,6 +142,34 @@ describe("recorder: counters", () => {
   });
 });
 
+describe("recorder: device id", () => {
+  it("adds this device's id to the record", () => {
+    assert.equal(record(rewritten("18:00", 'git commit -m "x"')?.command)?.[8], DEVICE);
+  });
+
+  it("creates a random id on first use, and keeps it", () => {
+    rmSync(join(configDir, "agentic-metrics"), { recursive: true });
+    const first = record(rewritten("18:00", 'git commit -m "x"')?.command)?.[8];
+    const second = record(rewritten("18:01", 'git commit -m "y"')?.command)?.[8];
+
+    assert.match(first ?? "", /^[0-9a-f]{8}$/);
+    assert.equal(second, first);
+    assert.equal(readFileSync(join(configDir, "agentic-metrics", "device"), "utf8").trim(), first);
+  });
+
+  it("leaves the id out, and still adds the record, when the config folder can't be written", () => {
+    rmSync(join(configDir, "agentic-metrics"), { recursive: true });
+    chmodSync(configDir, 0o500);
+    try {
+      const out = rewritten("18:00", 'git commit -m "x"');
+      assert.ok(record(out?.command));
+      assert.equal(record(out?.command)?.[8], undefined);
+    } finally {
+      chmodSync(configDir, 0o755);
+    }
+  });
+});
+
 describe("recorder: end to end", () => {
   it("writes a record that git keeps as a trailer and collect reads back", () => {
     rmSync(join(repo, ".git"), { recursive: true });
@@ -151,8 +187,8 @@ describe("recorder: end to end", () => {
     assert.equal(commit.status, 0, commit.stderr);
 
     const body = git("log", "-1", "--format=%b").stdout;
-    assert.match(git("log", "-1", "--format=%(trailers:key=Session-Record)").stdout, /^Session-Record: v1 k=[0-9a-f]{12} active=240 human=1 agents=0 started=2026-11-10T18:00:00Z\n+$/);
-    assert.deepEqual(parseRecords(body), [{ key: recordKey(SESSION), activeMs: 240_000, human: 1, agents: 0, startedAt: new Date("2026-11-10T18:00:00Z"), parent: undefined }]);
+    assert.match(git("log", "-1", "--format=%(trailers:key=Session-Record)").stdout, /^Session-Record: v1 k=[0-9a-f]{12} active=240 human=1 agents=0 started=2026-11-10T18:00:00Z d=0a1b2c3d\n+$/);
+    assert.deepEqual(parseRecords(body), [{ key: recordKey(SESSION), activeMs: 240_000, human: 1, agents: 0, startedAt: new Date("2026-11-10T18:00:00Z"), parent: undefined, device: DEVICE }]);
     // The state it keeps is not something git would commit.
     assert.equal(git("status", "--porcelain").stdout, "");
   });
@@ -168,7 +204,7 @@ describe("recorder: never in the way", () => {
 
   it("does nothing, and exits 0, on an event it cannot read or outside a git repo", () => {
     for (const input of ["", "not json", "null", "[]", '{"hook_event_name":"PreToolUse"}']) {
-      const result = spawnSync("node", [RECORDER], { input, encoding: "utf8", env: { PATH: process.env["PATH"] ?? "", CLAUDE_PROJECT_DIR: repo } });
+      const result = spawnSync("node", [RECORDER], { input, encoding: "utf8", env: { PATH: process.env["PATH"] ?? "", CLAUDE_PROJECT_DIR: repo, XDG_CONFIG_HOME: configDir } });
       assert.deepEqual({ status: result.status, stdout: result.stdout, stderr: result.stderr }, { status: 0, stdout: "", stderr: "" }, input);
     }
     rmSync(join(repo, ".git"), { recursive: true });

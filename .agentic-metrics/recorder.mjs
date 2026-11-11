@@ -15,16 +15,21 @@
 //   agents    the sub-agents it spawned (each has counters of its own).
 // When the agent runs `git commit`, or `git merge` with a message, it rewrites
 // the command to add the record as a trailer:
-//   Session-Record: v1 k=<key> active=<seconds> human=<n> agents=<n> started=<time> [parent=<key>]
+//   Session-Record: v1 k=<key> active=<seconds> human=<n> agents=<n> started=<time> [parent=<key>] [d=<device>]
 // Counts only: the key is a hash, and no session id, path or text is written.
+// The device is a random id this script creates once per device, in the user's
+// config folder (`~/.config/agentic-metrics/device`), so that `collect` can say
+// which device holds the transcripts of a recorded session. It is never
+// derived from the device's name or the user's.
 //
 // It returns no permission decision, so the rewritten command goes through the
 // session's own permission flow, and it never blocks or fails anything: on any
 // error it prints nothing and exits 0.
 import { execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { homedir } from "node:os";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
 
@@ -201,6 +206,26 @@ function gitAddsTrailers() {
   }
 }
 
+/** This device's id, created on first use; undefined when it can't be read or written (the record goes without it). */
+export function deviceId() {
+  try {
+    const file = join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "agentic-metrics", "device");
+    if (!existsSync(file)) {
+      mkdirSync(dirname(file), { recursive: true });
+      // `wx`: two hooks racing on the first use keep one id.
+      try {
+        writeFileSync(file, `${randomBytes(4).toString("hex")}\n`, { flag: "wx" });
+      } catch {
+        // Written by the other one.
+      }
+    }
+    const id = readFileSync(file, "utf8").trim();
+    return /^[0-9a-f]{8}$/.test(id) ? id : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function record(event) {
   const sessionId = event.session_id;
   if (typeof sessionId !== "string" || sessionId === "") return undefined;
@@ -227,6 +252,8 @@ function record(event) {
   const agents = agentId === undefined ? readdirSync(dir).filter((name) => name.startsWith(`${sessionKey}.`) && name.endsWith(".json") && name !== `${sessionKey}.json`).length : 0;
   const parts = [`v${String(RECORDER_VERSION)}`, `k=${key}`, `active=${String(Math.round(state.activeMs / 1000))}`, `human=${String(state.human)}`, `agents=${String(agents)}`, `started=${isoSeconds(state.started)}`];
   if (agentId !== undefined) parts.push(`parent=${sessionKey}`);
+  const device = deviceId();
+  if (device !== undefined) parts.push(`d=${device}`);
   return `${TRAILER}: ${parts.join(" ")}`;
 }
 

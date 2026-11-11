@@ -6,7 +6,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../../cli/main.ts";
 import { fixtureSource } from "../../cli/github/source.ts";
-import type { Gap } from "../../cli/gaps.ts";
+import { readConfig } from "../../cli/config.ts";
+import { findGaps, type Gap } from "../../cli/gaps.ts";
+import type { GitHubData } from "../../cli/github/load.ts";
+import type { LinkedWork } from "../../cli/linker.ts";
+import type { Session } from "../../cli/transcripts/load.ts";
 
 const FIXTURES = join(import.meta.dirname, "../fixtures/github");
 const NOW = new Date("2026-11-09T12:00:00Z");
@@ -179,5 +183,44 @@ describe("gaps", () => {
     writeFileSync(file, JSON.stringify(dataset));
 
     assert.equal(await main(["report"], { cwd, stdout: () => {} }), 0);
+  });
+});
+
+describe("gaps: devices", () => {
+  /** A session read from records, on `device`; `cloud` when its commits came from a cloud session. */
+  const recorded = (key: string, device?: string, cloud = false) =>
+    ({ sessionId: `record:${key}`, agentId: undefined, recorded: { parent: undefined, device, cloud }, humanMessages: [], spawns: [], responses: [] }) as unknown as Session;
+  const transcript = { sessionId: "s1", agentId: undefined, humanMessages: [], spawns: [], responses: [] } as unknown as Session;
+
+  function devices(tickets: { id: string; sessions: Session[] }[], orchestration: Session[] = []) {
+    const work = { tickets, transcripts: { sessions: 0, orchestration }, ci: { mainWorkflow: "check.yml" } } as unknown as LinkedWork;
+    const data = { actionRuns: [{ createdAt: new Date(), conclusion: "success" }], regressions: [{}] } as unknown as GitHubData;
+    return findGaps({ work, data, config: readConfig(cwd), checkout: undefined }).filter((gap) => gap.id === "device-transcripts");
+  }
+
+  it("names the other device whose sessions have only records here, with the tickets they worked on", () => {
+    const gaps = devices([
+      { id: "#1", sessions: [transcript] },
+      { id: "#2", sessions: [recorded("aa", "0a1b2c3d")] },
+      { id: "#3", sessions: [recorded("aa", "0a1b2c3d"), recorded("bb", "0a1b2c3d")] },
+    ]);
+
+    const [gap, ...rest] = gaps;
+    assert.ok(gap);
+    assert.equal(rest.length, 0);
+    assert.equal(gap.device, "0a1b2c3d");
+    assert.match(gap.cause, /^2 sessions from device 0a1b2c3d have no transcript here/);
+    assert.deepEqual(gap.ticketIds, ["#2", "#3"]);
+    assert.match(JSON.stringify(gap.fix), /import-transcripts <device 0a1b2c3d's/);
+  });
+
+  it("counts records that name no device under an unknown device", () => {
+    const gaps = devices([{ id: "#1", sessions: [recorded("aa")] }], [recorded("cc", "ffff0000")]);
+
+    assert.deepEqual(gaps.map((gap) => [gap.device, gap.tickets]), [["ffff0000", undefined], ["unknown", 1]]);
+  });
+
+  it("leaves cloud sessions out: no device holds their transcript", () => {
+    assert.deepEqual(devices([{ id: "#1", sessions: [recorded("aa", "0a1b2c3d", true)] }]), []);
   });
 });

@@ -30,6 +30,8 @@ export interface SessionRecord {
   startedAt: Date | undefined;
   /** Set for a sub-agent: its parent session's key. */
   parent: string | undefined;
+  /** The random id of the device the session ran on (`d=`); undefined in records written before it. */
+  device?: string | undefined;
 }
 
 const LINE = /^[ \t]*session-record:[ \t]*v1[ \t]+(.*)$/gim;
@@ -46,6 +48,7 @@ export function parseRecords(body: string): SessionRecord[] {
     if (key === undefined || !/^[0-9a-f]{6,64}$/.test(key) || active === undefined) continue;
     const started = Date.parse(fields.get("started") ?? "");
     const parent = fields.get("parent");
+    const device = fields.get("d");
     const record: SessionRecord = {
       key,
       activeMs: active * 1000,
@@ -53,6 +56,7 @@ export function parseRecords(body: string): SessionRecord[] {
       agents: count("agents") ?? 0,
       startedAt: Number.isFinite(started) ? new Date(started) : undefined,
       parent: parent !== undefined && /^[0-9a-f]{6,64}$/.test(parent) ? parent : undefined,
+      ...(device !== undefined && /^[0-9a-f]{8}$/.test(device) ? { device } : {}),
     };
     const seen = byKey.get(key);
     if (!seen || record.activeMs > seen.activeMs) byKey.set(key, record);
@@ -164,7 +168,11 @@ function sessionOf(key: string, steps: readonly Step[]): Session {
     sessionId: id,
     // A sub-agent's record: counted as a sub-agent, under its own key.
     agentId: record?.parent === undefined ? undefined : id,
-    recorded: { parent: record?.parent === undefined ? undefined : `record:${record.parent}` },
+    recorded: {
+      parent: record?.parent === undefined ? undefined : `record:${record.parent}`,
+      device: steps.find((step) => step.record.device !== undefined)?.record.device,
+      cloud: steps.some((step) => step.commit.cloudSession),
+    },
     branches: new Map(),
     cwds: [],
     prLinks: [],

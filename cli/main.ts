@@ -9,7 +9,7 @@ import { classifyAutonomy } from "./autonomy.ts";
 import { CASE_STUDIES_DIR, readApproved, writeDrafts, type CaseStudy } from "./case-studies.ts";
 import { CONFIG_FILE, readConfig, type Config } from "./config.ts";
 import { buildDataset, datasetPath, SCHEMA_VERSION, type Dataset } from "./dataset.ts";
-import { defaultClaudeDir, deviceGaps, formatDoctor } from "./doctor.ts";
+import { defaultClaudeDir, deviceGaps, formatDoctor, thisDevice } from "./doctor.ts";
 import { findGaps, inspectCheckout, type Gap } from "./gaps.ts";
 import { cachedSource, defaultCacheDir } from "./github/cache.ts";
 import { loadGitHub, type GitHubData } from "./github/load.ts";
@@ -46,6 +46,8 @@ export interface Dependencies {
   localRepo?: (dir: string) => Promise<string | undefined>;
   /** Claude Code's user folder, which `doctor` reads this device's settings from. Defaults to ~/.claude. */
   claudeDir?: string;
+  /** The user's config folder, where the recorder keeps this device's id. Defaults to $XDG_CONFIG_HOME, else ~/.config. */
+  configDir?: string;
   now?: () => Date;
   stdout?: (text: string) => void;
   stderr?: (text: string) => void;
@@ -224,7 +226,7 @@ async function collect(args: string[], deps: Dependencies, stdout: (text: string
 async function doctor(args: string[], deps: Dependencies, stdout: (text: string) => void, stderr: (text: string) => void): Promise<void> {
   const { values } = parseArgs({ args, options: { repo: { type: "string" }, checkout: { type: "string" } } });
   const { data, work, gaps } = await gather(values, deps, stderr);
-  stdout(formatDoctor(data.repo.fullName, work.tickets.length, gaps, deviceGaps(deps.claudeDir ?? defaultClaudeDir())));
+  stdout(formatDoctor(data.repo.fullName, work.tickets.length, gaps, deviceGaps(deps.claudeDir ?? defaultClaudeDir()), thisDevice(deps.configDir)));
 }
 
 async function initCommand(args: string[], deps: Dependencies, stdout: (text: string) => void): Promise<void> {
