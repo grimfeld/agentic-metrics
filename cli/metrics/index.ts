@@ -4,6 +4,7 @@ import { activeTime, estimatedActiveTime } from "./active-time.ts";
 import { attempts } from "./attempts.ts";
 import { autonomy } from "./autonomy.ts";
 import { batchHealth } from "./batch-health.ts";
+import { ciDuration } from "./ci-duration.ts";
 import { estimateVsActual } from "./estimate-vs-actual.ts";
 import { firstRunCiRate } from "./first-run-ci.ts";
 import { fixCycles } from "./fix-cycles.ts";
@@ -13,6 +14,7 @@ import { leadTime } from "./lead-time.ts";
 import { orchestrationTime } from "./orchestration-time.ts";
 import { netLinesRemoved } from "./net-lines-removed.ts";
 import { regressionRate } from "./regression-rate.ts";
+import { reviewWait } from "./review-wait.ts";
 import { scheduledFailures } from "./scheduled-failures.ts";
 import { size } from "./size.ts";
 import { skills } from "./skills.ts";
@@ -29,6 +31,8 @@ export const METRICS: readonly Metric<unknown>[] = [
   attempts,
   firstRunCiRate,
   fixCycles,
+  reviewWait,
+  ciDuration,
   scheduledFailures,
   batchHealth,
   regressionRate,

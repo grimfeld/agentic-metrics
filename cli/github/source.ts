@@ -69,7 +69,8 @@ query($owner: String!, $name: String!, $endCursor: String) {
         commits(first: 100) { nodes { commit { oid authoredDate messageHeadline messageBody additions deletions changedFilesIfAvailable parents(first: 10) { nodes { oid } } } } }
         labels(first: 20) { nodes { name } }
         files(first: 100) { totalCount nodes { path additions deletions } }
-        reviews(first: 100, states: [CHANGES_REQUESTED]) { nodes { submittedAt } }
+        reviews(first: 100) { nodes { submittedAt state author { __typename } } }
+        timelineItems(first: 20, itemTypes: [READY_FOR_REVIEW_EVENT]) { nodes { __typename ... on ReadyForReviewEvent { createdAt } } }
       }
     }
   }

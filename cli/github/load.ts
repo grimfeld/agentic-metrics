@@ -12,6 +12,14 @@ export interface Repo {
   url: string;
 }
 
+export interface Review {
+  at: Date;
+  /** `APPROVED`, `CHANGES_REQUESTED`, `COMMENTED`, `DISMISSED`. */
+  state: string;
+  /** By a bot (an app or an Action), not a person. */
+  byBot: boolean;
+}
+
 export interface PullRequest {
   number: number;
   title: string;
@@ -46,6 +54,10 @@ export interface PullRequest {
   references: number[];
   /** When its reviews requesting changes were submitted (first 100). */
   changesRequestedAt: Date[];
+  /** Its reviews (first 100), oldest first as GitHub lists them; none in data read before reviews were. */
+  reviews?: Review[];
+  /** When it was last marked ready for review, for a PR opened as a draft. */
+  readyForReviewAt?: Date | undefined;
   /** The commit its merge made on its base branch (a merge, squash or the last rebased commit); undefined when GitHub did not say. */
   mergeCommitOid?: string | undefined;
 }
@@ -99,6 +111,8 @@ export interface WorkflowRun {
   conclusion: string | undefined;
   /** The conclusion of its first attempt; undefined while it runs, or when a re-run's first attempt was not read. */
   firstAttemptConclusion: string | undefined;
+  /** How long its first attempt ran, start to last update, in ms; undefined while it runs or when not recorded. */
+  firstAttemptMs?: number | undefined;
 }
 
 export interface ChangedFile {
@@ -216,7 +230,8 @@ interface RawPullRequest {
   commits?: { nodes: { commit: RawCommit }[] };
   labels?: RawLabels;
   files?: { totalCount: number; nodes: ChangedFile[] } | null;
-  reviews?: { nodes: { submittedAt: string | null }[] };
+  reviews?: { nodes: { submittedAt: string | null; state?: string; author?: { __typename?: string } | null }[] };
+  timelineItems?: { nodes: { createdAt?: string }[] };
 }
 
 interface RawCommit {
@@ -241,7 +256,9 @@ interface RawRun {
   status: string;
   conclusion: string | null;
   run_attempt: number;
-  first_attempt?: { conclusion: string | null; status: string };
+  run_started_at?: string;
+  updated_at?: string;
+  first_attempt?: { conclusion: string | null; status: string; run_started_at?: string; updated_at?: string };
 }
 
 interface RawIssue {
@@ -302,9 +319,16 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
               commits: (pr.commits?.nodes ?? []).map((node) => commitOf(node.commit)),
               labels: labelNames(pr.labels),
               references: references(`${pr.title}\n${pr.body ?? ""}`),
+              // Reviews recorded before their state was read were changes-requested ones: the query asked for no other.
               changesRequestedAt: (pr.reviews?.nodes ?? []).flatMap((review) =>
-                review.submittedAt === null ? [] : [new Date(review.submittedAt)],
+                review.submittedAt === null || (review.state ?? "CHANGES_REQUESTED") !== "CHANGES_REQUESTED" ? [] : [new Date(review.submittedAt)],
               ),
+              reviews: (pr.reviews?.nodes ?? []).flatMap((review) =>
+                review.submittedAt === null || review.state === undefined
+                  ? []
+                  : [{ at: new Date(review.submittedAt), state: review.state, byBot: review.author?.__typename === "Bot" }],
+              ),
+              readyForReviewAt: (pr.timelineItems?.nodes ?? []).flatMap((event) => (event.createdAt ? [new Date(event.createdAt)] : [])).sort((a, b) => b.getTime() - a.getTime())[0],
               mergeCommitOid: pr.mergeCommit?.oid ?? undefined,
             },
           ],
@@ -357,7 +381,9 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
     .filter((run) => run.event !== "dynamic" && run.path !== ACTION_WORKFLOW)
     .map((run): WorkflowRun => {
       const conclusion = run.status === "completed" ? (run.conclusion ?? undefined) : undefined;
-      const first = run.run_attempt <= 1 ? { status: run.status, conclusion: run.conclusion } : run.first_attempt;
+      const first = run.run_attempt <= 1 ? { status: run.status, conclusion: run.conclusion, run_started_at: run.run_started_at, updated_at: run.updated_at } : run.first_attempt;
+      const started = Date.parse(first?.run_started_at ?? "");
+      const ended = Date.parse(first?.updated_at ?? "");
       return {
         id: run.id,
         name: run.name,
@@ -368,6 +394,7 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
         createdAt: new Date(run.created_at),
         conclusion,
         firstAttemptConclusion: first?.status === "completed" ? (first.conclusion ?? undefined) : undefined,
+        firstAttemptMs: first?.status === "completed" && Number.isFinite(started) && Number.isFinite(ended) && ended >= started ? ended - started : undefined,
       };
     })
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.id - a.id);
