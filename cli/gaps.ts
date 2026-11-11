@@ -108,10 +108,12 @@ export interface GapInputs {
   checkout: CheckoutState | undefined;
   /** The conventions inferred from history for the fields the config doesn't set (`infer.ts`). */
   inferred?: Inferred | undefined;
+  /** Whether blame tracing could run: it needs a full clone. */
+  blame?: "ready" | "no-clone" | "shallow" | undefined;
 }
 
 /** The repo's gaps: repo-level ones first, then by the number of tickets affected. */
-export function findGaps({ work, data, config, checkout, inferred }: GapInputs): Gap[] {
+export function findGaps({ work, data, config, checkout, inferred, blame }: GapInputs): Gap[] {
   const gaps: Gap[] = [];
   const perTicket = (gap: Omit<Gap, "tickets" | "ticketIds">, ids: string[]) => {
     if (ids.length > 0) gaps.push({ ...gap, tickets: ids.length, ticketIds: ids });
@@ -257,6 +259,18 @@ export function findGaps({ work, data, config, checkout, inferred }: GapInputs):
       cause: "No delivered PR closes an issue: every PR is its own ticket, and its lead time starts at its first commit or its opening.",
       metrics: ["leadTime", "throughput", "estimateVsActual"],
       fix: { kind: "convention", text: "Open an issue for each piece of work, and close it from its PR (\"Closes #N\" in the description, or the issue number in the branch name)." },
+    });
+  }
+
+  if ((blame === "no-clone" || blame === "shallow") && work.tickets.length > 0) {
+    gaps.push({
+      id: "no-blame",
+      cause:
+        blame === "shallow"
+          ? "The clone is shallow: regressions can't be traced from the history of the lines bug fixes changed."
+          : "No clone of the repo was read: regressions can't be traced from the history of the lines bug fixes changed.",
+      metrics: ["regressionRate"],
+      fix: { kind: "command", command: blame === "shallow" ? "git fetch --unshallow" : WITH_CHECKOUT },
     });
   }
 

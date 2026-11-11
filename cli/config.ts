@@ -34,6 +34,8 @@ export interface Config {
    * the most PRs.
    */
   ciWorkflow?: string | undefined;
+  /** How long after a ticket's delivery a fix's changed lines may still name it as an inferred regression's cause, in days. */
+  regressionWindowDays: number;
 }
 
 export interface AutonomyThresholds {
@@ -65,6 +67,7 @@ const DEFAULTS: Config = {
   integrationBranchPrefixes: ["integration/"],
   exclude: { authors: [], branches: [] },
   autonomy: { fullMaxFollowUps: 1, fullMinClaudeCommitShare: 1 },
+  regressionWindowDays: 90,
 };
 
 export function readConfig(repoDir: string): Config {
@@ -131,6 +134,11 @@ export function readConfig(repoDir: string): Config {
     };
   }
   if ("autonomy" in fields) config.autonomy = autonomyThresholds(fields["autonomy"]);
+  if ("regressionWindowDays" in fields) {
+    const days = fields["regressionWindowDays"];
+    if (typeof days !== "number" || !(days > 0)) throw new Error(`${CONFIG_FILE}: regressionWindowDays must be a number of days over 0`);
+    config.regressionWindowDays = days;
+  }
   return config;
 }
 

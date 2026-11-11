@@ -1,8 +1,12 @@
 // Regressions inferred from reverts, shown apart from declared ones.
-import { describe, it } from "node:test";
+import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { PullRequest, RegressionIssue } from "../../cli/github/load.ts";
-import { revertRegressions } from "../../cli/inferred-regressions.ts";
+import { blameReady, blameRegressions, revertRegressions } from "../../cli/inferred-regressions.ts";
 import type { LinkedWork, Ticket } from "../../cli/linker.ts";
 import { regressionRate } from "../../cli/metrics/regression-rate.ts";
 
@@ -55,5 +59,73 @@ describe("regressions inferred from reverts", () => {
     assert.equal(result.value.regressions, 1, "declared: #99 on PR #12");
     assert.deepEqual(result.value.inferred?.perTicket, [{ ticket: "PR #13", by: [{ pr: 21, how: "revert" }] }]);
     assert.equal(result.value.inferred.regressions, 1);
+  });
+});
+
+describe("regressions inferred by blame", () => {
+  let dir: string;
+  const git = (...args: string[]) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd: dir, encoding: "utf8" }).trim();
+  /** Writes `file`, commits it, and returns the commit. */
+  const commit = (file: string, text: string, message: string) => {
+    writeFileSync(join(dir, file), text);
+    git("add", file);
+    git("commit", "-q", "-m", message);
+    return git("rev-parse", "HEAD");
+  };
+  const merged = (number: number, oid: string, day: number, extra: { title?: string; branch?: string } = {}) =>
+    ({ number, title: extra.title ?? `PR ${String(number)}`, headRefName: extra.branch ?? `b${String(number)}`, body: "", closes: [], mergedAt: at(day), commits: [{ oid }], mergeCommitOid: oid }) as unknown as PullRequest;
+  const blamed = (prs: PullRequest[], windowDays = 90) =>
+    blameRegressions(work(prs), [], { dir, bugLabel: "bug", windowDays }).map(({ cause, by, how }) => [cause.id, by.number, how]);
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "am-blame-"));
+    git("init", "-q");
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("names the PR that last touched the lines a fix changed", () => {
+    const base = merged(1, commit("a.txt", "one\ntwo\nthree\n", "base"), 1);
+    const feature = merged(2, commit("a.txt", "one\nTWO\nthree\n", "feature"), 5);
+    const fix = merged(3, commit("a.txt", "one\n2\nthree\n", "fix: two"), 15, { title: "fix: two" });
+
+    assert.deepEqual(blamed([base, feature, fix]), [["PR #2", 3, "blame"]]);
+  });
+
+  it("names none when those lines were last touched outside the window", () => {
+    const feature = merged(2, commit("a.txt", "one\ntwo\n", "feature"), 1);
+    const fix = merged(3, commit("a.txt", "one\n2\n", "fix"), 100, { branch: "fix/two" });
+
+    assert.deepEqual(blamed([feature, fix], 90), []);
+    assert.deepEqual(blamed([feature, fix], 120), [["PR #2", 3, "blame"]]);
+  });
+
+  it("never traces added lines", () => {
+    const feature = merged(2, commit("a.txt", "one\n", "feature"), 1);
+    const fix = merged(3, commit("a.txt", "one\nadded\n", "fix"), 5, { title: "fix: add a line" });
+
+    assert.deepEqual(blamed([feature, fix]), []);
+  });
+
+  it("traces only bug fixes", () => {
+    const feature = merged(2, commit("a.txt", "one\n", "feature"), 1);
+    const change = merged(3, commit("a.txt", "uno\n", "change"), 5, { title: "Rename one" });
+
+    assert.deepEqual(blamed([feature, change]), []);
+  });
+
+  it("says a shallow clone can't be traced", () => {
+    commit("a.txt", "1\n", "one");
+    commit("a.txt", "2\n", "two");
+    const shallow = mkdtempSync(join(tmpdir(), "am-blame-shallow-"));
+    try {
+      execFileSync("git", ["clone", "-q", "--depth", "1", `file://${dir}`, shallow]);
+      assert.equal(blameReady(shallow), "shallow");
+      assert.equal(blameReady(dir), "ready");
+      assert.equal(blameReady(tmpdir()), "no-clone");
+    } finally {
+      rmSync(shallow, { recursive: true, force: true });
+    }
   });
 });

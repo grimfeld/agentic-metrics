@@ -46,6 +46,8 @@ export interface PullRequest {
   references: number[];
   /** When its reviews requesting changes were submitted (first 100). */
   changesRequestedAt: Date[];
+  /** The commit its merge made on its base branch (a merge, squash or the last rebased commit); undefined when GitHub did not say. */
+  mergeCommitOid?: string | undefined;
 }
 
 /** What a commit's trailers say about who wrote it. */
@@ -171,6 +173,7 @@ interface RawRepo {
 
 interface RawPullRequest {
   number: number;
+  mergeCommit?: { oid: string } | null;
   title: string;
   url: string;
   body?: string | null;
@@ -275,6 +278,7 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
               changesRequestedAt: (pr.reviews?.nodes ?? []).flatMap((review) =>
                 review.submittedAt === null ? [] : [new Date(review.submittedAt)],
               ),
+              mergeCommitOid: pr.mergeCommit?.oid ?? undefined,
             },
           ],
     );

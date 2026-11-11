@@ -62,6 +62,7 @@ query($owner: String!, $name: String!, $endCursor: String) {
       pageInfo { hasNextPage endCursor }
       nodes {
         number title url body createdAt updatedAt mergedAt baseRefName headRefName
+        mergeCommit { oid }
         author { login __typename }
         closingIssuesReferences(first: 50) { nodes { number repository { nameWithOwner } } }
         additions deletions changedFiles

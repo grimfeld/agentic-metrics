@@ -9,7 +9,7 @@ import { classifyAutonomy } from "./autonomy.ts";
 import { CASE_STUDIES_DIR, readApproved, writeDrafts, type CaseStudy } from "./case-studies.ts";
 import { CONFIG_FILE, configuredFields, readConfig, type Config } from "./config.ts";
 import { inferConventions, withInferred } from "./infer.ts";
-import { revertRegressions } from "./inferred-regressions.ts";
+import { blameReady, blameRegressions, revertRegressions } from "./inferred-regressions.ts";
 import { buildDataset, datasetPath, SCHEMA_VERSION, type Dataset } from "./dataset.ts";
 import { defaultClaudeDir, deviceGaps, formatDoctor, thisDevice } from "./doctor.ts";
 import { findGaps, inspectCheckout, type Gap } from "./gaps.ts";
@@ -179,8 +179,14 @@ async function gather(
       : transcriptCache({ dir: cacheDir ?? defaultCacheDir(), repoDir: resolve(deps.cwd, checkout), repo: data.repo.fullName }));
   const sessions = loadSessions(await transcripts.read());
   const linked = classifyAutonomy(linkRecords(linkSessions(link(data, config), sessions, config, data.repo.fullName), sessions), config.autonomy);
-  const work = { ...linked, inferredRegressions: revertRegressions(linked) };
-  const gaps = findGaps({ work, data, config, inferred, checkout: checkout === undefined ? undefined : inspectCheckout(resolve(deps.cwd, checkout)) });
+  // Blame tracing needs the repo's full history: the clone's, when there is one.
+  const blame = checkout === undefined ? "no-clone" : blameReady(resolve(deps.cwd, checkout));
+  const blamed =
+    blame === "ready" && checkout !== undefined
+      ? blameRegressions(linked, data.issues, { dir: resolve(deps.cwd, checkout), bugLabel: config.bugLabel, windowDays: config.regressionWindowDays })
+      : [];
+  const work = { ...linked, inferredRegressions: [...revertRegressions(linked), ...blamed] };
+  const gaps = findGaps({ work, data, config, inferred, blame, checkout: checkout === undefined ? undefined : inspectCheckout(resolve(deps.cwd, checkout)) });
   return { config, data, work, gaps };
 }
 
