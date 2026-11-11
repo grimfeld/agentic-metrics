@@ -193,7 +193,7 @@ describe("gaps: devices", () => {
   const transcript = { sessionId: "s1", agentId: undefined, humanMessages: [], spawns: [], responses: [] } as unknown as Session;
 
   function devices(tickets: { id: string; sessions: Session[] }[], orchestration: Session[] = []) {
-    const work = { tickets, transcripts: { sessions: 0, orchestration }, ci: { mainWorkflow: "check.yml" } } as unknown as LinkedWork;
+    const work = { tickets: tickets.map((ticket) => ({ ...ticket, pullRequests: [] })), transcripts: { sessions: 0, orchestration }, ci: { mainWorkflow: "check.yml" } } as unknown as LinkedWork;
     const data = { actionRuns: [{ createdAt: new Date(), conclusion: "success" }], regressions: [{}] } as unknown as GitHubData;
     return findGaps({ work, data, config: readConfig(cwd), checkout: undefined }).filter((gap) => gap.id === "device-transcripts");
   }

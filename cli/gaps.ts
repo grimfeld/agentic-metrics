@@ -274,6 +274,17 @@ export function findGaps({ work, data, config, checkout, inferred, blame }: GapI
     });
   }
 
+  // GitHub lists at most 100 commits and 100 files per PR.
+  perTicket(
+    {
+      id: "truncated-prs",
+      cause: "Tickets with a PR of more than 100 commits or 100 changed files: GitHub lists only the first 100, so figures read from them are partial.",
+      metrics: ["size", "testRatio", "autonomy", "estimatedActiveTime", "leadTime", "humanMessagesPerTicket"],
+      fix: { kind: "unfixable", reason: "GitHub's API lists at most 100 commits and 100 files of a pull request." },
+    },
+    work.tickets.filter((ticket) => ticket.pullRequests.some((pr) => !pr.filesComplete || pr.commitsComplete === false)).map((ticket) => ticket.id),
+  );
+
   // Conventions.
   perTicket(
     {

@@ -26,7 +26,7 @@ const CI = new Set(["firstRunCiRate", "fixCycles", "reviewWait", "ciDuration", "
  * on a repo with no transcript).
  */
 const ESTIMATED = "estimatedActiveTime";
-const PART_1 = ["reviewWait", "ciDuration", "activeTime", "estimatedActiveTime", "leadTime", "throughput", "firstRunCiRate", "fixCycles", "scheduledFailures", "batchHealth", "regressionRate", "humanMessagesPerTicket"];
+const PART_1 = ["regressionTiming", "reviewWait", "ciDuration", "activeTime", "estimatedActiveTime", "leadTime", "throughput", "firstRunCiRate", "fixCycles", "scheduledFailures", "batchHealth", "regressionRate", "humanMessagesPerTicket"];
 const PART_2 = ["attempts", "friction", "orchestrationTime", "subAgents", "skills", "apiEquivalentCost", "autonomy", "testRatio", "netLinesRemoved", "size", "estimateVsActual"];
 /** Repo-level metrics: no ticket owns them, so they have no per-ticket table. */
 const REPO_LEVEL = new Set(["orchestrationTime"]);

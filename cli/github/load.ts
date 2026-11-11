@@ -44,6 +44,8 @@ export interface PullRequest {
   files: ChangedFile[];
   /** Whether `files` lists every changed file. */
   filesComplete: boolean;
+  /** Whether `commits` lists every commit; true when GitHub did not say. */
+  commitsComplete?: boolean;
   /** The earliest authored date among its commits; undefined when GitHub returned none. */
   firstCommitAt: Date | undefined;
   /** Its commits (first 100), oldest first as GitHub lists them. Commit messages never reach the dataset. */
@@ -153,6 +155,10 @@ export interface Comment {
 /** An issue labelled as a regression. */
 export interface RegressionIssue {
   number: number;
+  /** When it was opened; undefined in data read before. */
+  createdAt?: Date | undefined;
+  /** When it was closed, whatever the reason. */
+  closedAt?: Date | undefined;
   /** Issue numbers named by `caused-by: #N` lines in its body or comments, in order, without repeats. */
   causedBy: number[];
   /** Closed as completed (not as not planned or a duplicate): the regression was fixed. */
@@ -227,7 +233,7 @@ interface RawPullRequest {
   additions?: number;
   deletions?: number;
   changedFiles?: number;
-  commits?: { nodes: { commit: RawCommit }[] };
+  commits?: { totalCount?: number; nodes: { commit: RawCommit }[] };
   labels?: RawLabels;
   files?: { totalCount: number; nodes: ChangedFile[] } | null;
   reviews?: { nodes: { submittedAt: string | null; state?: string; author?: { __typename?: string } | null }[] };
@@ -275,6 +281,7 @@ interface RawIssue {
 
 interface RawRegressionIssue {
   number: number;
+  createdAt?: string;
   body: string;
   closedAt?: string | null;
   stateReason?: string | null;
@@ -317,6 +324,7 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
               ),
               ...diffOf(pr),
               commits: (pr.commits?.nodes ?? []).map((node) => commitOf(node.commit)),
+              commitsComplete: pr.commits?.totalCount === undefined || (pr.commits.nodes.length >= pr.commits.totalCount),
               labels: labelNames(pr.labels),
               references: references(`${pr.title}\n${pr.body ?? ""}`),
               // Reviews recorded before their state was read were changes-requested ones: the query asked for no other.
@@ -364,6 +372,8 @@ export async function loadGitHub(source: GitHubSource): Promise<GitHubData> {
       const comments = [...issue.comments.nodes].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
       return {
         number: issue.number,
+        createdAt: issue.createdAt ? new Date(issue.createdAt) : undefined,
+        closedAt: issue.closedAt ? new Date(issue.closedAt) : undefined,
         causedBy: causedBy([issue.body, ...comments.map((comment) => comment.body)]),
         // Closed as not planned or as a duplicate is not a fix.
         fixed: Boolean(issue.closedAt) && (issue.stateReason ?? "COMPLETED") === "COMPLETED",

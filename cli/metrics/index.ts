@@ -14,6 +14,7 @@ import { leadTime } from "./lead-time.ts";
 import { orchestrationTime } from "./orchestration-time.ts";
 import { netLinesRemoved } from "./net-lines-removed.ts";
 import { regressionRate } from "./regression-rate.ts";
+import { regressionTiming } from "./regression-timing.ts";
 import { reviewWait } from "./review-wait.ts";
 import { scheduledFailures } from "./scheduled-failures.ts";
 import { size } from "./size.ts";
@@ -36,6 +37,7 @@ export const METRICS: readonly Metric<unknown>[] = [
   scheduledFailures,
   batchHealth,
   regressionRate,
+  regressionTiming,
   humanMessagesPerTicket,
   friction,
   orchestrationTime,
