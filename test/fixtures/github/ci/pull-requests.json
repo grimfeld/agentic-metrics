@@ -56,7 +56,15 @@
         ]
        },
        "reviews": {
-        "nodes": []
+        "nodes": [
+         {
+          "submittedAt": "2026-10-01T10:00:00Z",
+          "state": "APPROVED",
+          "author": {
+           "__typename": "User"
+          }
+         }
+        ]
        }
       },
       {
@@ -211,7 +219,11 @@
        "reviews": {
         "nodes": [
          {
-          "submittedAt": "2026-10-04T09:00:00Z"
+          "submittedAt": "2026-10-04T09:00:00Z",
+          "state": "CHANGES_REQUESTED",
+          "author": {
+           "__typename": "User"
+          }
          }
         ]
        }

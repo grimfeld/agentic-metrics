@@ -12,7 +12,7 @@ This repo is also the plugin's marketplace. Install it once and it covers every 
 
 It needs Node 24 or later on your `PATH`.
 
-At the end of every session the plugin copies the session's full transcript, and its sub-agent transcripts, into `~/.cache/agentic-metrics/<project>/` so they survive Claude Code's cleanup. Set `AGENTIC_METRICS_CACHE_DIR` to use another folder. The hook only copies files: it makes no network calls and never fails the session end.
+At the end of every session the plugin copies the session's full transcript, and its sub-agent transcripts, into `~/.cache/agentic-metrics/repos/<owner>/<name>/`, named after the GitHub repo the session's folder is a clone of, so they survive Claude Code's cleanup. Every clone of a repo, wherever it sits and on whichever device, caches into the same folder. A folder that is no clone of a GitHub repo caches under Claude Code's own name for it, `~/.cache/agentic-metrics/<project>/`, as caches written before did; `collect` reads both. Set `AGENTIC_METRICS_CACHE_DIR` to use another folder. The hook only copies files: it makes no network calls and never fails the session end.
 
 ### Skill addenda
 
@@ -26,24 +26,30 @@ Addenda add the metrics conventions to third-party skills without forking them. 
 
 A repo overrides one by name: `.agentic-metrics/addenda/<skill>.md` at its root replaces the shipped addendum, adds one for a skill that has none, or, left empty, switches it off. A namespaced skill (`plugin:name`) matches on its full name first, then on `name`.
 
+### Enriching a ticket
+
+`/agentic-metrics:enrich #N` proposes the conventions ticket or PR #N is missing: a `kind:*` label, the `caused-by: #M` line of a bug fix (only a cause that reverts or blame found, see regressions below), and the `Closes #N` line of a PR linked to no issue. It shows them together and writes only those you accept, as the ordinary conventions on GitHub (`docs/adr/0002`), so they read as declared, on every device. `doctor` lists the tickets it would help, each with its command. It runs in your Claude Code session: no API key. Under it are two commands: `npx agentic-metrics enrich-context <N>` prints what is known of the ticket, and `npx agentic-metrics enrich-apply <N> [--kind k] [--caused-by M] [--closes PR:ISSUE]` writes exactly what was accepted, refusing a cause tracing did not find.
+
 ### Onboarding a repo
 
 `/agentic-metrics:init` (or `npx agentic-metrics init` from the repo root) onboards a repo in one step:
 
 - writes `.agentic-metrics.json` with every field set: ready label `ready-for-agent`, the built-in branch pattern, `integration/` batches, Dependabot excluded, the default autonomy thresholds, and `publish` (`anonymized` for a private repo, else `full`; `--publish` overrides). An anonymized repo gets `--alias name`, or a random alias (`repo-` and 8 hex digits, not derived from the repo's name), which `init` reports so you can change it. `ciWorkflow` is set when exactly one existing workflow runs on pull requests; otherwise `init` says so, and you should set it, since the installed workflow runs on every PR too;
-- creates the `regression`, `autonomy:full`, `autonomy:assisted` and `autonomy:manual` labels that are missing;
+- creates the `regression`, `autonomy:full`, `autonomy:assisted` and `autonomy:manual` labels, and the six kind-of-change labels (`kind:feature`, `kind:fix`, `kind:refactor`, `kind:chore`, `kind:docs`, `kind:test`), that are missing;
 - installs `.github/workflows/agentic-metrics.yml` (see [GitHub Action](#github-action)), passing the config's ready label and branch pattern, with the Action pinned to a commit SHA;
 - reads the repo's Actions permissions and, when only selected actions are allowed and no pattern covers the Action, prints the pattern to add. It never changes those settings.
 - installs the recorder: `.agentic-metrics/recorder.mjs` and its hook entries in `.claude/settings.json`, beside whatever that file already holds (see [Session records](#session-records)).
 
-Re-running is safe: an existing config or workflow is kept as it is, only missing labels are created, and the recorder script is replaced only when this version's differs. Addenda overrides go in `.agentic-metrics/addenda/` (see above). Review and commit the files it wrote.
+The ready label, the branch pattern and the bug label are read from the repo's history when it has its own: the label most issues got before their first PR, a branch pattern that names the right issue for more PRs than the built-in one, a bug-like label when `bug` is unused. `init` writes what it found, and says so; otherwise the defaults. `collect` and `doctor` use the same inferred values for a field the config doesn't set, and list each as a gap whose fix is `init`. A field the config sets always wins.
+
+Re-running is safe: an existing config or workflow is kept as it is (a convention field it lacks gains its inferred value, and a field it sets is never changed), only missing labels are created, and the recorder script is replaced only when this version's differs. Addenda overrides go in `.agentic-metrics/addenda/` (see above). Review and commit the files it wrote.
 
 ### Session records
 
 Transcripts stay on the device a session ran on, so work done on another machine, or in a Claude Code cloud session, has none. The recorder makes a session's counts travel with the repo instead: each commit a session makes carries a **session record** as a trailer.
 
 ```
-Session-Record: v1 k=3fa9c1d2e4b7 active=754 human=3 agents=2 started=2026-11-10T18:00:00Z
+Session-Record: v2 k=3fa9c1d2e4b7 active=754 human=3 agents=2 started=2026-11-10T18:00:00Z d=0a1b2c3d s=1 t=claude-opus-5-5:1200/340/5000/0/88000
 ```
 
 - `k`: an opaque key for the session (a hash; a sub-agent has its own, and names its parent's as `parent=`).
@@ -51,14 +57,17 @@ Session-Record: v1 k=3fa9c1d2e4b7 active=754 human=3 agents=2 started=2026-11-10
 - `human`: the prompts a person typed so far. Slash commands, shell escapes and text written by the tooling or another agent don't count.
 - `agents`: the sub-agents it has spawned so far.
 - `started`: when it began.
+- `d`: a random id of the device it ran on, created once per device in `~/.config/agentic-metrics/device` (or under `$XDG_CONFIG_HOME`), never derived from the device's or the user's name. `doctor` prints this device's id, and names the device whose sessions have only records where it runs.
+- `s`: the skills Claude invoked so far, a count; never their names.
+- `t`: its tokens so far, per model: `<model>:<input>/<output>/<5-minute cache writes>/<1-hour cache writes>/<cache reads>`, models separated by commas. Hooks report no token usage, so the recorder reads it from the session's transcript when it adds the record; that can lack the current turn, which the next commit catches up (`docs/adr/0003`).
 
-Counts only: no session id, path or text. The record is public wherever the repo's history is.
+Counts only: no session id, path or text. The device id is random. The record is public wherever the repo's history is.
 
 The recorder is one script, `.agentic-metrics/recorder.mjs`, run by hooks in the repo's committed `.claude/settings.json` (on each prompt, each tool call, and at the end of a turn). It lives in the repo, not in the plugin, because a cloud session loads no plugin but does run the repo's own hooks. It needs Node 18 or later and git 2.32 or later, keeps its counters in `.git/agentic-metrics/` (never committed), and adds the trailer by rewriting the agent's `git commit` command, and `git merge` when it has a message. It grants no permission: the rewritten command goes through the session's usual permission flow. On any error it does nothing, so it never blocks a prompt, a tool call or a commit. A commit you type yourself in a terminal carries no record.
 
 To upgrade the recorder, run `init` again in the repo and commit the changed script. To remove it, delete the script and its entries from `.claude/settings.json`.
 
-`collect` reads the records from the commits it already loads, so nothing changes in how you run it. A session's counters are cumulative and one session can work on several tickets, so what a commit adds is the difference from that session's previous commit, and it goes to the ticket the commit belongs to. What a merge commit adds, or a commit of no ticket, is orchestration. Human messages per ticket, autonomy, sub-agents per ticket, orchestration time, active time and lead time's phases all read records as they read transcripts; API-equivalent cost does not (a record has no token counts), so a ticket known only through records has an unknown cost.
+`collect` reads the records from the commits it already loads, so nothing changes in how you run it. A session's counters are cumulative and one session can work on several tickets, so what a commit adds is the difference from that session's previous commit, and it goes to the ticket the commit belongs to. What a merge commit adds, or a commit of no ticket, is orchestration. Human messages per ticket, autonomy, sub-agents per ticket, orchestration time, active time and lead time's phases all read records as they read transcripts; API-equivalent cost reads a v2 record's token counts too, priced as a transcript's would be; a ticket known only through v1 records (written before tokens were) has an unknown cost.
 
 Limits: what a session does after its last commit is not recorded, and a session that never commits leaves nothing. Where a transcript is cached for the same session, `collect` reads the transcript and ignores its records. A sub-agent known only through records has no model. Squashing commits before the PR is opened keeps the records (the trailers are in the squashed message), but a squash that rewrites the message by hand can drop them.
 
@@ -73,6 +82,10 @@ A repo worked on from a laptop, a desktop and cloud sessions leaves its traces i
 3. On every other device, pull. A cloud session gets the files with its clone.
 
 From then on every session, on any device or in the cloud, leaves a [session record](#session-records) on its commits, and `collect` reads it from GitHub wherever you run it. Nothing needs copying between devices. To check it works, make a commit from a Claude Code session and look for a `Session-Record:` trailer in `git log -1`.
+
+**Sync the transcript cache.** Point `AGENTIC_METRICS_CACHE_DIR` at the same synced folder (iCloud Drive, Dropbox, Syncthing…) on every device with the plugin. The plugin caches each repo's transcripts under the repo's GitHub name, not the clone's path, so the device that runs `collect` reads every device's sessions with no import. A device without the plugin still needs the import below.
+
+**Cloud sessions with no record.** A cloud session that ran before the recorder, or on a repo without it, leaves only its commits, whose `Claude-Session:` trailer names it. `doctor` lists each one's link: run `claude --teleport` in a clean worktree of the repo (it checks out the session's branch), pick that session, send one message and exit, and the copy is written to this device's transcripts with the session's whole history, its sub-agents' own transcripts excepted. `collect` links it by its branch. The copy carries a new session id, so where the same tickets also have session records from cloud commits, the records win and the copy is not read (`docs/adr/0004`).
 
 **For past work: import each device's transcripts.** A session that ran before the recorder was installed is only known through its transcript, which stays on the device it ran on:
 
@@ -92,7 +105,7 @@ Pick one device to run `collect` on, and for each other device:
    npx agentic-metrics import-transcripts ~/from-laptop
    ```
 
-   It finds the project folders named after the clone and copies them into this device's cache under the local clone's name, worktrees and sub-agents included. Claude Code names a transcript folder after the clone's path, which differs between devices; that is why a plain copy is not enough. If the clone's folder is called something else on the other device, pass it: `--name life`. From outside the clone, add `--checkout ~/path/to/clone`.
+   It finds the project folders named after the clone and copies them into this device's cache under the repo's GitHub name (or, for a clone with no GitHub remote, under the local clone's name), worktrees and sub-agents included. A cache that already holds the repo under its GitHub name is copied as it is. Claude Code names a transcript folder after the clone's path, which differs between devices; that is why a plain copy is not enough. If the clone's folder is called something else on the other device, pass it: `--name life`. From outside the clone, add `--checkout ~/path/to/clone`.
 3. Repeat for each repo (run it from each repo's clone) and each device. Importing twice is safe: a transcript already there is kept, unless the imported one is longer.
 4. Run `collect` again for each repo.
 
@@ -109,12 +122,16 @@ npx agentic-metrics report    # renders datasets/ as a site in report/ (open rep
 
 `import-transcripts` brings another device's transcripts into this one's cache; see [Working on several devices](#working-on-several-devices).
 
+`collect` also writes the repo's **gaps** to the dataset (`gaps`): data a metric needs that is missing, with the reason it is missing. Each gap names the metrics it leaves unknown or partial, the tickets it affects (repo-level gaps affect none in particular), and one fix: a command to run, a change to `.agentic-metrics.json`, a convention to follow from now on, a GitHub setting, or why it can't be fixed. It finds tickets with neither a transcript nor a session record; sessions known only through their records (no cost), grouped by the device that holds their transcripts; the recorder missing or not committed; the Action missing, not committed, or blocked by the repo's allowed actions; tickets never labelled ready; no regression ever declared; a main CI workflow that was guessed, configured but never run, or absent; and PRs of more than 100 commits or files, which GitHub lists only in part. An anonymized dataset keeps each gap's counts and no ticket number.
+
+`npx agentic-metrics doctor` (with `--repo` and `--checkout` as `collect` takes them) prints those gaps, repo-level ones first and then by tickets affected, each with its fix, followed by this device's own: whether the plugin caches its transcripts and, if not, how long Claude Code keeps them (`cleanupPeriodDays`). It reads the repo as `collect` does and changes nothing: no dataset, no file in the repo, nothing on GitHub or in `~/.claude`.
+
 The first `collect` on a repo reads its whole history. Later runs read only the PRs and issues updated since the last run and merge them into a local cache of raw GitHub items, `~/.cache/agentic-metrics/github/<owner>/<repo>/` (or under `$AGENTIC_METRICS_CACHE_DIR`), so the dataset comes out the same as a full re-collection. `collect --full` reads everything again, for example after a metric definition changes. Editing a request's query also triggers a full read of that request on the next run.
 
 `collect --repo owner/name` measures another repo; pass its clone as `--checkout dir` too, so that its config and transcripts are read (without it, `collect` warns that it reads the current folder's config and no transcripts). Per-repo settings live in `.agentic-metrics.json` at the repo root. All fields are optional:
 
 ```json
-{ "readyLabel": "ready-for-agent", "publish": "anonymized", "alias": "client-a" }
+{ "readyLabel": "ready-for-agent", "bugLabel": "bug", "publish": "anonymized", "alias": "client-a" }
 ```
 
 `publish` sets what a repo's dataset may show:
@@ -150,9 +167,11 @@ Each ticket gets an autonomy level. `full`: a transcript, or session records, wi
 { "autonomy": { "fullMaxFollowUps": 1, "fullMinClaudeCommitShare": 1 } }
 ```
 
-A regression is an issue labelled `regression` with a line starting `caused-by: #N` in its body or a comment; `#N` is the ticket or PR that caused it. The [GitHub Action](#github-action) adds the label when such a line is written.
+Interrupts (a person stopping a turn) are counted from transcripts and shown beside human messages; they don't affect the level unless the repo sets `"fullMaxInterrupts"` under `autonomy`. PRs closed without merging are read too: linked to an issue as a merged PR is, an abandoned PR is one of its ticket's attempts (attempts per ticket, and what the sessions that worked only on abandoned branches cost), and an issue whose PRs were all abandoned is undelivered work, counted apart from tickets. Skill usage lists, per ticket, the skills its sessions used, typed by a person or invoked by Claude, from transcripts; each metric's page compares its figure between the tickets that used a skill and those that didn't, for skills used on 5 tickets or more. An anonymized dataset keeps the number of skills per ticket only. The friction metric counts, per ticket, failed tool calls, refused tool calls and context compactions, from transcripts only.
 
-CI metrics (first-run CI rate, fix cycles, scheduled failures, batch health) read the repo's GitHub Actions runs. `ciWorkflow` names the main check workflow by path (`.github/workflows/check.yml`), file name or name; unset, it is the workflow that ran on the most PRs. The `agentic-metrics.yml` workflow `init` installs is never CI. A batch drops a PR it names (`#N` in its title or description) that merged only after it.
+A regression is **declared** when an issue labelled `regression` has a line starting `caused-by: #N` in its body or a comment; `#N` is the ticket or PR that caused it. The [GitHub Action](#github-action) adds the label when such a line is written. A regression is **inferred** when a PR delivered to the default branch reverts an earlier one (GitHub's `Reverts owner/repo#N`, or a commit's `This reverts commit <sha>.`); reverting a revert is none. It is inferred too from a bug fix's changed lines: for a PR whose issue carries the bug label, whose title starts `fix:` or `fix(…)`, or whose branch starts `fix/`, `git blame` on the lines it modified or deleted names the PR that last touched most of them, if that PR merged within `regressionWindowDays` (default 90) before the fix. Blame needs the repo's full clone (`--checkout`, not shallow); without it, `doctor` says so. The regression rate shows the two apart and never adds them together; one both declared and inferred counts as declared. Regression timing gives how long regressions took to be found after their cause was delivered, and to be fixed once found, the two kinds apart.
+
+CI metrics (first-run CI rate, fix cycles, CI duration, scheduled failures, batch health) read the repo's GitHub Actions runs. Review wait is the time from a PR being ready for review (marked ready, for a draft, else opened) to its first review by a person, with the rounds of review it went through; it and CI duration are metrics of their own, and lead time's landing wait stays one phase. `ciWorkflow` names the main check workflow by path (`.github/workflows/check.yml`), file name or name; unset, it is the workflow that ran on the most PRs. The `agentic-metrics.yml` workflow `init` installs is never CI. A batch drops a PR it names (`#N` in its title or description) that merged only after it.
 
 ```json
 { "ciWorkflow": "check.yml" }
@@ -179,11 +198,12 @@ The report is a static site of linked pages, each with a sidebar listing them al
 
 - `index.html`, the overview: the headline tiles pooled over the repos published `full` (each naming the repos it covers and those it is unknown for), a table comparing every repo, every repo's CV-ready sentences, and a card per repo.
 - `<owner>--<name>/index.html` (or `<alias>/index.html`), a repo: a number tile per metric with a sparkline of its monthly trend, a grid of charts, the CV-ready sentences with a Copy button, and its approved case studies.
+- `<owner>--<name>/coverage.html`, a repo's data coverage: each metric's coverage, the gaps that hold it back, and each gap with its fix (counts only for an anonymized repo).
 - `<owner>--<name>/<metric-id>.html`, a metric of a repo: its tiles (including its figure at each autonomy level, `full`, `assisted`, `manual`), its chart, its figure by month and by autonomy level, its summary, its per-ticket table (sortable by any column; never for an anonymized repo), its monthly trend as a table, and its definition.
 - `<owner>--<name>/case-studies/<N>.html`, an approved case study, titled by its opening heading.
 - `methodology.html`: every metric's definition and limits, with its coverage per repo, and links to the raw datasets, copied to `datasets/` beside the pages.
 
-A value that is unknown says so, never 0: a metric over no ticket (or orchestration time with no measured activity) is unknown, and a dataset written before `collect` recorded it so is read the same way. A CV sentence quotes only known values, each with its coverage. Trends and the comparison by autonomy level come from the dataset (`trends`, `byAutonomy`), so an anonymized repo gets them too, from aggregates only, with any figure covering fewer than 3 tickets withheld (shown as —; `"suppressed"` in the dataset).
+A value that is unknown says so, never 0: a metric over no ticket (or orchestration time with no measured activity) is unknown, and a dataset written before `collect` recorded it so is read the same way. A CV sentence quotes only known values, each with its coverage. Each metric's page also breaks its figure down by kind of change, from the ticket's `kind:*` label (its issue's, else its PR's; a ticket labelled with two kinds counts under neither, and is a gap). Trends and the comparisons by autonomy level and by kind come from the dataset (`trends`, `byAutonomy`, `byKind`), so an anonymized repo gets them too, from aggregates only, with any figure covering fewer than 3 tickets withheld (shown as —; `"suppressed"` in the dataset).
 
 Adding a metric: write one file in `cli/metrics/` declaring a `Metric` (`cli/metrics/metric.ts` documents each field), then list it in `cli/metrics/index.ts`. The file holds:
 

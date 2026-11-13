@@ -15,6 +15,7 @@
 // ticket's issue, else on one of its PRs, wins over the computed level.
 import type { AutonomyThresholds } from "./config.ts";
 import { ownCommits, type LinkedWork, type Ticket } from "./linker.ts";
+import { ticketFriction } from "./metrics/friction.ts";
 
 export const AUTONOMY_LEVELS = ["full", "assisted", "manual"] as const;
 export type AutonomyLevel = (typeof AUTONOMY_LEVELS)[number];
@@ -46,7 +47,10 @@ function computedLevel(ticket: Ticket, thresholds: AutonomyThresholds): Autonomy
   if (!transcript && claude === 0) return "manual";
   if (!transcript || commits.length === 0) return "assisted";
   const humanMessages = new Set(ticket.sessions.flatMap((session) => session.humanMessages)).size;
-  const full = humanMessages <= 1 + thresholds.fullMaxFollowUps && claude / commits.length >= thresholds.fullMinClaudeCommitShare;
+  // Interrupts count only when the repo sets a threshold, and only where transcripts tell them.
+  const interrupts = thresholds.fullMaxInterrupts === undefined ? undefined : ticketFriction(ticket)?.interrupts.length;
+  const interrupted = interrupts !== undefined && thresholds.fullMaxInterrupts !== undefined && interrupts > thresholds.fullMaxInterrupts;
+  const full = humanMessages <= 1 + thresholds.fullMaxFollowUps && claude / commits.length >= thresholds.fullMinClaudeCommitShare && !interrupted;
   return full ? "full" : "assisted";
 }
 

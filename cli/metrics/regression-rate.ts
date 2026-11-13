@@ -14,13 +14,27 @@ export interface RegressionRate {
   untraced?: number[];
   /** The tickets with regressions, in delivery order, with the bug issues traced to each. Absent once anonymized. */
   perTicket?: { ticket: string; bugs: number[] }[];
+  /**
+   * Inferred regressions (reverts, blame), apart: never added to the declared
+   * figures above. A regression also declared counts as declared only. Absent
+   * from datasets written before they were read.
+   */
+  inferred?: {
+    rate: number;
+    regressions: number;
+    regressedTickets: number;
+    /** How many were found by each trace. */
+    by: { revert: number; blame: number };
+    /** Per ticket, the PRs that reverted or fixed it, and how each was found. Absent once anonymized. */
+    perTicket?: { ticket: string; by: { pr: number; how: "revert" | "blame" }[] }[];
+  };
 }
 
 export const regressionRate: Metric<RegressionRate> = {
   id: "regressionRate",
   name: "Regression rate",
 
-  compute({ tickets, regressions }) {
+  compute({ tickets, regressions, inferredRegressions }) {
     const coverage = { tickets: tickets.length, of: tickets.length };
     if (tickets.length === 0) return { value: UNKNOWN, coverage };
 
@@ -46,6 +60,16 @@ export const regressionRate: Metric<RegressionRate> = {
       const numbers = bugs.get(ticket);
       return numbers ? [{ ticket: ticket.id, bugs: numbers }] : [];
     });
+
+    // Inferred ones, over these tickets, unless a declared regression is the same one: its issue closed by the reverting or fixing PR.
+    const ours = new Set(tickets);
+    const declaredSame = (cause: Ticket, by: { closes: number[] }) =>
+      regressions.some((bug) => by.closes.includes(bug.number) && bug.causedBy.some((number) => byNumber.get(number) === cause));
+    const inferred = (inferredRegressions ?? []).filter(({ cause, by }) => ours.has(cause) && !declaredSame(cause, by));
+    const inferredPerTicket = tickets.flatMap((ticket) => {
+      const found = inferred.filter(({ cause }) => cause === ticket).map(({ by, how }) => ({ pr: by.number, how }));
+      return found.length ? [{ ticket: ticket.id, by: found }] : [];
+    });
     return {
       value: {
         rate: share(perTicket.length, tickets.length),
@@ -53,12 +77,26 @@ export const regressionRate: Metric<RegressionRate> = {
         regressedTickets: perTicket.length,
         untraced,
         perTicket,
+        ...(inferredRegressions && {
+          inferred: {
+            rate: share(inferredPerTicket.length, tickets.length),
+            regressions: inferred.length,
+            regressedTickets: inferredPerTicket.length,
+            by: { revert: inferred.filter(({ how }) => how === "revert").length, blame: inferred.filter(({ how }) => how === "blame").length },
+            perTicket: inferredPerTicket,
+          },
+        }),
       },
       coverage,
     };
   },
 
-  anonymize: ({ rate, regressions, regressedTickets }) => ({ rate, regressions, regressedTickets }),
+  anonymize: ({ rate, regressions, regressedTickets, inferred }) => ({
+    rate,
+    regressions,
+    regressedTickets,
+    ...(inferred && { inferred: { rate: inferred.rate, regressions: inferred.regressions, regressedTickets: inferred.regressedTickets, by: inferred.by } }),
+  }),
 
   figure: { label: "of tickets", of: ({ rate }) => percent(rate), format: formatPercent },
 
@@ -76,10 +114,16 @@ export const regressionRate: Metric<RegressionRate> = {
     },
   },
 
-  section({ untraced, regressions, regressedTickets }) {
-    const traced = `<p><strong>${plural(regressions, "regression")}</strong> traced to ${plural(regressedTickets, "delivered ticket")}.</p>`;
-    if (!untraced?.length) return traced;
-    return `${traced}<p>Untraced, and left out of the rate: ${untraced.map((bug) => `#${String(bug)}`).join(", ")}.</p>`;
+  section({ untraced, regressions, regressedTickets, inferred }) {
+    const traced = `<p><strong>${plural(regressions, "regression")}</strong> declared and traced to ${plural(regressedTickets, "delivered ticket")}.</p>`;
+    const untracedText = untraced?.length ? `<p>Untraced, and left out of the rate: ${untraced.map((bug) => `#${String(bug)}`).join(", ")}.</p>` : "";
+    const how = inferred ? [inferred.by.revert ? plural(inferred.by.revert, "revert") : "", inferred.by.blame ? `${String(inferred.by.blame)} from the history of the lines a fix changed` : ""].filter(Boolean).join(", ") : "";
+    const inferredText = !inferred
+      ? ""
+      : inferred.regressions === 0
+        ? "<p>None inferred from the history.</p>"
+        : `<p>Inferred, apart: <strong>${formatPercent(percent(inferred.rate))}</strong> of tickets, ${plural(inferred.regressions, "regression")} on ${plural(inferred.regressedTickets, "ticket")}${how ? ` (${how})` : ""}. Never added to the declared figure.</p>`;
+    return `${traced}${untracedText}${inferredText}`;
   },
 
   ticketTable: {
@@ -90,8 +134,8 @@ export const regressionRate: Metric<RegressionRate> = {
 
   methodology: {
     definition:
-      "The share of delivered tickets that caused at least one regression. A regression is an issue labelled <code>regression</code> whose body, or one of its comments, has a line starting <code>caused-by: #N</code>. <code>#N</code> may name a ticket or a PR; a PR counts against its ticket. A regression naming several tickets counts against each.",
+      "The share of delivered tickets that caused at least one regression, in two figures never added together. <strong>Declared</strong>: an issue labelled <code>regression</code> whose body, or one of its comments, has a line starting <code>caused-by: #N</code>. <code>#N</code> may name a ticket or a PR; a PR counts against its ticket. A regression naming several tickets counts against each. <strong>Inferred</strong>: a PR delivered to the default branch that reverts an earlier one (GitHub's <code>Reverts owner/repo#N</code> description, or a commit's <code>This reverts commit &lt;sha&gt;.</code> line naming a commit of an earlier PR) is a regression of that PR's ticket; reverting a revert is none. An inferred regression whose reverting PR closes a declared regression of the same ticket counts as declared only. The headline and the sentence quote the declared figure.",
     limits:
-      "Only bugs someone traced count: a bug without the <code>regression</code> label or a <code>caused-by:</code> line is not a regression here, so the rate is a floor. Regressions whose <code>caused-by:</code> is missing or names work not merged into the default branch are listed as untraced and left out of the rate. Recent tickets have had less time to show regressions.",
+      "Only bugs someone traced count: a bug without the <code>regression</code> label or a <code>caused-by:</code> line is not a regression here, so the rate is a floor. Regressions whose <code>caused-by:</code> is missing or names work not merged into the default branch are listed as untraced and left out of the rate. Recent tickets have had less time to show regressions. A revert is not always a regression (a feature switched off on purpose reverts too), and a revert pushed straight to the default branch, outside a PR, is not seen.",
   },
 };

@@ -129,3 +129,31 @@ describe("SessionEnd hook", () => {
     assert.ok(existsSync(join(home, ".cache", "agentic-metrics", PROJECT, `${SESSION}.jsonl`)));
   });
 });
+
+describe("SessionEnd hook, in a clone of a GitHub repo", () => {
+  function clone(path: string, remote: string) {
+    spawnSync("git", ["init", "-q", path]);
+    spawnSync("git", ["-C", path, "remote", "add", "origin", remote]);
+    return path;
+  }
+
+  it("caches under the repo's GitHub name, so two clones at different paths share one folder", () => {
+    const a = clone(join(root, "laptop", "reader"), "git@github.com:Dev/Jellyfin-Comics-Reader.git");
+    const b = clone(join(root, "elsewhere", "jcr"), "https://github.com/dev/jellyfin-comics-reader");
+    assert.equal(runHook(sessionEndEvent({ cwd: a })).status, 0);
+    assert.equal(runHook(sessionEndEvent({ cwd: b, transcript_path: join(projectDir, `${SESSION}.jsonl`) })).status, 0);
+
+    const folder = join(cache, "repos", "dev", "jellyfin-comics-reader");
+    assert.ok(existsSync(join(folder, `${SESSION}.jsonl`)));
+    assert.ok(existsSync(join(folder, SESSION, "subagents")));
+    assert.equal(existsSync(join(cache, PROJECT)), false);
+  });
+
+  it("caches under the project folder as before when the clone has no GitHub remote", () => {
+    const local = clone(join(root, "plain"), "https://gitlab.com/dev/reader.git");
+    assert.equal(runHook(sessionEndEvent({ cwd: local })).status, 0);
+
+    assert.ok(existsSync(join(cache, PROJECT, `${SESSION}.jsonl`)));
+    assert.equal(existsSync(join(cache, "repos")), false);
+  });
+});

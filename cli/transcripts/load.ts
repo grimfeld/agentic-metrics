@@ -57,11 +57,29 @@ export interface Session {
   /** Sub-agents it spawned with the Agent tool. Agent ids are never published. */
   spawns: AgentSpawn[];
   /**
+   * Where it met friction, each by the id of its line or tool use, so that a
+   * resumed session counts each once. Absent for a session read from records,
+   * whose friction is unknown.
+   */
+  friction?: Friction;
+  /** A copy of a cloud session brought here by `claude --teleport` (a `remote_session_change` line): its records win over it (docs/adr/0004). */
+  teleported?: boolean;
+  /** The skills it used, each by the id of its line or tool use. Absent for a session read from records. */
+  skills?: SkillUse[];
+  /**
    * Set for a session read from session records (`records.ts`), not from a
    * transcript: it has counts and activity but no API response, so its cost is
    * unknown, not zero. `parent` is its parent's id, for a sub-agent.
    */
-  recorded?: { parent: string | undefined };
+  recorded?: {
+    parent: string | undefined;
+    /** The device it ran on, from its records' `d=`; undefined when they don't say. */
+    device?: string | undefined;
+    /** Its commits carry a `Claude-Session:` trailer: it ran in a cloud session, whose transcript no device holds. */
+    cloud?: boolean;
+    /** Every record it was read from held token counts (v2), so its responses give its cost. */
+    tokens?: boolean;
+  };
 }
 
 export interface ApiResponse {
@@ -79,6 +97,26 @@ export interface ApiResponse {
   inferenceGeo: string | undefined;
   /** `usage.speed`, e.g. `standard` or `fast`. */
   speed: string | undefined;
+}
+
+export interface SkillUse {
+  /** The line or tool use that loaded it; never published. */
+  id: string;
+  /** The skill's name, as typed (`grill-with-docs`) or invoked (`plugin:name`). */
+  name: string;
+  /** Typed by a person as a slash command, else invoked by Claude with the Skill tool. */
+  typed: boolean;
+}
+
+export interface Friction {
+  /** A person stopped a turn: `[Request interrupted by user]`. A refused tool call is a denial, not an interrupt. */
+  interrupts: string[];
+  /** Tool calls that failed, denials left out. */
+  toolErrors: string[];
+  /** Tool calls the person (or the permission mode) refused. */
+  denials: string[];
+  /** Times its context was compacted. */
+  compactions: string[];
 }
 
 export interface AgentSpawn {
@@ -103,7 +141,12 @@ export function loadSessions(files: TranscriptFile[]): Session[] {
     const responses = new Map<string, ApiResponse>();
     const agentToolUses = new Set<string>();
     const spawns = new Map<string, AgentSpawn>();
+    const friction: Friction = { interrupts: [], toolErrors: [], denials: [], compactions: [] };
+    const skills = new Map<string, SkillUse>();
+    /** A slash command just typed: a skill if the next meta line loads one. */
+    let command: { name: string; id: string } | undefined;
     let sessionId: string | undefined;
+    let teleported = false;
 
     for (const raw of file.lines) {
       if (!isRecord(raw)) continue;
@@ -129,6 +172,18 @@ export function loadSessions(files: TranscriptFile[]): Session[] {
       }
       const spawn = agentSpawn(raw, agentToolUses);
       if (spawn) spawns.set(spawn.agentId, spawn);
+      if (uuid) frictionOf(raw, uuid, friction);
+      if (raw["type"] === "attachment" && isRecord(raw["attachment"]) && raw["attachment"]["type"] === "remote_session_change") teleported = true;
+      for (const use of invokedSkills(raw)) skills.set(use.id, use);
+      if (raw["type"] === "user" && uuid) {
+        const text = lineText(raw);
+        const typed = /<command-name>\/([^<\s]+)<\/command-name>/.exec(text ?? "")?.[1];
+        if (typed !== undefined && raw["isMeta"] !== true) command = { name: typed, id: uuid };
+        else if (command && raw["isMeta"] === true && text?.startsWith("Base directory for this skill:")) {
+          skills.set(command.id, { id: command.id, name: command.name, typed: true });
+          command = undefined;
+        } else if (raw["isMeta"] !== true) command = undefined;
+      }
     }
 
     times.sort((a, b) => a - b);
@@ -147,8 +202,66 @@ export function loadSessions(files: TranscriptFile[]): Session[] {
       startedAt: times[0] === undefined ? undefined : new Date(times[0]),
       responses: [...responses.values()],
       spawns: [...spawns.values()],
+      ...(teleported && { teleported }),
+      skills: [...skills.values()],
+      friction: {
+        interrupts: [...new Set(friction.interrupts)],
+        toolErrors: [...new Set(friction.toolErrors)],
+        denials: [...new Set(friction.denials)],
+        compactions: [...new Set(friction.compactions)],
+      },
     };
   });
+}
+
+/** The skills a line of Claude's invokes with the Skill tool. */
+function invokedSkills(line: Record<string, unknown>): SkillUse[] {
+  if (line["type"] !== "assistant") return [];
+  const message = line["message"];
+  const content = isRecord(message) ? message["content"] : undefined;
+  if (!Array.isArray(content)) return [];
+  return content.flatMap((block) => {
+    if (!isRecord(block) || block["type"] !== "tool_use" || block["name"] !== "Skill") return [];
+    const input = block["input"];
+    const name = isRecord(input) ? str(input["skill"]) : undefined;
+    const id = str(block["id"]);
+    return name && id ? [{ id, name, typed: false }] : [];
+  });
+}
+
+/** A line's text: its content when a string, else its first text block. */
+function lineText(line: Record<string, unknown>): string | undefined {
+  const message = line["message"];
+  const content = isRecord(message) ? message["content"] : undefined;
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return undefined;
+  const text: unknown = (content as unknown[]).find((block) => isRecord(block) && block["type"] === "text");
+  return isRecord(text) ? str(text["text"]) : undefined;
+}
+
+/** A refused tool call's result: refused by the person, or by the permission mode. */
+const DENIED = /^(The user doesn't want to proceed with this tool use|Permission to use \S+ (?:has been|was) denied)/;
+
+/** Adds what `line` shows of friction: an interrupt, failed or refused tool calls, a compaction. */
+function frictionOf(line: Record<string, unknown>, uuid: string, friction: Friction): void {
+  if (line["type"] === "system" && line["subtype"] === "compact_boundary") {
+    friction.compactions.push(uuid);
+    return;
+  }
+  if (line["type"] !== "user") return;
+  const message = line["message"];
+  const content = isRecord(message) ? message["content"] : undefined;
+  const blocks = Array.isArray(content) ? content : typeof content === "string" ? [{ type: "text", text: content }] : [];
+  for (const block of blocks) {
+    if (!isRecord(block)) continue;
+    if (block["type"] === "text" && /^\[Request interrupted by user\]/.test(str(block["text"]) ?? "")) friction.interrupts.push(uuid);
+    if (block["type"] === "tool_result" && block["is_error"] === true) {
+      const result = block["content"];
+      const text = typeof result === "string" ? result : Array.isArray(result) ? (result.map((part) => (isRecord(part) ? (str(part["text"]) ?? "") : "")).join("\n")) : "";
+      const id = str(block["tool_use_id"]) ?? uuid;
+      (DENIED.test(text) ? friction.denials : friction.toolErrors).push(id);
+    }
+  }
 }
 
 /**

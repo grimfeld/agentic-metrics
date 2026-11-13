@@ -85,6 +85,7 @@ function fakeGitHub(issues: FakeIssue[], prs: FakePr[]): GitHubSource {
         },
       },
     ],
+    "closed-pull-requests": [{ data: { repository: { pullRequests: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } } } }],
     "workflow-runs": [{ total_count: 0, workflow_runs: [] }],
   };
   return { read: (request) => Promise.resolve(answers[request]) };

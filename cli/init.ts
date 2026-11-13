@@ -9,7 +9,8 @@ import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { DEFAULT_BRANCH_REGEX } from "./branch.ts";
 import { CONFIG_FILE, isAlias, readConfig, type PublishMode } from "./config.ts";
-import { ACTION_WORKFLOW, REGRESSION_LABEL } from "./conventions.ts";
+import { ACTION_WORKFLOW, KINDS, REGRESSION_LABEL } from "./conventions.ts";
+import type { Inferred } from "./infer.ts";
 import { installRecorder } from "./recorder-install.ts";
 
 /** The GitHub calls `init` makes: the CLI's boundary to the repo's settings. */
@@ -45,6 +46,8 @@ export interface InitOptions {
   publish?: PublishMode | undefined;
   /** The CLI's version, whose release the Action is pinned to; package.json's when unset. */
   version?: string | undefined;
+  /** Conventions inferred from the repo's history (`infer.ts`), written in place of the defaults. */
+  inferred?: Omit<Inferred, "usesIssues"> | undefined;
 }
 
 export const WORKFLOW_FILE = ACTION_WORKFLOW;
@@ -82,6 +85,7 @@ export const LABELS: readonly Label[] = [
   { name: "autonomy:full", color: "0e8a16", description: "agentic-metrics: override the computed autonomy level" },
   { name: "autonomy:assisted", color: "fbca04", description: "agentic-metrics: override the computed autonomy level" },
   { name: "autonomy:manual", color: "d93f0b", description: "agentic-metrics: override the computed autonomy level" },
+  ...KINDS.map((kind) => ({ name: `kind:${kind}`, color: "c5def5", description: "agentic-metrics: the kind of change a ticket made" })),
 ];
 
 /** Onboards the repo at `cwd`; returns the lines to report, one per step. */
@@ -96,13 +100,34 @@ export async function init(cwd: string, admin: RepoAdmin, options: InitOptions):
   const pin = existsSync(workflowPath) ? undefined : await actionPin(admin, options.version ?? packageVersion());
 
   const configPath = join(cwd, CONFIG_FILE);
+  const inferred = options.inferred ?? {};
+  // Written as they were inferred, else as the defaults: the conventions the Action and `collect` follow.
+  const conventions = {
+    readyLabel: inferred.readyLabel ?? "ready-for-agent",
+    branchRegex: inferred.branchRegex ?? DEFAULT_BRANCH_REGEX.source,
+    bugLabel: inferred.bugLabel ?? BUG_LABEL,
+  };
+  const inferredNote = (fields: string[]) => {
+    const found = fields.filter((field) => inferred[field as keyof typeof inferred] !== undefined);
+    return found.length ? `; inferred from history: ${found.map((field) => `${field} ${JSON.stringify(conventions[field as keyof typeof conventions])}`).join(", ")}` : "";
+  };
   if (existsSync(configPath)) {
-    lines.push(`${CONFIG_FILE}: kept as it is`);
+    // A config written before a convention field existed, or without it, gains that field's inferred value; a field set is never changed.
+    const file = JSON.parse(readFileSync(configPath, "utf8")) as Record<string, unknown>;
+    const missing = (["readyLabel", "branchRegex", "bugLabel"] as const).filter((field) => !(field in file) && inferred[field] !== undefined);
+    if (missing.length === 0) {
+      lines.push(`${CONFIG_FILE}: kept as it is`);
+    } else {
+      for (const field of missing) file[field] = conventions[field];
+      await writeFile(configPath, `${JSON.stringify(file, null, 2)}\n`);
+      lines.push(`${CONFIG_FILE}: kept, with ${missing.join(", ")} added${inferredNote(missing)}`);
+    }
   } else {
     const publish = options.publish ?? (repo.private ? "anonymized" : "full");
     const file: Record<string, unknown> = {
-      readyLabel: "ready-for-agent",
-      branchRegex: DEFAULT_BRANCH_REGEX.source,
+      readyLabel: conventions.readyLabel,
+      bugLabel: conventions.bugLabel,
+      branchRegex: conventions.branchRegex,
       integrationBranchPrefix: "integration/",
       exclude: { authors: ["dependabot"], branches: ["dependabot/"] },
       autonomy: { fullMaxFollowUps: 1, fullMinClaudeCommitShare: 1 },
@@ -118,6 +143,7 @@ export async function init(cwd: string, admin: RepoAdmin, options: InitOptions):
     const check = prCheckWorkflow(cwd);
     if (check) file["ciWorkflow"] = check;
     note += check ? `, ciWorkflow ${check}` : ", ciWorkflow unset (no single PR check workflow found; set it to the main check workflow)";
+    note += inferredNote(["readyLabel", "branchRegex", "bugLabel"]);
     await writeFile(configPath, `${JSON.stringify(file, null, 2)}\n`);
     lines.push(`${CONFIG_FILE}: written (${note})`);
   }
@@ -135,7 +161,7 @@ export async function init(cwd: string, admin: RepoAdmin, options: InitOptions):
     lines.push(`${WORKFLOW_FILE}: kept as it is`);
   } else {
     await mkdir(dirname(workflowPath), { recursive: true });
-    await writeFile(workflowPath, workflow({ readyLabel: config.readyLabel, branchRegex: config.branchRegex.source, pin }));
+    await writeFile(workflowPath, workflow({ readyLabel: config.readyLabel, bugLabel: config.bugLabel, branchRegex: config.branchRegex.source, pin }));
     lines.push(`${WORKFLOW_FILE}: written (${ACTION} pinned to ${pin.sha}, ${pin.ref})`);
   }
   lines.push(...(await allowListing(admin, repo.fullName, pin ? undefined : readFileSync(workflowPath, "utf8"))));
@@ -210,7 +236,7 @@ function quote(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
-function workflow(settings: { readyLabel: string; branchRegex: string; pin: { ref: string; sha: string } }): string {
+function workflow(settings: { readyLabel: string; bugLabel: string; branchRegex: string; pin: { ref: string; sha: string } }): string {
   return `# Installed by \`agentic-metrics init\`. The inputs mirror ${CONFIG_FILE};
 # change both together.
 name: agentic-metrics
@@ -232,7 +258,7 @@ jobs:
       - uses: ${ACTION}@${settings.pin.sha} # ${settings.pin.ref}
         with:
           branch-regex: ${quote(settings.branchRegex)}
-          bug-label: ${quote(BUG_LABEL)}
+          bug-label: ${quote(settings.bugLabel)}
           ready-label: ${quote(settings.readyLabel)}
 `;
 }

@@ -10,6 +10,8 @@ export const CONFIG_FILE = ".agentic-metrics.json";
 export interface Config {
   /** The label that marks a ticket ready for work; lead time starts when it is added. */
   readyLabel: string;
+  /** The label that marks an issue as a bug. */
+  bugLabel: string;
   /** What `collect` may publish; unset means `full` for a public repo, `anonymized` for a private one. */
   publish?: PublishMode | undefined;
   /** The name an `anonymized` repo is published under, in place of `owner/name`. */
@@ -32,6 +34,8 @@ export interface Config {
    * the most PRs.
    */
   ciWorkflow?: string | undefined;
+  /** How long after a ticket's delivery a fix's changed lines may still name it as an inferred regression's cause, in days. */
+  regressionWindowDays: number;
 }
 
 export interface AutonomyThresholds {
@@ -39,6 +43,8 @@ export interface AutonomyThresholds {
   fullMaxFollowUps: number;
   /** The share of its commits Claude must have co-authored, from 0 to 1. */
   fullMinClaudeCommitShare: number;
+  /** Interrupts allowed; unset, interrupts don't affect the level. */
+  fullMaxInterrupts?: number | undefined;
 }
 
 /**
@@ -58,10 +64,12 @@ export function isAlias(alias: string): boolean {
 
 const DEFAULTS: Config = {
   readyLabel: "ready-for-agent",
+  bugLabel: "bug",
   branchRegex: DEFAULT_BRANCH_REGEX,
   integrationBranchPrefixes: ["integration/"],
   exclude: { authors: [], branches: [] },
   autonomy: { fullMaxFollowUps: 1, fullMinClaudeCommitShare: 1 },
+  regressionWindowDays: 90,
 };
 
 export function readConfig(repoDir: string): Config {
@@ -77,6 +85,10 @@ export function readConfig(repoDir: string): Config {
   if ("readyLabel" in fields) {
     if (typeof fields["readyLabel"] !== "string") throw new Error(`${CONFIG_FILE}: readyLabel must be a string`);
     config.readyLabel = fields["readyLabel"];
+  }
+  if ("bugLabel" in fields) {
+    if (typeof fields["bugLabel"] !== "string" || fields["bugLabel"] === "") throw new Error(`${CONFIG_FILE}: bugLabel must be a non-empty string`);
+    config.bugLabel = fields["bugLabel"];
   }
   if ("ciWorkflow" in fields) {
     const workflow = fields["ciWorkflow"];
@@ -124,7 +136,20 @@ export function readConfig(repoDir: string): Config {
     };
   }
   if ("autonomy" in fields) config.autonomy = autonomyThresholds(fields["autonomy"]);
+  if ("regressionWindowDays" in fields) {
+    const days = fields["regressionWindowDays"];
+    if (typeof days !== "number" || !(days > 0)) throw new Error(`${CONFIG_FILE}: regressionWindowDays must be a number of days over 0`);
+    config.regressionWindowDays = days;
+  }
   return config;
+}
+
+/** The fields `.agentic-metrics.json` at `repoDir` sets; none when there is no such file. */
+export function configuredFields(repoDir: string): Set<string> {
+  const path = join(repoDir, CONFIG_FILE);
+  if (!existsSync(path)) return new Set();
+  const raw = JSON.parse(readFileSync(path, "utf8")) as unknown;
+  return typeof raw === "object" && raw !== null && !Array.isArray(raw) ? new Set(Object.keys(raw)) : new Set();
 }
 
 function autonomyThresholds(value: unknown): AutonomyThresholds {
@@ -146,6 +171,13 @@ function autonomyThresholds(value: unknown): AutonomyThresholds {
       throw new Error(`${CONFIG_FILE}: autonomy.fullMinClaudeCommitShare must be a number from 0 to 1`);
     }
     thresholds.fullMinClaudeCommitShare = share;
+  }
+  if ("fullMaxInterrupts" in fields) {
+    const interrupts = fields["fullMaxInterrupts"];
+    if (typeof interrupts !== "number" || !Number.isInteger(interrupts) || interrupts < 0) {
+      throw new Error(`${CONFIG_FILE}: autonomy.fullMaxInterrupts must be a whole number, 0 or more`);
+    }
+    thresholds.fullMaxInterrupts = interrupts;
   }
   return thresholds;
 }

@@ -184,7 +184,7 @@ describe("overview page", () => {
       ["client-a", "grimfeld/agentic-metrics", "grimfeld/lifeline"],
     );
     assert.match(element(table, "data-repo", "client-a"), /<a href="client-a\/index\.html">client-a<\/a>/);
-    assert.match(text(element(table, "data-repo", "client-a")), /^client-a anonymized 5 \d+ unknown 0 of 5 tickets 30 min p50 · 30 min p90 3 of 5 tickets/);
+    assert.match(text(element(table, "data-repo", "client-a")), /^client-a anonymized 5 \d+ \d+ unknown 0 of 5 tickets 30 min p50 · 30 min p90 3 of 5 tickets/);
     const cards = element(html, "data-section", "repo-cards");
     assert.match(cards, /<a class="repo-card" href="grimfeld--lifeline\/index\.html"/);
     assert.match(cards, /<a class="repo-card" href="client-a\/index\.html"/);

@@ -8,6 +8,7 @@ import { dirname, join } from "node:path";
 import type { CaseStudy } from "./case-studies.ts";
 import type { Dataset } from "./dataset.ts";
 import { caseStudyPage } from "./report/case-study-page.ts";
+import { coveragePage } from "./report/coverage-page.ts";
 import { methodologyPage } from "./report/methodology-page.ts";
 import { metricPage } from "./report/metric-page.ts";
 import { overviewPage } from "./report/overview.ts";
@@ -23,6 +24,7 @@ export function renderSite(datasets: readonly Dataset[], caseStudies: ReadonlyMa
     page(PATHS.methodology, methodologyPage),
     ...site.repos.flatMap((repo) => [
       page(PATHS.repo(repo), (ctx) => repoPage(ctx, repo)),
+      page(PATHS.coverage(repo), (ctx) => coveragePage(ctx, repo)),
       ...repo.metrics.map((metric) => page(PATHS.metric(repo, metric), (ctx) => metricPage(ctx, repo, metric))),
       ...repo.studies.map((study) => page(PATHS.caseStudy(repo, study), (ctx) => caseStudyPage(ctx, repo, study))),
     ]),

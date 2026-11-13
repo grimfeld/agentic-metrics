@@ -4,12 +4,25 @@
 // aggregates only, under an alias.
 import { selectCandidates, type CaseStudyCandidate } from "./case-studies.ts";
 import type { PublishMode } from "./config.ts";
+import { anonymizeGaps, type Gap } from "./gaps.ts";
 import type { Repo } from "./github/load.ts";
 import type { LinkedWork } from "./linker.ts";
 import { METRICS } from "./metrics/index.ts";
 import type { FigureResult, Metric, MetricResult } from "./metrics/metric.ts";
 import { UNKNOWN } from "./metrics/metric.ts";
-import { anonymizeByAutonomy, anonymizeTrends, byAutonomy, trends, type ByAutonomy, type Trends } from "./trends.ts";
+import {
+  anonymizeByAutonomy,
+  anonymizeByKind,
+  anonymizeTrends,
+  byAutonomy,
+  byKind,
+  bySkill,
+  trends,
+  type ByAutonomy,
+  type ByKind,
+  type BySkill,
+  type Trends,
+} from "./trends.ts";
 
 export const SCHEMA_VERSION = 2;
 
@@ -40,6 +53,12 @@ export interface Dataset {
   trends?: Trends;
   /** Each metric's figure per autonomy level. Absent from datasets written before the comparison. */
   byAutonomy?: ByAutonomy;
+  /** Each metric's figure per kind of change (`kind:*` labels). Absent from older datasets. */
+  byKind?: ByKind;
+  /** Each metric's figure with and without each skill used on 5 tickets or more. Absent when anonymized, and from older datasets. */
+  bySkill?: BySkill;
+  /** Data the metrics need that is missing, and how to fill it (`gaps.ts`). Absent from datasets written before gaps: read as none. */
+  gaps?: Gap[];
   /** The repo's GitHub page. Absent when anonymized. */
   url?: string;
   /** Every delivered ticket with its title and link, in delivery order. Absent when anonymized. */
@@ -53,7 +72,7 @@ export interface Dataset {
  * alias in place of the repo's name, no titles or links, and each metric's
  * value only as that metric's `anonymize` keeps it.
  */
-export function buildDataset(repo: Repo, work: LinkedWork, now: Date, publish: PublishMode, alias?: string): Dataset {
+export function buildDataset(repo: Repo, work: LinkedWork, now: Date, publish: PublishMode, alias?: string, gaps: Gap[] = []): Dataset {
   const anonymized = publish === "anonymized";
   if (anonymized && !alias) throw new Error("an anonymized dataset needs an alias");
   const publishValue = <V>(metric: Metric<V>, value: V): V => (anonymized ? metric.anonymize(value) : value);
@@ -77,6 +96,8 @@ export function buildDataset(repo: Repo, work: LinkedWork, now: Date, publish: P
     metrics,
     trends: anonymized ? anonymizeTrends(monthly) : monthly,
     byAutonomy: anonymized ? anonymizeByAutonomy(byLevel) : byLevel,
+    byKind: anonymized ? anonymizeByKind(byKind(work, METRICS, publishValue)) : byKind(work, METRICS, publishValue),
+    gaps: anonymized ? anonymizeGaps(gaps) : gaps,
   };
   if (anonymized) return dataset;
   return {
@@ -88,6 +109,7 @@ export function buildDataset(repo: Repo, work: LinkedWork, now: Date, publish: P
       return { id: ticket.id, title: source?.title ?? "", url: source?.url ?? "", doneAt: ticket.doneAt.toISOString() };
     }),
     caseStudyCandidates: selectCandidates(work),
+    bySkill: bySkill(work, METRICS, publishValue),
   };
 }
 

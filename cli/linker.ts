@@ -24,7 +24,8 @@ import { attributeBatch } from "./batch.ts";
 import type { Config } from "./config.ts";
 import { mainWorkflow, type Ci } from "./ci.ts";
 import { issueNumberFromBranch } from "./branch.ts";
-import type { Commit, GitHubData, Issue, PullRequest, RegressionIssue } from "./github/load.ts";
+import type { AbandonedPullRequest, Commit, GitHubData, Issue, PullRequest, RegressionIssue } from "./github/load.ts";
+import type { InferredRegression } from "./inferred-regressions.ts";
 import type { Session } from "./transcripts/load.ts";
 
 export interface Ticket {
@@ -50,6 +51,8 @@ export interface Ticket {
   sessions: Session[];
   /** Its autonomy level, set once sessions are linked (`autonomy.ts`); undefined before. */
   autonomy?: Autonomy;
+  /** PRs opened for it and closed without merging (`attempts.ts`); undefined before they are read. */
+  abandonedPullRequests?: AbandonedPullRequest[];
 }
 
 export interface LinkedWork {
@@ -60,6 +63,10 @@ export interface LinkedWork {
   integrationPullRequests: PullRequest[];
   /** Issues labelled as regressions, whether or not their cause is delivered work. */
   regressions: RegressionIssue[];
+  /** Issues whose PRs were all abandoned: undelivered work, no ticket (`attempts.ts`). Undefined before they are read. */
+  undelivered?: number[];
+  /** Regressions deduced from traces (`inferred-regressions.ts`); never pooled with declared ones. Absent before they are read. */
+  inferredRegressions?: InferredRegression[];
   /** CI runs, and the repo's main check workflow. */
   ci: Ci;
   /** The repo's Claude Code transcripts (`transcripts/link.ts`). */
@@ -179,8 +186,8 @@ function excluded(pr: PullRequest, config: Config): boolean {
   );
 }
 
-/** The issues a PR delivers, by the first strategy that finds any. */
-function linkedIssues(pr: PullRequest, issues: Map<number, Issue>, config: Config): number[] {
+/** The issues a PR delivers (or, abandoned, would have), by the first strategy that finds any. */
+export function linkedIssues(pr: Pick<PullRequest, "closes" | "headRefName" | "commitSubjects">, issues: ReadonlyMap<number, unknown>, config: Config): number[] {
   if (pr.closes.length > 0) return pr.closes;
   const fromBranch = issueNumberFromBranch(pr.headRefName, config.branchRegex);
   if (fromBranch !== undefined && issues.has(fromBranch)) return [fromBranch];

@@ -14,6 +14,18 @@ _Avoid_: Task, story
 Several tickets landed on the default branch together through one integration pull request.
 _Avoid_: Release, integration
 
+**Abandoned pull request**:
+A pull request closed without being merged. When it is linked to a ticket, it is one of that ticket's attempts.
+_Avoid_: Failed PR, dropped PR
+
+**Attempt**:
+A pull request opened to deliver a ticket, whether it was merged or abandoned.
+_Avoid_: Try, iteration
+
+**Undelivered work**:
+An issue whose pull requests were all abandoned. It is not a ticket.
+_Avoid_: Waste, failed ticket
+
 **Delivered**:
 Reached the default branch. A batched ticket is delivered when its batch lands, not when its own pull request merges.
 _Avoid_: Done, shipped, merged
@@ -77,3 +89,27 @@ _Avoid_: History, chat log
 **Human message**:
 A prompt a person typed into a session, as opposed to anything the tooling or another agent wrote.
 _Avoid_: Interaction, intervention, prompt
+
+**Interrupt**:
+A person stopping a session in the middle of its turn. It is not a human message.
+_Avoid_: Cancel, abort, intervention
+
+### Quality
+
+**Regression**:
+A bug caused by a delivered ticket.
+_Avoid_: Breakage, defect
+
+**Declared** / **Inferred**:
+A fact is declared when a person wrote it down by convention (a `caused-by:` line, a label), and inferred when the tool deduced it from traces such as reverts or the history of changed lines. The two are never pooled in one figure.
+_Avoid_: Manual, automatic, detected
+
+**Kind of change**:
+What a ticket did to the code: a feature, a fix, a refactor, a chore, docs or tests.
+_Avoid_: Type, category
+
+### Data
+
+**Gap**:
+Data a metric needs that is missing, with the reason it is missing.
+_Avoid_: Hole, missing data, blind spot

@@ -5,15 +5,22 @@ import { existsSync } from "node:fs";
 import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { parseArgs, promisify } from "node:util";
+import { linkAbandoned } from "./attempts.ts";
 import { classifyAutonomy } from "./autonomy.ts";
 import { CASE_STUDIES_DIR, readApproved, writeDrafts, type CaseStudy } from "./case-studies.ts";
-import { CONFIG_FILE, readConfig } from "./config.ts";
+import { CONFIG_FILE, configuredFields, readConfig, type Config } from "./config.ts";
+import { inferConventions, withInferred } from "./infer.ts";
+import { blameReady, blameRegressions, revertRegressions } from "./inferred-regressions.ts";
 import { buildDataset, datasetPath, SCHEMA_VERSION, type Dataset } from "./dataset.ts";
+import type { Kind } from "./conventions.ts";
+import { defaultClaudeDir, deviceGaps, formatDoctor, thisDevice } from "./doctor.ts";
+import { applyAccepted, enrichContext, ghWriter, type GitHubWriter } from "./enrich.ts";
+import { findGaps, inspectCheckout, type Gap } from "./gaps.ts";
 import { cachedSource, defaultCacheDir } from "./github/cache.ts";
-import { loadGitHub } from "./github/load.ts";
+import { loadGitHub, type GitHubData } from "./github/load.ts";
 import { ghAdmin, init, type RepoAdmin } from "./init.ts";
 import { ghSource, type GitHubSource } from "./github/source.ts";
-import { link } from "./linker.ts";
+import { link, type LinkedWork } from "./linker.ts";
 import { linkRecords } from "./records.ts";
 import { writeSite } from "./report.ts";
 import { importTranscripts } from "./transcripts/import.ts";
@@ -42,6 +49,12 @@ export interface Dependencies {
   transcripts?: TranscriptSource;
   /** The `owner/name` of the GitHub repo cloned at `dir`, if any. Defaults to its git `origin` remote. */
   localRepo?: (dir: string) => Promise<string | undefined>;
+  /** Writes accepted enrichment proposals to GitHub. Defaults to the `gh` CLI. */
+  writer?: GitHubWriter;
+  /** Claude Code's user folder, which `doctor` reads this device's settings from. Defaults to ~/.claude. */
+  claudeDir?: string;
+  /** The user's config folder, where the recorder keeps this device's id. Defaults to $XDG_CONFIG_HOME, else ~/.config. */
+  configDir?: string;
   now?: () => Date;
   stdout?: (text: string) => void;
   stderr?: (text: string) => void;
@@ -76,6 +89,21 @@ const USAGE = `Usage:
       A repo published \`full\` gets a case-study draft per candidate in
       <case-studies>/<owner>/<name>/ (default: case-studies); an existing
       draft is never overwritten.
+  agentic-metrics doctor [--repo owner/name [--checkout dir]] [--all]
+      Print the repo's gaps, largest first: data a metric needs that is
+      missing, why, and the one fix for each; then this device's (whether the
+      plugin caches its transcripts, and how long Claude Code keeps them).
+      Reads the repo as collect does and changes nothing: no dataset, no file
+      in the repo, nothing on GitHub or in ~/.claude. --all lists every
+      ticket and every command of a gap, not the first few.
+  agentic-metrics enrich-context <N> [--repo owner/name [--checkout dir]]
+      Print, as JSON, what the enrich skill needs for ticket or PR #N: its
+      kind label, whether it is a bug fix, the causes reverts and blame found,
+      and its PRs that close no issue.
+  agentic-metrics enrich-apply <N> [--kind k] [--caused-by M] [--closes PR:ISSUE]
+      Write the accepted proposals for #N, and nothing else: a kind:<k> label,
+      a "caused-by: #M" comment (M must be a cause tracing found), a
+      "Closes #ISSUE" line in an unlinked PR's description.
   agentic-metrics import-transcripts <folder> [--checkout dir] [--name clone-folder]... [--dry-run]
       Bring another device's Claude Code transcripts of this repo into this
       device's transcript cache, so that collect reads them. <folder> is that
@@ -104,6 +132,15 @@ export async function main(argv: string[], deps: Dependencies): Promise<number> 
       case "report":
         await report(rest, deps, stdout);
         return 0;
+      case "enrich-context":
+        await enrichContextCommand(rest, deps, stdout, stderr);
+        return 0;
+      case "enrich-apply":
+        await enrichApplyCommand(rest, deps, stdout, stderr);
+        return 0;
+      case "doctor":
+        await doctor(rest, deps, stdout, stderr);
+        return 0;
       case "init":
         await initCommand(rest, deps, stdout);
         return 0;
@@ -120,6 +157,59 @@ export async function main(argv: string[], deps: Dependencies): Promise<number> 
   }
 }
 
+interface Gathered {
+  config: Config;
+  data: GitHubData;
+  work: LinkedWork;
+  gaps: Gap[];
+}
+
+/**
+ * Reads and links a repo as `collect` and `doctor` both do: its config and
+ * transcripts from its clone (the current folder, unless --repo names another
+ * repo and --checkout is not given), and GitHub through the cache.
+ */
+async function gather(
+  values: { repo?: string | undefined; checkout?: string | undefined; full?: boolean | undefined },
+  deps: Dependencies,
+  stderr: (text: string) => void,
+): Promise<Gathered> {
+  const checkout =
+    values.checkout ??
+    (!values.repo || sameRepo(await (deps.localRepo ?? originRepo)(deps.cwd), values.repo) ? deps.cwd : undefined);
+  const configDir = checkout === undefined ? deps.cwd : resolve(deps.cwd, checkout);
+  const configured = readConfig(configDir);
+  if (values.repo && checkout === undefined) {
+    stderr(
+      `agentic-metrics: ${values.repo} has no --checkout: reading ${CONFIG_FILE} from ${deps.cwd}, and its transcript metrics are unknown. Pass --checkout <its clone>.\n`,
+    );
+  }
+  const now = deps.now ?? (() => new Date());
+  const source = deps.github ?? ghSource({ cwd: deps.cwd, repo: values.repo });
+  const cacheDir = deps.cacheDir ?? (deps.github ? undefined : defaultCacheDir());
+  const github = cacheDir ? cachedSource(source, { dir: cacheDir, now, full: values.full ?? false }) : source;
+  const data = await loadGitHub(github);
+  // The conventions the config doesn't set, inferred from the history (`infer.ts`).
+  const inferred = inferConventions(data, configuredFields(configDir));
+  const config = withInferred(configured, inferred);
+  const transcripts =
+    deps.transcripts ??
+    (deps.github || checkout === undefined
+      ? noTranscripts
+      : transcriptCache({ dir: cacheDir ?? defaultCacheDir(), repoDir: resolve(deps.cwd, checkout), repo: data.repo.fullName }));
+  const sessions = loadSessions(await transcripts.read());
+  const linked = linkAbandoned(classifyAutonomy(linkRecords(linkSessions(link(data, config), sessions, config, data.repo.fullName), sessions), config.autonomy), data, config);
+  // Blame tracing needs the repo's full history: the clone's, when there is one.
+  const blame = checkout === undefined ? "no-clone" : blameReady(resolve(deps.cwd, checkout));
+  const blamed =
+    blame === "ready" && checkout !== undefined
+      ? blameRegressions(linked, data.issues, { dir: resolve(deps.cwd, checkout), bugLabel: config.bugLabel, windowDays: config.regressionWindowDays })
+      : [];
+  const work = { ...linked, inferredRegressions: [...revertRegressions(linked), ...blamed] };
+  const gaps = findGaps({ work, data, config, inferred, blame, checkout: checkout === undefined ? undefined : inspectCheckout(resolve(deps.cwd, checkout)) });
+  return { config, data, work, gaps };
+}
+
 async function collect(args: string[], deps: Dependencies, stdout: (text: string) => void, stderr: (text: string) => void): Promise<void> {
   const { values } = parseArgs({
     args,
@@ -132,34 +222,15 @@ async function collect(args: string[], deps: Dependencies, stdout: (text: string
       "case-studies": { type: "string", default: CASE_STUDIES_DIR },
     },
   });
-  // The measured repo's clone holds its config and names its transcripts: the
-  // current folder, unless --repo names another repo and --checkout is not given.
-  const checkout =
-    values.checkout ??
-    (!values.repo || sameRepo(await (deps.localRepo ?? originRepo)(deps.cwd), values.repo) ? deps.cwd : undefined);
-  const config = readConfig(checkout === undefined ? deps.cwd : resolve(deps.cwd, checkout));
-  if (values.repo && checkout === undefined) {
-    stderr(
-      `agentic-metrics: ${values.repo} has no --checkout: reading ${CONFIG_FILE} from ${deps.cwd}, and its transcript metrics are unknown. Pass --checkout <its clone>.\n`,
-    );
-  }
+  const { config, data, work, gaps } = await gather(values, deps, stderr);
   const now = deps.now ?? (() => new Date());
-  const source = deps.github ?? ghSource({ cwd: deps.cwd, repo: values.repo });
-  const cacheDir = deps.cacheDir ?? (deps.github ? undefined : defaultCacheDir());
-  const github = cacheDir ? cachedSource(source, { dir: cacheDir, now, full: values.full }) : source;
-  const data = await loadGitHub(github);
   const publish = config.publish ?? (data.repo.private ? "anonymized" : "full");
   if (publish === "anonymized" && !config.alias) {
     throw new Error(
       `${data.repo.fullName} is published anonymized${config.publish ? "" : " (it is private)"}: set "alias" in ${CONFIG_FILE}, or set "publish"`,
     );
   }
-  const transcripts =
-    deps.transcripts ??
-    (deps.github || checkout === undefined ? noTranscripts : transcriptCache({ dir: cacheDir ?? defaultCacheDir(), repoDir: resolve(deps.cwd, checkout) }));
-  const sessions = loadSessions(await transcripts.read());
-  const work = classifyAutonomy(linkRecords(linkSessions(link(data, config), sessions, config, data.repo.fullName), sessions), config.autonomy);
-  const dataset = buildDataset(data.repo, work, now(), publish, config.alias);
+  const dataset = buildDataset(data.repo, work, now(), publish, config.alias, gaps);
 
   // Only this collect's dataset may stay in the datasets folder: a dataset left
   // by an earlier mode would publish what the current mode hides.
@@ -185,13 +256,62 @@ async function collect(args: string[], deps: Dependencies, stdout: (text: string
   stdout(`${dataset.repo} (publish: none): ${String(dataset.tickets)} tickets, ${String(dataset.pullRequests)} PRs -> ${join(local, "index.html")}\n`);
 }
 
+async function doctor(args: string[], deps: Dependencies, stdout: (text: string) => void, stderr: (text: string) => void): Promise<void> {
+  const { values } = parseArgs({ args, options: { repo: { type: "string" }, checkout: { type: "string" }, all: { type: "boolean", default: false } } });
+  const { data, work, gaps } = await gather(values, deps, stderr);
+  stdout(formatDoctor(data.repo.fullName, work.tickets.length, gaps, deviceGaps(deps.claudeDir ?? defaultClaudeDir()), thisDevice(deps.configDir), values.all));
+}
+
+function ticketNumber(positionals: string[]): number {
+  const [raw, ...extra] = positionals;
+  const number = Number(/^#?(\d+)$/.exec(raw ?? "")?.[1]);
+  if (!Number.isSafeInteger(number) || number <= 0 || extra.length > 0) throw new Error("takes one ticket or PR number: #N");
+  return number;
+}
+
+/** Prints, as JSON, what the `enrich` skill needs to propose a ticket's missing conventions. */
+async function enrichContextCommand(args: string[], deps: Dependencies, stdout: (text: string) => void, stderr: (text: string) => void): Promise<void> {
+  const { values, positionals } = parseArgs({ args, allowPositionals: true, options: { repo: { type: "string" }, checkout: { type: "string" } } });
+  const { config, data, work } = await gather(values, deps, stderr);
+  stdout(`${JSON.stringify(enrichContext(work, data, config.bugLabel, ticketNumber(positionals)), null, 2)}\n`);
+}
+
+/** Writes the proposals a person accepted for one ticket, and nothing else. */
+async function enrichApplyCommand(args: string[], deps: Dependencies, stdout: (text: string) => void, stderr: (text: string) => void): Promise<void> {
+  const { values, positionals } = parseArgs({
+    args,
+    allowPositionals: true,
+    options: { repo: { type: "string" }, checkout: { type: "string" }, kind: { type: "string" }, "caused-by": { type: "string" }, closes: { type: "string" } },
+  });
+  const { config, data, work } = await gather(values, deps, stderr);
+  const context = enrichContext(work, data, config.bugLabel, ticketNumber(positionals));
+  const closes = values.closes === undefined ? undefined : /^#?(\d+):#?(\d+)$/.exec(values.closes);
+  if (values.closes !== undefined && !closes) throw new Error("--closes takes <PR>:<issue>, e.g. 136:104");
+  const lines = await applyAccepted(
+    context,
+    {
+      kind: values.kind as Kind | undefined,
+      causedBy: values["caused-by"] === undefined ? undefined : Number(values["caused-by"].replace(/^#/, "")),
+      closes: closes ? { pullRequest: Number(closes[1]), issue: Number(closes[2]) } : undefined,
+    },
+    deps.writer ?? ghWriter(deps.cwd),
+  );
+  stdout(`${lines.join("\n")}\n`);
+}
+
 async function initCommand(args: string[], deps: Dependencies, stdout: (text: string) => void): Promise<void> {
   const { values } = parseArgs({ args, options: { alias: { type: "string" }, publish: { type: "string" } } });
   const publish = values.publish;
   if (publish !== undefined && publish !== "full" && publish !== "anonymized" && publish !== "none") {
     throw new Error("--publish must be one of full, anonymized, none");
   }
-  const lines = await init(deps.cwd, deps.admin ?? ghAdmin(deps.cwd), { alias: values.alias, publish, version: deps.version });
+  // The conventions to write are inferred from the repo's history, read as `collect` reads it. With an injected admin and no GitHub source (tests), none is.
+  const source = deps.github ?? (deps.admin ? undefined : ghSource({ cwd: deps.cwd }));
+  const cacheDir = deps.cacheDir ?? (deps.github ? undefined : defaultCacheDir());
+  const inferred = source
+    ? inferConventions(await loadGitHub(cacheDir ? cachedSource(source, { dir: cacheDir, now: deps.now ?? (() => new Date()), full: false }) : source), configuredFields(deps.cwd))
+    : undefined;
+  const lines = await init(deps.cwd, deps.admin ?? ghAdmin(deps.cwd), { alias: values.alias, publish, version: deps.version, inferred });
   stdout(lines.map((line) => `${line}\n`).join(""));
 }
 
@@ -219,9 +339,11 @@ async function importCommand(args: string[], deps: Dependencies, stdout: (text: 
   });
   const [source, ...extra] = positionals;
   if (source === undefined || extra.length > 0) throw new Error("import-transcripts takes one folder: the other device's ~/.cache/agentic-metrics or ~/.claude/projects, copied here");
+  const checkout = resolve(deps.cwd, values.checkout ?? ".");
   const lines = await importTranscripts({
     source: resolve(deps.cwd, source),
-    checkout: resolve(deps.cwd, values.checkout ?? "."),
+    checkout,
+    repo: await (deps.localRepo ?? originRepo)(checkout),
     cacheDir: deps.cacheDir ?? defaultCacheDir(),
     names: values.name,
     dryRun: values["dry-run"],

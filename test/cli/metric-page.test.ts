@@ -18,7 +18,7 @@ const CACHE = join(import.meta.dirname, "../fixtures/transcript-cache/cost");
 const NOW = new Date("2026-11-09T12:00:00Z");
 
 /** Where each metric has data: the `ci` fixture has CI, `lifeline` the rest. */
-const CI = new Set(["firstRunCiRate", "fixCycles", "scheduledFailures", "batchHealth"]);
+const CI = new Set(["firstRunCiRate", "fixCycles", "reviewWait", "ciDuration", "scheduledFailures", "batchHealth"]);
 /**
  * Every ticket here has a transcript or a single commit, so active time is
  * measured where it is known and estimated nowhere: the estimate's page says
@@ -26,8 +26,8 @@ const CI = new Set(["firstRunCiRate", "fixCycles", "scheduledFailures", "batchHe
  * on a repo with no transcript).
  */
 const ESTIMATED = "estimatedActiveTime";
-const PART_1 = ["activeTime", "estimatedActiveTime", "leadTime", "throughput", "firstRunCiRate", "fixCycles", "scheduledFailures", "batchHealth", "regressionRate", "humanMessagesPerTicket"];
-const PART_2 = ["orchestrationTime", "subAgents", "apiEquivalentCost", "autonomy", "testRatio", "netLinesRemoved", "size", "estimateVsActual"];
+const PART_1 = ["regressionTiming", "reviewWait", "ciDuration", "activeTime", "estimatedActiveTime", "leadTime", "throughput", "firstRunCiRate", "fixCycles", "scheduledFailures", "batchHealth", "regressionRate", "humanMessagesPerTicket"];
+const PART_2 = ["attempts", "friction", "orchestrationTime", "subAgents", "skills", "apiEquivalentCost", "autonomy", "testRatio", "netLinesRemoved", "size", "estimateVsActual"];
 /** Repo-level metrics: no ticket owns them, so they have no per-ticket table. */
 const REPO_LEVEL = new Set(["orchestrationTime"]);
 

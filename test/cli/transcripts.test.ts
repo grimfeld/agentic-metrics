@@ -73,11 +73,12 @@ describe("transcripts", () => {
         // S1, on no ticket, got 2 more: steering no per-ticket figure shows.
         orchestration: 2,
         sources: { transcripts: 4, records: 0 },
+        interrupts: { p50: 0, total: 0, tickets: 4 },
         perTicket: [
-          { ticket: "#104", messages: 3 },
-          { ticket: "#105", messages: 3 },
-          { ticket: "#106", messages: 1 },
-          { ticket: "PR #137", messages: 2 },
+          { ticket: "#104", messages: 3, interrupts: 0 },
+          { ticket: "#105", messages: 3, interrupts: 0 },
+          { ticket: "#106", messages: 1, interrupts: 0 },
+          { ticket: "PR #137", messages: 2, interrupts: 0 },
         ],
       },
       coverage: { tickets: 4, of: 5 },
@@ -151,7 +152,7 @@ describe("transcripts", () => {
     await collect();
 
     const metrics = (JSON.parse(readFileSync(join(cwd, "datasets/side-project.json"), "utf8")) as { metrics: Record<string, { value: unknown }> }).metrics;
-    assert.deepEqual(metrics["humanMessagesPerTicket"]?.value, { p50: 2, p90: 3, mean: 2.3, orchestration: 2, sources: { transcripts: 4, records: 0 } });
+    assert.deepEqual(metrics["humanMessagesPerTicket"]?.value, { p50: 2, p90: 3, mean: 2.3, orchestration: 2, sources: { transcripts: 4, records: 0 }, interrupts: { p50: 0, total: 0, tickets: 4 } });
     assert.deepEqual(metrics["orchestrationTime"]?.value, { hours: 0.5, sessions: 1, subAgents: 1, humanMessages: 2 });
   });
 });
