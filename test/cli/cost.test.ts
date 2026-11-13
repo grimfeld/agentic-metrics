@@ -7,6 +7,7 @@ import { main } from "../../cli/main.ts";
 import { readMetricPages, readRepo } from "./report-pages.ts";
 import { fixtureSource } from "../../cli/github/source.ts";
 import { transcriptCache } from "../../cli/transcripts/source.ts";
+import { CURRENT_PRICE_TABLE } from "../../cli/pricing/price-table.ts";
 
 const GITHUB = join(import.meta.dirname, "../fixtures/github/lifeline");
 const CACHE = join(import.meta.dirname, "../fixtures/transcript-cache/cost");
@@ -97,7 +98,7 @@ describe("delegation and cost", () => {
 
     assert.deepEqual(metric("apiEquivalentCost"), {
       value: {
-        priceTable: "2026-11-09",
+        priceTable: CURRENT_PRICE_TABLE.version,
         apiEquivalentUsd: 1.2358,
         unpricedModels: ["claude-future-9"],
         perTicketUsd: { p50: 1.168, p90: 1.168 },
@@ -151,7 +152,7 @@ describe("delegation and cost", () => {
     assert.equal(delegation?.["perTicket"], undefined);
     assert.equal(delegation?.["total"], 2);
     assert.equal(cost?.["perTicket"], undefined);
-    assert.deepEqual([cost?.["apiEquivalentUsd"], cost?.["priceTable"]], [1.2358, "2026-11-09"]);
+    assert.deepEqual([cost?.["apiEquivalentUsd"], cost?.["priceTable"]], [1.2358, CURRENT_PRICE_TABLE.version]);
     for (const leak of [/SECRET/, /cccccccc-|c1000000000000001|c2000000000000002/, /msg_|req_|toolu_/, /\/Users\//, /#10\d|PR #/]) {
       assert.doesNotMatch(text, leak);
     }
@@ -166,7 +167,7 @@ describe("delegation and cost", () => {
 
     const section = text(/data-section="apiEquivalentCost">([\s\S]*?)<\/section>/);
     assert.match(section, /^Summary \$1\.24 API equivalent over the tickets with transcripts \(p50 \$1\.17, p90 \$1\.17 API equivalent per ticket\), and \$0\.01 API equivalent on no ticket/);
-    assert.match(section, /prices of 2026-11-09/);
+    assert.match(section, new RegExp(`prices of ${CURRENT_PRICE_TABLE.version}`));
     assert.match(section, /claude-future-9/);
     assert.match(text(/data-section="tickets">([\s\S]*?)<\/section>/), / API equivalent #104 .* \$1\.17 #105 .* \$1\.17 #106 .* \$0\.02 PR #137 .* unknown$/);
     assert.equal(
